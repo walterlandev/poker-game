@@ -1,338 +1,96 @@
-[{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "eslint2",
-	"severity": 8,
-	"message": "Parsing error: Unexpected token App",
-	"source": "eslint",
-	"startLineNumber": 378,
-	"startColumn": 7,
-	"endLineNumber": 378,
-	"endColumn": 7,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "';' esperado.",
-	"source": "ts",
-	"startLineNumber": 378,
-	"startColumn": 7,
-	"endLineNumber": 378,
-	"endColumn": 10,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1127",
-	"severity": 8,
-	"message": "Caractere inválido.",
-	"source": "ts",
-	"startLineNumber": 378,
-	"startColumn": 17,
-	"endLineNumber": 378,
-	"endColumn": 18,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Palavra-chave ou identificador inesperado.",
-	"source": "ts",
-	"startLineNumber": 378,
-	"startColumn": 19,
-	"endLineNumber": 378,
-	"endColumn": 27,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Palavra-chave ou identificador inesperado.",
-	"source": "ts",
-	"startLineNumber": 378,
-	"startColumn": 28,
-	"endLineNumber": 378,
-	"endColumn": 34,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "';' esperado.",
-	"source": "ts",
-	"startLineNumber": 379,
-	"startColumn": 7,
-	"endLineNumber": 379,
-	"endColumn": 10,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1127",
-	"severity": 8,
-	"message": "Caractere inválido.",
-	"source": "ts",
-	"startLineNumber": 379,
-	"startColumn": 18,
-	"endLineNumber": 379,
-	"endColumn": 19,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "';' esperado.",
-	"source": "ts",
-	"startLineNumber": 380,
-	"startColumn": 7,
-	"endLineNumber": 380,
-	"endColumn": 10,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1127",
-	"severity": 8,
-	"message": "Caractere inválido.",
-	"source": "ts",
-	"startLineNumber": 380,
-	"startColumn": 18,
-	"endLineNumber": 380,
-	"endColumn": 19,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Palavra-chave ou identificador inesperado.",
-	"source": "ts",
-	"startLineNumber": 380,
-	"startColumn": 20,
-	"endLineNumber": 380,
-	"endColumn": 25,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Palavra-chave ou identificador inesperado.",
-	"source": "ts",
-	"startLineNumber": 380,
-	"startColumn": 26,
-	"endLineNumber": 380,
-	"endColumn": 32,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1127",
-	"severity": 8,
-	"message": "Caractere inválido.",
-	"source": "ts",
-	"startLineNumber": 380,
-	"startColumn": 43,
-	"endLineNumber": 380,
-	"endColumn": 44,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Palavra-chave ou identificador inesperado.",
-	"source": "ts",
-	"startLineNumber": 380,
-	"startColumn": 45,
-	"endLineNumber": 380,
-	"endColumn": 52,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1127",
-	"severity": 8,
-	"message": "Caractere inválido.",
-	"source": "ts",
-	"startLineNumber": 380,
-	"startColumn": 63,
-	"endLineNumber": 380,
-	"endColumn": 64,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "';' esperado.",
-	"source": "ts",
-	"startLineNumber": 381,
-	"startColumn": 7,
-	"endLineNumber": 381,
-	"endColumn": 14,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Palavra-chave ou identificador inesperado.",
-	"source": "ts",
-	"startLineNumber": 381,
-	"startColumn": 15,
-	"endLineNumber": 381,
-	"endColumn": 20,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Palavra-chave ou identificador inesperado.",
-	"source": "ts",
-	"startLineNumber": 381,
-	"startColumn": 21,
-	"endLineNumber": 381,
-	"endColumn": 23,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1127",
-	"severity": 8,
-	"message": "Caractere inválido.",
-	"source": "ts",
-	"startLineNumber": 381,
-	"startColumn": 29,
-	"endLineNumber": 381,
-	"endColumn": 30,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "';' esperado.",
-	"source": "ts",
-	"startLineNumber": 382,
-	"startColumn": 7,
-	"endLineNumber": 382,
-	"endColumn": 14,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Palavra-chave ou identificador inesperado.",
-	"source": "ts",
-	"startLineNumber": 382,
-	"startColumn": 15,
-	"endLineNumber": 382,
-	"endColumn": 18,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Palavra-chave ou identificador inesperado.",
-	"source": "ts",
-	"startLineNumber": 382,
-	"startColumn": 19,
-	"endLineNumber": 382,
-	"endColumn": 21,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1127",
-	"severity": 8,
-	"message": "Caractere inválido.",
-	"source": "ts",
-	"startLineNumber": 382,
-	"startColumn": 28,
-	"endLineNumber": 382,
-	"endColumn": 29,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "';' esperado.",
-	"source": "ts",
-	"startLineNumber": 383,
-	"startColumn": 7,
-	"endLineNumber": 383,
-	"endColumn": 14,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Palavra-chave ou identificador inesperado.",
-	"source": "ts",
-	"startLineNumber": 383,
-	"startColumn": 15,
-	"endLineNumber": 383,
-	"endColumn": 18,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1127",
-	"severity": 8,
-	"message": "Caractere inválido.",
-	"source": "ts",
-	"startLineNumber": 383,
-	"startColumn": 28,
-	"endLineNumber": 383,
-	"endColumn": 29,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-},{
-	"resource": "/home/walterlan/Documentos/poker-game/frontend/src/App.jsx",
-	"owner": "typescript",
-	"code": "1185",
-	"severity": 8,
-	"message": "Marcador de conflito de mesclagem encontrado.",
-	"source": "ts",
-	"startLineNumber": 384,
-	"startColumn": 1,
-	"endLineNumber": 384,
-	"endColumn": 8,
-	"modelVersionId": 86,
-	"origin": "extHost1"
-}]  
+import { useState, useEffect, useCallback } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { io } from "socket.io-client";
+import { auth, db } from "./services/firebase-config";
+import Auth from "./pages/Auth/index";
+import Lobby from "./pages/Lobby/index";
+import Game from "./pages/Game/index";
+
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
+const socket = io(SERVER_URL, { autoConnect: false, reconnection: true, reconnectionDelay: 1000, reconnectionAttempts: 5 });
+const TELAS = { CARREGANDO: "carregando", AUTH: "auth", LOBBY: "lobby", JOGO: "jogo" };
+
+export default function App() {
+    const [tela, setTela] = useState(TELAS.CARREGANDO);
+    const [usuario, setUsuario] = useState(null);
+    const [mesaAtual, setMesaAtual] = useState(null);
+
+    const conectarSocket = useCallback((perfil) => {
+        if (socket.connected) return;
+        socket.connect();
+        socket.once("connect", () => {
+            socket.emit("autenticar", { uid: perfil.uid, nome: perfil.nome, avatar: perfil.avatar || "" });
+        });
+        socket.on("disconnect", (m) => console.warn("Desconectado:", m));
+        socket.on("erro", ({ mensagem }) => console.error("Erro:", mensagem));
+    }, []);
+
+    useEffect(() => {
+        const cancelar = onAuthStateChanged(auth, async (userFirebase) => {
+            if (userFirebase) {
+                try {
+                    const snap = await getDoc(doc(db, "jogadores", userFirebase.uid));
+                    if (snap.exists()) {
+                        const perfil = {
+                            uid: userFirebase.uid,
+                            nome: snap.data().nome || "",
+                            avatar: snap.data().avatar || "",
+                            saldo: snap.data().saldo ?? 0,
+                            saldoBonus: snap.data().saldoBonus ?? 0,
+                            sacadoHoje: snap.data().sacadoHoje ?? 0,
+                            bonusResgatado: snap.data().bonusResgatado ?? false,
+                            rankPontos: snap.data().rankPontos ?? 0,
+                            tema: snap.data().tema || "classico",
+                            temasComprados: snap.data().temasComprados || [],
+                        };
+                        setUsuario(perfil);
+                        conectarSocket(perfil);
+                        setTela(TELAS.LOBBY);
+                    } else {
+                        setTela(TELAS.AUTH);
+                    }
+                } catch (e) {
+                    console.error("Erro perfil:", e);
+                    setTela(TELAS.AUTH);
+                }
+            } else {
+                setUsuario(null);
+                socket.disconnect();
+                setTela(TELAS.AUTH);
+            }
+        });
+        return () => cancelar();
+    }, [conectarSocket]);
+
+    const handleAutenticado = useCallback((perfil) => {
+        setUsuario(perfil); conectarSocket(perfil); setTela(TELAS.LOBBY);
+    }, [conectarSocket]);
+
+    const handleEntrarMesa = useCallback((mesaId) => {
+        setMesaAtual(mesaId); setTela(TELAS.JOGO);
+    }, []);
+
+    const handleSairMesa = useCallback(() => {
+        socket.emit("sair_mesa"); setMesaAtual(null); setTela(TELAS.LOBBY);
+    }, []);
+
+    if (tela === TELAS.CARREGANDO) return (
+        <div style={{ minHeight:"100vh", background:"#0a0f1e", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"32px", fontFamily:"sans-serif" }}>
+            <style>{`@keyframes girar { to { transform: rotate(360deg); } }`}</style>
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"8px" }}>
+                <img src="/logo.png" alt="Poker Game" style={{ width:"80px", height:"80px", objectFit:"contain" }} />
+                <h1 style={{ fontSize:"32px", fontWeight:"800", color:"#F8FAFC", margin:0 }}>Poker Game</h1>
+                <p style={{ fontSize:"13px", color:"#D97706", margin:0 }}>Powered by BC Bitchager</p>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"12px" }}>
+                <div style={{ width:"36px", height:"36px", border:"3px solid rgba(255,255,255,0.1)", borderTop:"3px solid #7C3AED", borderRadius:"50%", animation:"girar 0.8s linear infinite" }} />
+                <p style={{ fontSize:"14px", color:"rgba(255,255,255,0.4)", margin:0 }}>Verificando sessao...</p>
+            </div>
+        </div>
+    );
+
+    if (tela === TELAS.AUTH) return <Auth onAutenticado={handleAutenticado} socket={socket} />;
+    if (tela === TELAS.JOGO) return <Game socket={socket} usuario={usuario} mesaId={mesaAtual} onSair={handleSairMesa} />;
+    return <Lobby usuario={usuario} socket={socket} onEntrarMesa={handleEntrarMesa} />;
+}
