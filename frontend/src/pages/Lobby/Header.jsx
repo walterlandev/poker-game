@@ -118,7 +118,7 @@ export default function Header({ usuario, onAbrirLoja, onAbrirCarteira, onAbrirP
                         <div style={estilos.saldoLinha}>
                             <span style={estilos.simboloBC}>{SIMBOLO_BC}</span>
                             <span className="header-saldo-valor">
-                                {formatarSaldo(usuario?.saldo)}
+                                {formatarSaldo((usuario?.saldo || 0) + (usuario?.saldoBonus || 0))}
                             </span>
                         </div>
                         <div style={estilos.saldoRodape}>
