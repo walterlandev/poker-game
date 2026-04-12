@@ -6,6 +6,10 @@
    Permite editar: nome, email, telefone, foto de perfil.
    Também oferece opção de recuperação de senha por email.
 
+   ADIÇÕES DESTA VERSÃO:
+   → ID do jogador exibido e copiável (para transferência ₿C)
+   → Temas comprados exibidos no perfil
+
    AVATARES DISPONÍVEIS:
    avata01.png até avata10.png na pasta /public/
    O jogador escolhe clicando em um dos avatares.
@@ -17,7 +21,7 @@
    → Firestore — atualiza perfil na coleção 'jogadores'
 
    PROPS:
-     usuario   → { uid, nome, email, avatar, telefone }
+     usuario   → { uid, nome, email, avatar, telefone, temasComprados }
      onFechar  → fecha o modal
      onAtualizar → callback quando perfil é salvo com sucesso
 ================================================================ */
@@ -39,6 +43,16 @@ const AVATARES = [
     '/avata09.png', '/avata10.png',
 ];
 
+// Nomes legíveis dos temas
+const NOMES_TEMAS = {
+    classico:    'Clássico',
+    quatroCores: '4 Cores',
+    royal:       'Royal',
+    neon:        'Neon',
+    dourado:     'Dourado',
+    minimalista: 'Minimalista',
+};
+
 export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
 
     const auth = getAuth();
@@ -50,10 +64,22 @@ export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
     const [salvando,  setSalvando ] = useState(false);
     const [feedback,  setFeedback ] = useState(null);
     const [enviandoSenha, setEnviandoSenha] = useState(false);
+    const [idCopiado, setIdCopiado] = useState(false);
 
     function mostrarFeedback(tipo, mensagem) {
         setFeedback({ tipo, mensagem });
         setTimeout(() => setFeedback(null), 4000);
+    }
+
+    // ----------------------------------------------------------------
+    // Copia ID do jogador para a área de transferência
+    // ----------------------------------------------------------------
+    function handleCopiarId() {
+        if (!usuario?.uid) return;
+        navigator.clipboard.writeText(usuario.uid).then(() => {
+            setIdCopiado(true);
+            setTimeout(() => setIdCopiado(false), 2000);
+        });
     }
 
     // ----------------------------------------------------------------
@@ -127,12 +153,14 @@ export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
         try {
             await sendPasswordResetEmail(auth, emailParaEnviar);
             mostrarFeedback('sucesso', `Email de recuperação enviado para ${emailParaEnviar}`);
-        }   catch {
-              mostrarFeedback('erro', 'Não foi possível enviar o email.');
+        } catch {
+            mostrarFeedback('erro', 'Não foi possível enviar o email.');
         } finally {
             setEnviandoSenha(false);
         }
     }
+
+    const temasComprados = usuario?.temasComprados || [];
 
     return (
         <>
@@ -193,6 +221,22 @@ export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
                         </div>
                     </div>
 
+                    {/* ── ID DO JOGADOR ── */}
+                    <div style={estilos.idCard}>
+                        <div style={estilos.idTextos}>
+                            <p style={estilos.idLabel}>🆔 Seu ID — use para receber ₿C</p>
+                            <p style={estilos.idValor}>{usuario?.uid || '—'}</p>
+                        </div>
+                        <button onClick={handleCopiarId} style={{
+                            ...estilos.btnCopiar,
+                            background: idCopiado ? 'rgba(34,197,94,0.15)' : 'rgba(124,58,237,0.15)',
+                            border:     idCopiado ? '1px solid rgba(34,197,94,0.4)' : '1px solid rgba(124,58,237,0.3)',
+                            color:      idCopiado ? '#4ADE80' : '#A78BFA',
+                        }}>
+                            {idCopiado ? '✓ Copiado!' : '📋 Copiar'}
+                        </button>
+                    </div>
+
                     {/* Campos de edição */}
                     <div style={estilos.campos}>
 
@@ -223,6 +267,41 @@ export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
                         />
 
                     </div>
+
+                    {/* ── TEMAS COMPRADOS ── */}
+                    {temasComprados.length > 0 && (
+                        <div style={estilos.temasSecao}>
+                            <p style={estilos.labelSecao}>🎨 Temas desbloqueados</p>
+                            <div style={estilos.temasGrid}>
+                                {temasComprados.map(temaId => (
+                                    <div
+                                        key={temaId}
+                                        style={{
+                                            ...estilos.temaBadge,
+                                            border: usuario?.tema === temaId
+                                                ? '1px solid rgba(124,58,237,0.6)'
+                                                : '1px solid rgba(255,255,255,0.10)',
+                                            background: usuario?.tema === temaId
+                                                ? 'rgba(124,58,237,0.15)'
+                                                : 'rgba(255,255,255,0.04)',
+                                        }}
+                                    >
+                                        <span style={{ fontSize: '13px' }}>🎨</span>
+                                        <span style={{
+                                            fontSize:   '12px',
+                                            fontWeight: usuario?.tema === temaId ? '600' : '400',
+                                            color:      usuario?.tema === temaId ? '#A78BFA' : 'rgba(255,255,255,0.6)',
+                                        }}>
+                                            {NOMES_TEMAS[temaId] || temaId}
+                                        </span>
+                                        {usuario?.tema === temaId && (
+                                            <span style={estilos.temaBadgeAtivo}>ativo</span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Recuperar senha */}
                     <button
@@ -360,9 +439,76 @@ const estilos = {
         borderRadius:'10px', overflow:'hidden',
         cursor:'pointer', transition:'border 0.2s, box-shadow 0.2s',
     },
+
+    // ── ID do jogador ──
+    idCard: {
+        display:      'flex',
+        alignItems:   'center',
+        gap:          '10px',
+        padding:      '12px 14px',
+        background:   'rgba(124,58,237,0.06)',
+        border:       '1px solid rgba(124,58,237,0.20)',
+        borderRadius: '10px',
+    },
+    idTextos: { flex: 1, minWidth: 0 },
+    idLabel: {
+        fontSize:  '11px',
+        color:     'rgba(255,255,255,0.40)',
+        margin:    0,
+        marginBottom: '3px',
+    },
+    idValor: {
+        fontSize:   '11px',
+        color:      '#A78BFA',
+        margin:     0,
+        fontFamily: 'monospace',
+        wordBreak:  'break-all',
+    },
+    btnCopiar: {
+        flexShrink:   0,
+        padding:      '7px 12px',
+        borderRadius: '8px',
+        cursor:       'pointer',
+        fontSize:     '12px',
+        fontWeight:   '600',
+        fontFamily:   'sans-serif',
+        border:       'none',
+        transition:   'all 0.2s',
+        whiteSpace:   'nowrap',
+    },
+
     campos: {
         display:'flex', flexDirection:'column', gap:'12px',
     },
+
+    // ── Temas comprados ──
+    temasSecao: {
+        display:       'flex',
+        flexDirection: 'column',
+        gap:           '8px',
+    },
+    temasGrid: {
+        display:   'flex',
+        flexWrap:  'wrap',
+        gap:       '6px',
+    },
+    temaBadge: {
+        display:      'flex',
+        alignItems:   'center',
+        gap:          '5px',
+        padding:      '5px 10px',
+        borderRadius: '20px',
+        transition:   'all 0.15s',
+    },
+    temaBadgeAtivo: {
+        fontSize:     '9px',
+        background:   'rgba(124,58,237,0.25)',
+        color:        '#A78BFA',
+        padding:      '1px 5px',
+        borderRadius: '4px',
+        fontWeight:   '600',
+    },
+
     btnSenha: {
         background:   'rgba(255,255,255,0.06)',
         border:       '1px solid rgba(255,255,255,0.1)',
