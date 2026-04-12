@@ -32,8 +32,13 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
 
         const onEstado = (e) => {
             const mesaAnterior = mesa;
-
             setMesa(e);
+            // Extrai cartas do jogador local direto do estado_mesa
+            // O servidor pode enviar via carta_privada OU via estado_mesa
+            const cartasDoEstado = e.jogadores?.[usuario?.uid]?.cartas;
+            if (cartasDoEstado && cartasDoEstado.length > 0 && cartasDoEstado[0] !== 'XX') {
+                setMinhasCartas(cartasDoEstado);
+            }
 
             // Detecta fim de rodada para animar ganho/perda
             if (
@@ -138,27 +143,37 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
                     align-items:center; justify-content:center;
                     padding:4px; min-height:0; overflow:hidden;
                 }
+                /* Mobile: painel em coluna */
                 .game-painel {
                     flex-shrink:0; display:flex; flex-direction:column;
-                    align-items:center; gap:4px;
+                    align-items:stretch; gap:4px;
                     padding:4px 8px 8px; background:#0a0f1e;
                 }
+                /* Mobile: cartas comunitárias + jogador lado a lado */
+                .game-painel-cartas {
+                    display:flex; flex-direction:row;
+                    align-items:center; justify-content:center;
+                    gap:12px; flex-wrap:nowrap;
+                }
+                .game-painel-acoes { flex:1; min-width:0; }
 
                 @media (min-width: 768px) {
                     .game-pagina  { max-width:1200px !important; }
                     .game-corpo   { flex-direction:column; }
                     .game-mesa-area { flex:1; padding:16px 24px 8px; align-items:center; }
+                    /* Desktop: painel em linha — ações à esquerda, cartas à direita */
                     .game-painel {
                         padding:8px 24px 16px;
                         border-top:1px solid rgba(255,255,255,0.06);
                         background:#0d1424;
                         flex-direction:row; align-items:center; gap:16px;
                     }
+                    /* Desktop: cartas do jogador ficam à direita */
                     .game-painel-cartas {
-                        display:flex; flex-direction:column;
-                        align-items:center; gap:6px; flex-shrink:0;
+                        flex-direction:column; align-items:center;
+                        gap:6px; flex-shrink:0; order:2;
                     }
-                    .game-painel-acoes { flex:1; min-width:0; }
+                    .game-painel-acoes { flex:1; min-width:0; order:1; }
                 }
             `}</style>
 
@@ -417,9 +432,9 @@ const estilos = {
         animation:'fadeDown 0.3s ease', whiteSpace:'nowrap',
     },
 
-    // Notificação de ganho/perda
+    // Notificação de ganho/perda — fica no topo para não cobrir ActionBar
     notifGanho: {
-        position:'fixed', bottom:'120px', left:'50%',
+        position:'fixed', top:'80px', left:'50%',
         transform:'translateX(-50%)',
         borderRadius:'12px', padding:'14px 20px',
         display:'flex', alignItems:'center', gap:'12px',
