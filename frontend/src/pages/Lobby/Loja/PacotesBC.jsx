@@ -15,6 +15,11 @@
      Recebe: ₿C 20.000 na carteira
      Na mesa aparece como: 20 fichas
 
+   CORREÇÃO DESTA VERSÃO:
+     → handleComprar agora abre PinConfirm antes de emitir
+       wallet:depositar. O backend exige PIN válido — antes
+       estava enviando pin: null causando erro silencioso.
+
    PROPS:
      saldoAtual → number: saldo atual do jogador em ₿C
      usuario    → object: { uid, nome }
@@ -24,6 +29,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { calcularDeposito, fmt, fmtBC, TAXAS, LIMITES } from '../../Wallet/walletUtils';
+import PinConfirm from '../../Wallet/PinConfirm';
 
 
 // ================================================================
@@ -52,6 +58,11 @@ export default function PacotesBC({ saldoAtual, usuario, socket, onFeedback }) {
     const [pixCopia,   setPixCopia  ] = useState(null);
     const [copiado,    setCopiado   ] = useState(false);
     const [erroValor,  setErroValor ] = useState('');
+
+    // ── NOVO: controle do PIN ──────────────────────────────────────
+    const [pinAberto,    setPinAberto]    = useState(false);
+    const [calculoPendente, setCalculoPendente] = useState(null);
+    // ─────────────────────────────────────────────────────────────
 
     // Valor numérico limpo
     const valorNum = parseFloat(valorBRL) || 0;
@@ -106,7 +117,7 @@ export default function PacotesBC({ saldoAtual, usuario, socket, onFeedback }) {
 
 
     // ----------------------------------------------------------------
-    // Inicia pagamento
+    // Inicia pagamento → valida → abre PIN
     // ----------------------------------------------------------------
     function handleComprar() {
         if (!valorNum || valorNum < LIMITES.DEPOSITO_MIN_BRL) {
@@ -119,16 +130,31 @@ export default function PacotesBC({ saldoAtual, usuario, socket, onFeedback }) {
         }
         if (!calculo || !socket) return;
 
+        // ── NOVO: guarda o cálculo e abre o PIN ───────────────────
+        setCalculoPendente(calculo);
+        setPinAberto(true);
+        // ─────────────────────────────────────────────────────────
+    }
+
+    // ----------------------------------------------------------------
+    // PIN confirmado → emite ao backend
+    // ----------------------------------------------------------------
+    function handlePinConfirmado(pin) {
+        if (!calculoPendente || !socket) return;
+
+        setPinAberto(false);
         setEtapa('aguardando');
 
         socket.emit('wallet:depositar', {
             uid:        usuario?.uid,
-            valorBRL:   calculo.valorBRL,
-            taxaBRL:    calculo.taxaBRL,
-            bcEsperado: calculo.bcRecebido,
-            pin:        null,
+            valorBRL:   calculoPendente.valorBRL,
+            taxaBRL:    calculoPendente.taxaBRL,
+            bcEsperado: calculoPendente.bcRecebido,
+            pin,
             metodo,
         });
+
+        setCalculoPendente(null);
     }
 
 
@@ -388,6 +414,16 @@ export default function PacotesBC({ saldoAtual, usuario, socket, onFeedback }) {
             <p style={estilos.avisoSeguro}>
                 🔒 Pagamento seguro via Mercado Pago · Fichas creditadas automaticamente
             </p>
+
+            {/* ---- Modal de PIN ---- */}
+            {pinAberto && calculoPendente && (
+                <PinConfirm
+                    titulo="Confirmar depósito"
+                    descricao={`R$ ${fmt(calculoPendente.totalBRL)} → ₿C ${fmtBC(calculoPendente.bcRecebido)}`}
+                    onConfirmar={handlePinConfirmado}
+                    onCancelar={() => { setPinAberto(false); setCalculoPendente(null); }}
+                />
+            )}
 
         </div>
     );

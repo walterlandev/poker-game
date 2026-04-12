@@ -6,6 +6,8 @@
      → onFeedback centralizado na Loja e repassado para filhos
      → TemasCartas recebe temas comprados do perfil real
      → Saldo exibe real + bônus separados
+     → CORREÇÃO: TemasCartas agora recebe socket e onFeedback
+       para aguardar confirmação real do backend antes do feedback
 
    PROPS:
      usuario → { uid, nome, saldo, saldoBonus, tema, temasComprados }
@@ -119,22 +121,18 @@ export default function Loja({ usuario, socket }) {
                 {/* Coluna Temas */}
                 <div className="loja-col" style={{ display: tabAtiva === 'temas' ? 'block' : 'none' }}>
                     <p style={estilos.colunaTitle}>🎨 Temas das Cartas</p>
+                    {/*
+                        CORREÇÃO: antes passava onComprar/onAtivar inline que davam
+                        feedback imediato sem esperar o backend.
+                        Agora TemasCartas recebe socket e onFeedback diretamente
+                        e gerencia os eventos tema:comprado/tema:ativado/tema:erro.
+                    */}
                     <TemasCartas
                         saldoAtual={saldoTotal}
                         temaAtual={usuario?.tema || 'classico'}
                         temasComprados={usuario?.temasComprados || []}
-                        onComprar={(tema) => {
-                            if (saldoTotal < tema.preco) {
-                                mostrarFeedback('erro', 'Saldo insuficiente de ₿C.');
-                                return;
-                            }
-                            socket?.emit('comprar_tema', { temaId: tema.id });
-                            mostrarFeedback('sucesso', `Tema "${tema.nome}" comprado!`);
-                        }}
-                        onAtivar={(tema) => {
-                            socket?.emit('ativar_tema', { temaId: tema.id });
-                            mostrarFeedback('sucesso', `Tema "${tema.nome}" ativado!`);
-                        }}
+                        socket={socket}
+                        onFeedback={mostrarFeedback}
                     />
                 </div>
 

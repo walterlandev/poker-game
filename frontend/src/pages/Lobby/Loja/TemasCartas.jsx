@@ -5,6 +5,9 @@
      → Tema "Royal" adicionado (₿C 1.000, imagem real)
      → PreviewTema suporta imagem quando tema.imagem existe
      → temasComprados recebido via prop do perfil real do jogador
+     → CORREÇÃO: props onComprar/onAtivar substituídas por socket
+       e onFeedback — compra/ativação aguardam confirmação real
+       do backend antes de exibir feedback ao usuário
 
    TEMAS DISPONÍVEIS:
      Clássico    → gratuito
@@ -18,11 +21,11 @@
      saldoAtual      → number: saldo atual em ₿C
      temaAtual       → string: id do tema ativo
      temasComprados  → string[]: ids dos temas comprados pelo jogador
-     onComprar       → function(tema)
-     onAtivar        → function(tema)
+     socket          → Socket.io (substituiu onComprar/onAtivar)
+     onFeedback      → fn(tipo, msg): exibe feedback no pai
 ================================================================ */
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 
 // ================================================================
@@ -141,17 +144,76 @@ const TEMAS_GRATIS = ['classico', 'quatroCores'];
 // BLOCO 2: COMPONENTE PRINCIPAL
 // ================================================================
 
-export default function TemasCartas({ saldoAtual, temaAtual, temasComprados = [], onComprar, onAtivar }) {
+export default function TemasCartas({ saldoAtual, temaAtual, temasComprados = [], socket, onFeedback }) {
 
     const [temaSelecionado, setTemaSelecionado] = useState(
         TEMAS.find(t => t.id === temaAtual) || TEMAS[0]
     );
+
+    // Estado para evitar duplo clique durante operação em curso
+    const [operando, setOperando] = useState(false);
 
     // Verifica se o jogador tem um tema
     function estaComprado(tema) {
         if (TEMAS_GRATIS.includes(tema.id)) return true;
         return temasComprados.includes(tema.id);
     }
+
+    // ✅ Compra real — aguarda tema:comprado ou tema:erro do backend
+    const handleComprar = useCallback((tema) => {
+        if (!socket || operando) return;
+
+        if (saldoAtual < tema.preco) {
+            onFeedback('erro', 'Saldo insuficiente de ₿C.');
+            return;
+        }
+
+        setOperando(true);
+        socket.emit('comprar_tema', { temaId: tema.id });
+
+        socket.once('tema:comprado', () => {
+            setOperando(false);
+            onFeedback('sucesso', `Tema "${tema.nome}" comprado com sucesso!`);
+        });
+
+        socket.once('tema:erro', ({ mensagem }) => {
+            setOperando(false);
+            onFeedback('erro', mensagem || 'Erro ao comprar tema.');
+        });
+
+        // Timeout de segurança em caso de falha silenciosa
+        setTimeout(() => {
+            setOperando(false);
+            socket.off('tema:comprado');
+            socket.off('tema:erro');
+        }, 8000);
+
+    }, [socket, operando, saldoAtual, onFeedback]);
+
+    // ✅ Ativação real — aguarda tema:ativado ou tema:erro do backend
+    const handleAtivar = useCallback((tema) => {
+        if (!socket || operando) return;
+
+        setOperando(true);
+        socket.emit('ativar_tema', { temaId: tema.id });
+
+        socket.once('tema:ativado', () => {
+            setOperando(false);
+            onFeedback('sucesso', `Tema "${tema.nome}" ativado!`);
+        });
+
+        socket.once('tema:erro', ({ mensagem }) => {
+            setOperando(false);
+            onFeedback('erro', mensagem || 'Erro ao ativar tema.');
+        });
+
+        setTimeout(() => {
+            setOperando(false);
+            socket.off('tema:ativado');
+            socket.off('tema:erro');
+        }, 5000);
+
+    }, [socket, operando, onFeedback]);
 
     return (
         <div style={estilos.container}>
@@ -161,8 +223,9 @@ export default function TemasCartas({ saldoAtual, temaAtual, temasComprados = []
                 ativo={temaSelecionado.id === temaAtual}
                 saldoAtual={saldoAtual}
                 comprado={estaComprado(temaSelecionado)}
-                onComprar={() => onComprar(temaSelecionado)}
-                onAtivar={() => onAtivar(temaSelecionado)}
+                operando={operando}
+                onComprar={() => handleComprar(temaSelecionado)}
+                onAtivar={() => handleAtivar(temaSelecionado)}
             />
 
             <div style={estilos.divisor}>
@@ -202,7 +265,7 @@ export default function TemasCartas({ saldoAtual, temaAtual, temasComprados = []
 // ou o preview de cartas gerado por CSS se não houver imagem.
 // ================================================================
 
-function PreviewTema({ tema, ativo, saldoAtual, comprado, onComprar, onAtivar }) {
+function PreviewTema({ tema, ativo, saldoAtual, comprado, operando, onComprar, onAtivar }) {
 
     const temSaldo    = saldoAtual >= tema.preco;
     const podeComprar = tema.premium && !comprado && temSaldo;
@@ -331,12 +394,28 @@ function PreviewTema({ tema, ativo, saldoAtual, comprado, onComprar, onAtivar })
                 {ativo ? (
                     <div style={estilos.btnAtivo}>✓ Tema ativo</div>
                 ) : podeAtivar ? (
-                    <button onClick={onAtivar} style={estilos.btnAtivar}>
-                        Usar este tema
+                    <button
+                        onClick={onAtivar}
+                        disabled={operando}
+                        style={{
+                            ...estilos.btnAtivar,
+                            opacity: operando ? 0.6 : 1,
+                            cursor:  operando ? 'wait' : 'pointer',
+                        }}
+                    >
+                        {operando ? 'Ativando...' : 'Usar este tema'}
                     </button>
                 ) : podeComprar ? (
-                    <button onClick={onComprar} style={estilos.btnComprar}>
-                        Comprar · ₿C {fmt(tema.preco)}
+                    <button
+                        onClick={onComprar}
+                        disabled={operando}
+                        style={{
+                            ...estilos.btnComprar,
+                            opacity: operando ? 0.6 : 1,
+                            cursor:  operando ? 'wait' : 'pointer',
+                        }}
+                    >
+                        {operando ? 'Comprando...' : `Comprar · ₿C ${fmt(tema.preco)}`}
                     </button>
                 ) : semSaldo ? (
                     <button disabled style={{ ...estilos.btnComprar, opacity: 0.4, cursor: 'not-allowed' }}>

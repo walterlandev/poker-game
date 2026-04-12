@@ -5,29 +5,31 @@
    → Inicializa o Firebase Admin SDK
    → debitarEntradaMesa    : desconta buyIn do saldo REAL ao sentar
    → creditarSaidaMesa     : devolve fichas restantes ao saldo REAL
-   → salvarResultadoRodada : credita prêmio + atualiza ranking
+   → salvarResultadoRodada : atualiza APENAS ranking (sem tocar saldo)
    → buscarRanking / buscarPerfil / buscarSaldo
 
    REGRA DE OURO DO SALDO:
    saldo      → ₿C comprados com dinheiro real  (pode sacar)
    saldoBonus → ₿C de bônus promocional         (NÃO pode sacar)
 
-   Ao entrar na mesa:
-     1. Debita do saldo real primeiro
-     2. Se insuficiente, complementa com bônus
-     3. Se nem somado cobrir o buyIn → recusa entrada
+   FLUXO CORRETO DE FICHAS:
+   1. Jogador entra na mesa → debitarEntradaMesa() subtrai saldo real
+   2. Fichas ficam em memória no game-manager durante o jogo
+   3. Rodadas: fichas mudam só em memória (saldo Firestore não muda)
+   4. Jogador sai com fichas → creditarSaidaMesa() devolve ao saldo real
+   5. salvarResultadoRodada() só salva estatísticas de ranking
 
-   Ao ganhar rodada:
-     → Credita SEMPRE em saldo real (fichas ganhas viram saldo sacável)
-
-   Ao sair com fichas restantes:
-     → Credita em saldo real
+   POR QUE NÃO CREDITAR NO SHOWDOWN?
+   O vencedor ainda está NA mesa com as fichas em memória.
+   Se creditarmos no showdown E na saída → saldo duplicado.
+   A única fonte de verdade do saldo em jogo é o game-manager.
+   Quando o jogador sair, creditarSaidaMesa() devolve tudo.
 
    ESTRUTURA FIRESTORE:
    ┌────────────────────────────────────────────────┐
    │ jogadores/{uid}                                │
    │   nome, avatar                                 │
-   │   saldo        (₿C reais)                     │
+   │   saldo        (₿C reais — fora da mesa)      │
    │   saldoBonus   (₿C de bônus)                  │
    │   sacadoHoje   (controle de limite diário)     │
    │   pinHash      (bcrypt do PIN de saque)        │
@@ -143,9 +145,9 @@ export async function debitarEntradaMesa(uid, valorBuyIn) {
                 };
             }
 
-            // Regra: debita do saldo real primeiro
+            // Regra: debita do saldo real primeiro, complementa com bônus
             const debitarReal  = Math.min(valorBuyIn, saldo);
-            const debitarBonus = valorBuyIn - debitarReal;  // complementa com bônus se necessário
+            const debitarBonus = valorBuyIn - debitarReal;
 
             tx.update(ref, {
                 saldo:      admin.firestore.FieldValue.increment(-debitarReal),
@@ -173,11 +175,12 @@ export async function debitarEntradaMesa(uid, valorBuyIn) {
 // ================================================================
 // BLOCO 4: CREDITAR SAÍDA DA MESA
 //
-// Chamado quando o jogador SAI da mesa com fichas restantes.
-// (voluntariamente, por desconexão ou após fim de rodada sem ganho)
+// Chamado quando o jogador SAI da mesa (voluntário ou desconexão).
+// Esta é a ÚNICA função que devolve fichas ao saldo real.
 //
-// Todas as fichas restantes voltam como saldo REAL.
-// Isso inclui o buyIn original caso o jogador não tenha perdido.
+// Importante: inclui fichas ganhas nas rodadas anteriores,
+// pois o saldo da mesa (em memória) já foi atualizado pelo
+// game-manager a cada showdown.
 // ================================================================
 
 export async function creditarSaidaMesa(uid, fichasRestantes) {
@@ -199,26 +202,20 @@ export async function creditarSaidaMesa(uid, fichasRestantes) {
 // ================================================================
 // BLOCO 5: SALVAR RESULTADO DA RODADA
 //
-// Chamado pelo game-manager.js ao fim de cada mão (showdown / W.O.)
-// Faz DUAS coisas em paralelo:
+// ⚠️  ATENÇÃO — APENAS ESTATÍSTICAS, SEM TOCAR NO SALDO ⚠️
 //
-//   A) Atualiza estatísticas no ranking (coleção separada)
-//   B) Credita o prêmio no saldo REAL dos vencedores
+// Esta função SOMENTE atualiza o ranking de estatísticas.
+// Ela NÃO credita fichas no saldo real.
 //
-// IMPORTANTE — Contabilidade correta:
-//   O buyIn foi debitado em debitarEntradaMesa.
-//   Durante o jogo as fichas ficam na mesa (estado em memória).
-//   Ao fim da rodada, o vencedor recebe fichasGanhas (pote total).
-//   Esse valor inclui o buyIn dele + o que ganhou dos outros.
-//   Creditamos fichasGanhas integralmente em saldo real.
-//
-//   Os perdedores já tiveram seu buyIn debitado ao sentar —
-//   não há nada a debitar novamente aqui.
+// Por quê?
+//   O vencedor ainda está NA mesa com as fichas em memória.
+//   O saldo real só é atualizado quando ele SAI via creditarSaidaMesa().
+//   Se creditarmos aqui E na saída, o saldo seria duplicado.
 //
 // resultados: [{
 //   uid, nome, avatar,
-//   fichasGanhas,    → total recebido (pote ganho)
-//   fichasPerdidas,  → apenas para estatística do ranking
+//   fichasGanhas,    → para estatística do ranking
+//   fichasPerdidas,  → para estatística do ranking
 //   venceu,          → boolean
 // }]
 // ================================================================
@@ -233,7 +230,7 @@ export async function salvarResultadoRodada(resultados) {
         if (ehBot(u)) return;
         humanos++;
 
-        // ---- A) Ranking (estatísticas) ----
+        // Apenas estatísticas de ranking — sem mexer em saldo/saldoBonus
         const refRanking = db.collection('ranking').doc(u);
         batch.set(refRanking, {
             nome,
@@ -246,20 +243,17 @@ export async function salvarResultadoRodada(resultados) {
             ultimaPartida:   admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
 
-        // ---- B) Saldo real: credita prêmio ----
-        // Só credita vencedores (perdedores não recebem nada)
-        if (fichasGanhas > 0) {
-            batch.update(refJogador(u), {
-                saldo: admin.firestore.FieldValue.increment(fichasGanhas),
-            });
-        }
+        // ❌ REMOVIDO: batch.update(refJogador(u), { saldo: ... })
+        // O saldo real é gerenciado exclusivamente por:
+        //   debitarEntradaMesa() → ao entrar
+        //   creditarSaidaMesa()  → ao sair
     });
 
     if (humanos === 0) return; // só bots, sem operação no Firebase
 
     try {
         await batch.commit();
-        console.log(`📊 Rodada: ${humanos} jogador(es) atualizados no Firestore.`);
+        console.log(`📊 Ranking: ${humanos} jogador(es) atualizados.`);
     } catch (e) {
         console.error('salvarResultadoRodada erro:', e.message);
     }
@@ -311,7 +305,7 @@ export async function buscarPerfil(uid) {
 
 
 // ================================================================
-// BLOCO 8: BUSCAR SALDO (antes de sentar na mesa)
+// BLOCO 8: BUSCAR SALDO
 // ================================================================
 
 export async function buscarSaldo(uid) {

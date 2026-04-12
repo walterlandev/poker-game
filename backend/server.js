@@ -1,14 +1,12 @@
 /* ================================================================
    ARQUIVO: backend/server.js
 
-   MUDANÇAS DESTA VERSÃO:
-   → entrar_mesa / criar_mesa: chama debitarEntradaMesa()
-     antes de sentar o jogador. Se saldo insuficiente → recusa.
-   → sair_mesa / disconnect: chama creditarSaidaMesa()
-     devolvendo as fichas restantes ao saldo real.
-   → GET /jogador/:uid → retorna saldo atual (usado pela Wallet)
-   → Rota POST /webhook/mercadopago para confirmação de pagamentos
-   → resetarLimiteDiario() agendado para meia-noite todo dia
+   CORREÇÕES DESTA VERSÃO:
+   → processarSaidaMesa: não credita fichas se a saída foi causada
+     por reconexão durante jogo ativo (evita crédito prematuro)
+   → emitirSaldoAtualizado: importação estática em vez de dinâmica
+   → sacadoHoje: preservado corretamente no emit de saldo
+   → Demais funcionalidades mantidas intactas
 ================================================================ */
 
 import express          from 'express';
@@ -21,6 +19,7 @@ import { GameManager  } from './game-manager.js';
 import {
     buscarRanking,
     buscarPerfil,
+    buscarSaldo,
     debitarEntradaMesa,
     creditarSaidaMesa,
 } from './firebase-admin.js';
@@ -224,7 +223,7 @@ io.on('connection', (socket) => {
         socket.emit('mesa_criada', { mesaId });
 
         // Notifica o frontend do novo saldo (buy-in debitado)
-        emitirSaldoAtualizado(socket, usuario.uid);
+        await emitirSaldoAtualizado(socket, usuario.uid);
 
         console.log(`🃏 Mesa ${mesaId} criada por ${usuario.nome} (buy-in ₿C ${buyIn})`);
     });
@@ -283,8 +282,8 @@ io.on('connection', (socket) => {
         socket.emit('entrou_mesa', { mesaId: dados.mesaId });
 
         if (!jaEstaNaMesa) {
-            // Notifica frontend do saldo atualizado
-            emitirSaldoAtualizado(socket, usuario.uid);
+            // Notifica frontend do saldo atualizado após débito
+            await emitirSaldoAtualizado(socket, usuario.uid);
         }
 
         console.log(`🚪 ${usuario.nome} entrou na mesa ${dados.mesaId}`);
@@ -381,7 +380,7 @@ io.on('connection', (socket) => {
             socket.emit('erro', { mensagem: resultado.erro });
         } else {
             socket.emit('rebuy_ok', { valor });
-            emitirSaldoAtualizado(socket, uid);
+            await emitirSaldoAtualizado(socket, uid);
         }
     });
 
@@ -401,18 +400,32 @@ io.on('connection', (socket) => {
     socket.on('disconnect', (motivo) => {
         console.log(`🔴 Desconectado: ${socket.id} (${motivo})`);
 
-        // Aguarda 5s para dar chance de reconexão antes de remover
-        setTimeout(async () => {
-            const mesaId = socketMesa.get(socket.id);
-            if (!mesaId) return;
-
-            const mesa = gameManager.getMesa(mesaId);
-            if (!mesa || !mesa.jogadores[socket.data.uid]) return;
-
-            await processarSaidaMesa(socket, 'desconexão');
-        }, 5000);
+        // Guarda referência antes de limpar o map
+        const mesaId = socketMesa.get(socket.id);
+        const uid    = socket.data.uid;
 
         socketMesa.delete(socket.id);
+
+        if (!mesaId || !uid) return;
+
+        // Aguarda 5s para dar chance de reconexão antes de remover
+        setTimeout(async () => {
+            const mesa = gameManager.getMesa(mesaId);
+            if (!mesa || !mesa.jogadores[uid]) return;
+
+            // Verifica se o socket reconectou (outro socket.id para o mesmo uid)
+            let reconectou = false;
+            for (const [, s] of io.sockets.sockets) {
+                if (s.data.uid === uid && s.data.mesaId === mesaId) {
+                    reconectou = true;
+                    break;
+                }
+            }
+
+            if (!reconectou) {
+                await processarSaidaMesa(socket, 'desconexão');
+            }
+        }, 5000);
     });
 
 
@@ -439,9 +452,12 @@ io.on('connection', (socket) => {
 
 /**
  * Processa saída completa da mesa:
- * 1. Captura fichas restantes do jogador
+ * 1. Captura fichas restantes do jogador na memória
  * 2. Remove da mesa via game-manager
  * 3. Credita fichas restantes no saldo real do Firestore
+ *
+ * IMPORTANTE: só credita se o jogador realmente está saindo.
+ * Reconexões são tratadas no evento disconnect com delay de 5s.
  */
 async function processarSaidaMesa(socket, motivo = 'saída') {
     const mesaId = socket.data.mesaId || socketMesa.get(socket.id);
@@ -449,7 +465,7 @@ async function processarSaidaMesa(socket, motivo = 'saída') {
     if (!mesaId || !uid) return;
 
     // Captura fichas ANTES de remover da mesa
-    const mesa = gameManager.getMesa(mesaId);
+    const mesa            = gameManager.getMesa(mesaId);
     const fichasRestantes = mesa?.jogadores?.[uid]?.saldo || 0;
 
     // Remove da mesa (em memória)
@@ -458,11 +474,12 @@ async function processarSaidaMesa(socket, motivo = 'saída') {
     socket.data.mesaId = null;
     gameManager.sairMesa(mesaId, uid);
 
-    // Credita fichas restantes no Firestore
+    // Credita fichas restantes no Firestore como saldo real
+    // Isso inclui: buyIn original + fichas ganhas nas rodadas - fichas perdidas
     if (fichasRestantes > 0) {
         await creditarSaidaMesa(uid, fichasRestantes);
-        // Notifica o frontend do novo saldo
-        emitirSaldoAtualizado(socket, uid);
+        // Emite saldo atualizado para o frontend
+        await emitirSaldoAtualizado(socket, uid);
     }
 
     console.log(`🚪 ${socket.data.nome} saiu (${motivo}): ₿C ${fichasRestantes} devolvidos`);
@@ -471,18 +488,18 @@ async function processarSaidaMesa(socket, motivo = 'saída') {
 /**
  * Busca saldo atualizado do Firestore e emite para o socket.
  * Chamado após qualquer operação que altere o saldo.
+ * Importação estática (buscarSaldo já importado no topo).
  */
 async function emitirSaldoAtualizado(socket, uid) {
     try {
-        const { buscarSaldo } = await import('./firebase-admin.js');
         const saldos = await buscarSaldo(uid);
         socket.emit('wallet:saldo_atualizado', {
             saldo:      saldos.saldo      || 0,
             saldoBonus: saldos.saldoBonus || 0,
-            sacadoHoje: 0,
+            sacadoHoje: saldos.sacadoHoje || 0,
         });
     } catch (e) {
-        // Não crítico — o frontend já tem o saldo local
+        console.error('emitirSaldoAtualizado erro:', e.message);
     }
 }
 
@@ -500,7 +517,7 @@ server.listen(PORT, () => {
 ║   Porta:    ${PORT}                          ║
 ║   Ambiente: ${(process.env.NODE_ENV || 'desenvolvimento').padEnd(16)}    ║
 ║   Buy-in:   debitado ao sentar           ║
-║   Prêmio:   creditado ao vencer          ║
+║   Prêmio:   creditado ao sair            ║
 ╚══════════════════════════════════════════╝
     `);
 });
