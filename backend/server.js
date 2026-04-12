@@ -2,49 +2,13 @@
    ARQUIVO: backend/server.js
 
    MUDANÇAS DESTA VERSÃO:
-     → Importa e registra registrarEventosWallet() para cada socket
-     → Rota POST /webhook/mercadopago para confirmação de pagamentos
-     → express.raw() para capturar rawBody necessário na validação
-       da assinatura HMAC do webhook do Mercado Pago
-     → resetarLimiteDiario() agendado para meia-noite todo dia
-     → Rota GET /jogador/:uid para buscar perfil (usado pelo SendBC)
-
-   CONCEITO GERAL:
-   Este é o PONTO DE ENTRADA do servidor — o primeiro arquivo
-   que o Node.js executa quando você roda "node server.js".
-
-   ELE FAZ TRÊS COISAS:
-     1. Cria o servidor HTTP com Express
-     2. Anexa o Socket.io nesse servidor (tempo real)
-     3. Define todos os eventos do jogo (entrar, agir, sair, etc.)
-        + todos os eventos da carteira (via wallet-manager.js)
-
-   COMO O SOCKET.IO FUNCIONA:
-     O cliente (React) conecta via WebSocket.
-     O servidor escuta eventos:  socket.on('nome', dados => ...)
-     O servidor emite eventos:   io.to(sala).emit('nome', dados)
-
-   FLUXO DE UMA PARTIDA:
-     1. Cliente conecta    → 'connection'
-     2. Cliente autentica  → 'autenticar'
-     3. Cliente cria mesa  → 'criar_mesa'
-     4. Cliente entra mesa → 'entrar_mesa'
-     5. Host inicia jogo   → 'iniciar_rodada'
-     6. Jogadores agem     → 'acao' (fold/check/call/raise)
-     7. Fim de mão         → servidor emite 'estado_mesa' com vencedor
-     8. Cliente sai        → 'disconnect' ou 'sair_mesa'
-
-   ROTAS REST:
-     GET  /health                → verifica saúde do servidor
-     GET  /mesas                 → lista mesas abertas no lobby
-     GET  /ranking               → top jogadores (Firestore)
-     POST /webhook/mercadopago   → confirmação de pagamentos (NOVO)
-
-   VARIÁVEIS DE AMBIENTE (.env):
-     PORT              → porta do servidor (padrão 3001)
-     CLIENT_URL        → URL do frontend React (para CORS)
-     MP_ACCESS_TOKEN   → token privado do Mercado Pago
-     MP_WEBHOOK_SECRET → chave para validar webhooks do MP
+   → entrar_mesa / criar_mesa: chama debitarEntradaMesa()
+     antes de sentar o jogador. Se saldo insuficiente → recusa.
+   → sair_mesa / disconnect: chama creditarSaidaMesa()
+     devolvendo as fichas restantes ao saldo real.
+   → GET /jogador/:uid → retorna saldo atual (usado pela Wallet)
+   → Rota POST /webhook/mercadopago para confirmação de pagamentos
+   → resetarLimiteDiario() agendado para meia-noite todo dia
 ================================================================ */
 
 import express          from 'express';
@@ -54,20 +18,22 @@ import cors             from 'cors';
 import dotenv           from 'dotenv';
 import { GameManager  } from './game-manager.js';
 
-// Firebase Admin para ranking e perfis
-import { buscarRanking } from './firebase-admin.js';
+import {
+    buscarRanking,
+    buscarPerfil,
+    debitarEntradaMesa,
+    creditarSaidaMesa,
+} from './firebase-admin.js';
 
-// Wallet — eventos Socket.io e reset diário
 import { registrarEventosWallet, resetarLimiteDiario } from './wallet/wallet-manager.js';
-
-// Mercado Pago — webhook de confirmação de pagamentos
-import { processarWebhookMP } from './wallet/mercadopago.js';
+import { processarWebhookMP }                          from './wallet/mercadopago.js';
+import { registrarEventosTemas }                       from './temas.js';
 
 dotenv.config();
 
 
 // ================================================================
-// BLOCO 1: CONFIGURAÇÃO DO SERVIDOR HTTP + SOCKET.IO
+// BLOCO 1: SERVIDOR HTTP + SOCKET.IO
 // ================================================================
 
 const app    = express();
@@ -82,12 +48,9 @@ const ORIGENS_PERMITIDAS = [
 
 const io = new Server(server, {
     cors: {
-        origin: (origin, callback) => {
-            if (!origin || ORIGENS_PERMITIDAS.includes(origin)) {
-                callback(null, true);
-            } else {
-                callback(new Error(`CORS bloqueado: ${origin}`));
-            }
+        origin: (origin, cb) => {
+            if (!origin || ORIGENS_PERMITIDAS.includes(origin)) cb(null, true);
+            else cb(new Error(`CORS bloqueado: ${origin}`));
         },
         methods:     ['GET', 'POST'],
         credentials: true,
@@ -100,15 +63,10 @@ const gameManager = new GameManager(io);
 
 
 // ================================================================
-// BLOCO 2: MIDDLEWARES DO EXPRESS
-//
-// IMPORTANTE: express.raw() deve vir ANTES de express.json()
-// para capturar o rawBody necessário na validação do webhook MP.
-// O rawBody é o body em bytes brutos — necessário para recalcular
-// a assinatura HMAC e verificar se o webhook é legítimo.
+// BLOCO 2: MIDDLEWARES
 // ================================================================
 
-// Captura rawBody para validação do webhook HMAC
+// rawBody necessário para validação HMAC do webhook do MP
 app.use('/webhook/mercadopago', express.raw({ type: 'application/json' }), (req, res, next) => {
     if (Buffer.isBuffer(req.body)) {
         req.rawBody = req.body.toString('utf8');
@@ -118,19 +76,9 @@ app.use('/webhook/mercadopago', express.raw({ type: 'application/json' }), (req,
 });
 
 app.use(cors({
-    origin: (origin, callback) => {
-        const permitidas = [
-            'http://localhost:5173',
-            'http://localhost:3000',
-            process.env.CLIENT_URL,
-            'https://poker-game-tawny-rho.vercel.app',
-        ].filter(Boolean);
-
-        if (!origin || permitidas.includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(new Error(`CORS bloqueado para: ${origin}`));
-        }
+    origin: (origin, cb) => {
+        if (!origin || ORIGENS_PERMITIDAS.includes(origin)) cb(null, true);
+        else cb(new Error(`CORS bloqueado: ${origin}`));
     },
     credentials: true,
 }));
@@ -142,7 +90,6 @@ app.use(express.json());
 // BLOCO 3: ROTAS REST
 // ================================================================
 
-// GET /health → verifica se o servidor está online
 app.get('/health', (req, res) => {
     res.json({
         status:  'ok',
@@ -152,7 +99,6 @@ app.get('/health', (req, res) => {
     });
 });
 
-// GET /mesas → lista mesas abertas para o lobby
 app.get('/mesas', (req, res) => {
     const mesas = gameManager.getMesasAtivas()
         .filter(m => m.fase === 'AGUARDANDO')
@@ -165,39 +111,32 @@ app.get('/mesas', (req, res) => {
             buyIn:        m.valorBuyIn,
             temSenha:     !!m.senha,
         }));
-
     res.json({ mesas });
 });
 
-// GET /ranking → retorna top jogadores salvos no Firestore
 app.get('/ranking', async (req, res) => {
     const top     = Math.min(parseInt(req.query.top) || 20, 100);
     const ranking = await buscarRanking(top);
     res.json({ ranking });
 });
 
-// ----------------------------------------------------------------
-// POST /webhook/mercadopago
-// Recebe notificações de pagamento do Mercado Pago.
-//
-// FLUXO:
-//   1. MP chama este endpoint quando pagamento é aprovado
-//   2. Validamos a assinatura HMAC com MP_WEBHOOK_SECRET
-//   3. Buscamos detalhes do pagamento na API do MP
-//   4. Se status === 'approved' → chamamos creditarDeposito()
-//   5. creditarDeposito() credita ₿C e notifica o socket do jogador
-//
-// IMPORTANTE: respondemos 200 imediatamente (antes do processamento)
-//   O MP considera falha se não receber 200 em < 5 segundos.
-//   O processamento acontece de forma assíncrona depois.
-// ----------------------------------------------------------------
+// GET /jogador/:uid → saldo atual para a Wallet no frontend
+app.get('/jogador/:uid', async (req, res) => {
+    const perfil = await buscarPerfil(req.params.uid);
+    if (!perfil) return res.status(404).json({ erro: 'Jogador não encontrado.' });
+    // Nunca expõe pinHash ou dados bancários ao cliente
+    const { pinHash, dadosBancarios, chavePrivadaCriptografada, ...publico } = perfil;
+    res.json(publico);
+});
+
 app.post('/webhook/mercadopago', processarWebhookMP(io));
 
 
 // ================================================================
-// BLOCO 4: MAP DE SOCKETS
+// BLOCO 4: MAP DE SOCKETS ATIVOS
 // ================================================================
 
+// socketMesa: socket.id → mesaId  (para limpeza no disconnect)
 const socketMesa = new Map();
 
 
@@ -206,17 +145,17 @@ const socketMesa = new Map();
 // ================================================================
 
 io.on('connection', (socket) => {
-    console.log(`Socket conectado: ${socket.id}`);
+    console.log(`🔌 Conectado: ${socket.id}`);
 
-    // ----------------------------------------------------------------
-    // Registra todos os eventos da carteira para este socket
-    // Separado em wallet-manager.js para manter o server.js limpo
-    // ----------------------------------------------------------------
+    // Registra eventos da carteira (depósito, saque, envio P2P)
     registrarEventosWallet(socket, io);
 
+    // Registra eventos de temas (comprar, ativar)
+    registrarEventosTemas(socket);
+
 
     // ----------------------------------------------------------------
-    // EVENTO: autenticar
+    // autenticar
     // ----------------------------------------------------------------
     socket.on('autenticar', (dados) => {
         if (!dados?.uid) {
@@ -228,13 +167,13 @@ io.on('connection', (socket) => {
         socket.data.nome   = dados.nome   || 'Anônimo';
         socket.data.avatar = dados.avatar || '';
 
-        console.log(`Autenticado: ${dados.nome} (${dados.uid})`);
+        console.log(`✅ Autenticado: ${dados.nome} (${dados.uid})`);
         socket.emit('autenticado', { sucesso: true });
     });
 
 
     // ----------------------------------------------------------------
-    // EVENTO: criar_mesa
+    // criar_mesa
     // ----------------------------------------------------------------
     socket.on('criar_mesa', async (config) => {
         if (!socket.data.uid) {
@@ -243,14 +182,27 @@ io.on('connection', (socket) => {
         }
 
         const usuario = {
-            uid:    socket.data.uid,
-            nome:   socket.data.nome,
-            avatar: socket.data.avatar,
+            uid:        socket.data.uid,
+            nome:       socket.data.nome,
+            avatar:     socket.data.avatar,
+            rankPontos: config.rankPontos || 0,
         };
+
+        const buyIn = config.buyIn || 1000;
+
+        // ── DÉBITO DO BUY-IN ──────────────────────────────────────
+        const debito = await debitarEntradaMesa(usuario.uid, buyIn);
+        if (!debito.sucesso) {
+            socket.emit('erro', { mensagem: debito.erro });
+            return;
+        }
+        // ─────────────────────────────────────────────────────────
 
         const resultado = gameManager.criarMesa(config, usuario);
 
         if (!resultado.sucesso) {
+            // Se a mesa falhou depois do débito, devolve o buyIn
+            await creditarSaidaMesa(usuario.uid, buyIn);
             socket.emit('erro', { mensagem: resultado.erro });
             return;
         }
@@ -261,6 +213,7 @@ io.on('connection', (socket) => {
         socket.data.mesaId = mesaId;
         socketMesa.set(socket.id, mesaId);
 
+        // Bots adicionados após a criação
         if (config.qtdBots > 0) {
             for (let i = 0; i < config.qtdBots; i++) {
                 await new Promise(r => setTimeout(r, 300));
@@ -269,22 +222,44 @@ io.on('connection', (socket) => {
         }
 
         socket.emit('mesa_criada', { mesaId });
-        console.log(`Mesa ${mesaId} criada por ${usuario.nome}`);
+
+        // Notifica o frontend do novo saldo (buy-in debitado)
+        emitirSaldoAtualizado(socket, usuario.uid);
+
+        console.log(`🃏 Mesa ${mesaId} criada por ${usuario.nome} (buy-in ₿C ${buyIn})`);
     });
 
 
     // ----------------------------------------------------------------
-    // EVENTO: entrar_mesa
+    // entrar_mesa
     // ----------------------------------------------------------------
-    socket.on('entrar_mesa', (dados) => {
+    socket.on('entrar_mesa', async (dados) => {
         if (!socket.data.uid) {
             socket.emit('erro', { mensagem: 'Autentique-se primeiro.' });
             return;
         }
-
         if (!dados?.mesaId) {
             socket.emit('erro', { mensagem: 'ID da mesa inválido.' });
             return;
+        }
+
+        const mesa = gameManager.getMesa(dados.mesaId);
+        if (!mesa) {
+            socket.emit('erro', { mensagem: 'Mesa não encontrada.' });
+            return;
+        }
+
+        // Se jogador já está na mesa (reconexão), não debita novamente
+        const jaEstaNaMesa = !!mesa.jogadores[socket.data.uid];
+
+        if (!jaEstaNaMesa) {
+            // ── DÉBITO DO BUY-IN ──────────────────────────────────
+            const debito = await debitarEntradaMesa(socket.data.uid, mesa.valorBuyIn);
+            if (!debito.sucesso) {
+                socket.emit('erro', { mensagem: debito.erro });
+                return;
+            }
+            // ──────────────────────────────────────────────────────
         }
 
         const usuario = {
@@ -296,6 +271,8 @@ io.on('connection', (socket) => {
         const resultado = gameManager.entrarMesa(dados.mesaId, usuario, socket);
 
         if (!resultado.sucesso) {
+            // Devolve buyIn se não conseguiu entrar
+            if (!jaEstaNaMesa) await creditarSaidaMesa(usuario.uid, mesa.valorBuyIn);
             socket.emit('erro', { mensagem: resultado.erro });
             return;
         }
@@ -304,12 +281,18 @@ io.on('connection', (socket) => {
         socketMesa.set(socket.id, dados.mesaId);
 
         socket.emit('entrou_mesa', { mesaId: dados.mesaId });
-        console.log(`${usuario.nome} entrou na mesa ${dados.mesaId}`);
+
+        if (!jaEstaNaMesa) {
+            // Notifica frontend do saldo atualizado
+            emitirSaldoAtualizado(socket, usuario.uid);
+        }
+
+        console.log(`🚪 ${usuario.nome} entrou na mesa ${dados.mesaId}`);
     });
 
 
     // ----------------------------------------------------------------
-    // EVENTO: iniciar_rodada
+    // iniciar_rodada
     // ----------------------------------------------------------------
     socket.on('iniciar_rodada', () => {
         const mesaId = socket.data.mesaId;
@@ -322,19 +305,18 @@ io.on('connection', (socket) => {
             socket.emit('erro', { mensagem: 'Somente o host pode iniciar.' });
             return;
         }
-
         if (Object.keys(mesa.jogadores).length < 2) {
             socket.emit('erro', { mensagem: 'Mínimo 2 jogadores para iniciar.' });
             return;
         }
 
         gameManager.iniciarRodada(mesaId);
-        console.log(`Rodada iniciada na mesa ${mesaId}`);
+        console.log(`▶️  Rodada iniciada na mesa ${mesaId}`);
     });
 
 
     // ----------------------------------------------------------------
-    // EVENTO: acao
+    // acao (fold / check / call / raise)
     // ----------------------------------------------------------------
     socket.on('acao', (dados) => {
         const mesaId = socket.data.mesaId;
@@ -355,7 +337,7 @@ io.on('connection', (socket) => {
 
 
     // ----------------------------------------------------------------
-    // EVENTO: adicionar_bot
+    // adicionar_bot
     // ----------------------------------------------------------------
     socket.on('adicionar_bot', (dados) => {
         const mesaId = socket.data.mesaId;
@@ -369,9 +351,11 @@ io.on('connection', (socket) => {
 
 
     // ----------------------------------------------------------------
-    // EVENTO: rebuy
+    // rebuy
+    // Jogador já está na mesa mas ficou sem fichas.
+    // Debita novo buy-in do saldo real e recarrega fichas na mesa.
     // ----------------------------------------------------------------
-    socket.on('rebuy', (dados) => {
+    socket.on('rebuy', async (dados) => {
         const mesaId = socket.data.mesaId;
         const uid    = socket.data.uid;
         if (!mesaId || !uid) return;
@@ -382,59 +366,58 @@ io.on('connection', (socket) => {
             return;
         }
 
+        // ── DÉBITO DO REBUY ────────────────────────────────────────
+        const debito = await debitarEntradaMesa(uid, valor);
+        if (!debito.sucesso) {
+            socket.emit('erro', { mensagem: debito.erro });
+            return;
+        }
+        // ─────────────────────────────────────────────────────────
+
         const resultado = gameManager.fazerRebuy(mesaId, uid, valor);
         if (!resultado.sucesso) {
+            // Devolve o débito se o rebuy falhou (ex: mão ativa)
+            await creditarSaidaMesa(uid, valor);
             socket.emit('erro', { mensagem: resultado.erro });
         } else {
             socket.emit('rebuy_ok', { valor });
+            emitirSaldoAtualizado(socket, uid);
         }
     });
 
 
     // ----------------------------------------------------------------
-    // EVENTO: sair_mesa
+    // sair_mesa  (voluntário)
     // ----------------------------------------------------------------
-    socket.on('sair_mesa', () => {
-        const mesaId = socket.data.mesaId;
-        const uid    = socket.data.uid;
-        if (!mesaId || !uid) return;
-
-        socket.leave(mesaId);
-        socketMesa.delete(socket.id);
-        socket.data.mesaId = null;
-
-        gameManager.sairMesa(mesaId, uid);
+    socket.on('sair_mesa', async () => {
+        await processarSaidaMesa(socket, 'voluntária');
         socket.emit('saiu_mesa', { sucesso: true });
-
-        console.log(`${socket.data.nome} saiu da mesa ${mesaId}`);
     });
 
 
     // ----------------------------------------------------------------
-    // EVENTO: disconnect
+    // disconnect
     // ----------------------------------------------------------------
     socket.on('disconnect', (motivo) => {
-        console.log(`Socket desconectado: ${socket.id} (${motivo})`);
+        console.log(`🔴 Desconectado: ${socket.id} (${motivo})`);
 
-        const mesaId = socketMesa.get(socket.id);
-        const uid    = socket.data.uid;
+        // Aguarda 5s para dar chance de reconexão antes de remover
+        setTimeout(async () => {
+            const mesaId = socketMesa.get(socket.id);
+            if (!mesaId) return;
 
-        if (mesaId && uid) {
-            setTimeout(() => {
-                const mesa = gameManager.getMesa(mesaId);
-                if (!mesa) return;
-                if (mesa.jogadores[uid]) {
-                    gameManager.sairMesa(mesaId, uid);
-                }
-            }, 5000);
-        }
+            const mesa = gameManager.getMesa(mesaId);
+            if (!mesa || !mesa.jogadores[socket.data.uid]) return;
+
+            await processarSaidaMesa(socket, 'desconexão');
+        }, 5000);
 
         socketMesa.delete(socket.id);
     });
 
 
     // ----------------------------------------------------------------
-    // EVENTO: pedir_estado
+    // pedir_estado
     // ----------------------------------------------------------------
     socket.on('pedir_estado', () => {
         const mesaId = socket.data.mesaId;
@@ -451,57 +434,102 @@ io.on('connection', (socket) => {
 
 
 // ================================================================
-// BLOCO 6: INICIALIZAÇÃO DO SERVIDOR
+// BLOCO 6: HELPERS DO SERVIDOR
+// ================================================================
+
+/**
+ * Processa saída completa da mesa:
+ * 1. Captura fichas restantes do jogador
+ * 2. Remove da mesa via game-manager
+ * 3. Credita fichas restantes no saldo real do Firestore
+ */
+async function processarSaidaMesa(socket, motivo = 'saída') {
+    const mesaId = socket.data.mesaId || socketMesa.get(socket.id);
+    const uid    = socket.data.uid;
+    if (!mesaId || !uid) return;
+
+    // Captura fichas ANTES de remover da mesa
+    const mesa = gameManager.getMesa(mesaId);
+    const fichasRestantes = mesa?.jogadores?.[uid]?.saldo || 0;
+
+    // Remove da mesa (em memória)
+    socket.leave(mesaId);
+    socketMesa.delete(socket.id);
+    socket.data.mesaId = null;
+    gameManager.sairMesa(mesaId, uid);
+
+    // Credita fichas restantes no Firestore
+    if (fichasRestantes > 0) {
+        await creditarSaidaMesa(uid, fichasRestantes);
+        // Notifica o frontend do novo saldo
+        emitirSaldoAtualizado(socket, uid);
+    }
+
+    console.log(`🚪 ${socket.data.nome} saiu (${motivo}): ₿C ${fichasRestantes} devolvidos`);
+}
+
+/**
+ * Busca saldo atualizado do Firestore e emite para o socket.
+ * Chamado após qualquer operação que altere o saldo.
+ */
+async function emitirSaldoAtualizado(socket, uid) {
+    try {
+        const { buscarSaldo } = await import('./firebase-admin.js');
+        const saldos = await buscarSaldo(uid);
+        socket.emit('wallet:saldo_atualizado', {
+            saldo:      saldos.saldo      || 0,
+            saldoBonus: saldos.saldoBonus || 0,
+            sacadoHoje: 0,
+        });
+    } catch (e) {
+        // Não crítico — o frontend já tem o saldo local
+    }
+}
+
+
+// ================================================================
+// BLOCO 7: INICIALIZAÇÃO
 // ================================================================
 
 const PORT = process.env.PORT || 3001;
 
 server.listen(PORT, () => {
     console.log(`
-╔══════════════════════════════════════╗
-║   Servidor Poker rodando!            ║
-║   Porta:    ${PORT}                      ║
-║   Ambiente: ${process.env.NODE_ENV || 'desenvolvimento'}          ║
-╚══════════════════════════════════════╝
+╔══════════════════════════════════════════╗
+║   🃏 Servidor Poker Online               ║
+║   Porta:    ${PORT}                          ║
+║   Ambiente: ${(process.env.NODE_ENV || 'desenvolvimento').padEnd(16)}    ║
+║   Buy-in:   debitado ao sentar           ║
+║   Prêmio:   creditado ao vencer          ║
+╚══════════════════════════════════════════╝
     `);
 });
 
 
 // ================================================================
-// BLOCO 7: RESET DIÁRIO DO LIMITE DE SAQUE
-//
-// Zera sacadoHoje para todos os jogadores à meia-noite.
-// Calcula o tempo até a próxima meia-noite e agenda com setTimeout.
-// Depois repete a cada 24h com setInterval.
+// BLOCO 8: RESET DIÁRIO DO LIMITE DE SAQUE (meia-noite)
 // ================================================================
 
 function agendarResetDiario() {
-    const agora       = new Date();
-    const meianoite   = new Date(agora);
-    meianoite.setHours(24, 0, 0, 0); // próxima meia-noite
-
-    const msAteMeianoite = meianoite.getTime() - agora.getTime();
+    const agora     = new Date();
+    const meianoite = new Date(agora);
+    meianoite.setHours(24, 0, 0, 0);
+    const ms = meianoite.getTime() - agora.getTime();
 
     setTimeout(async () => {
         await resetarLimiteDiario();
-        // Depois da primeira vez, repete a cada 24h
         setInterval(resetarLimiteDiario, 24 * 60 * 60 * 1000);
-    }, msAteMeianoite);
+    }, ms);
 
-    console.log(`🕐 Reset diário agendado em ${Math.round(msAteMeianoite / 1000 / 60)} minutos.`);
+    console.log(`🕐 Reset diário em ${Math.round(ms / 60000)} minutos.`);
 }
 
 agendarResetDiario();
 
 
 // ================================================================
-// BLOCO 8: TRATAMENTO DE ERROS GLOBAIS
+// BLOCO 9: ERROS GLOBAIS
 // ================================================================
 
-process.on('unhandledRejection', (erro) => {
-    console.error('Erro assíncrono não capturado:', erro);
-});
-
-process.on('uncaughtException', (erro) => {
-    console.error('Erro síncrono não capturado:', erro);
-});
+process.on('unhandledRejection', (e) => console.error('Erro async:', e));
+process.on('uncaughtException',  (e) => console.error('Erro sync:',  e));
