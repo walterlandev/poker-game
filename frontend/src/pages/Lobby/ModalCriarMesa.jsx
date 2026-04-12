@@ -15,14 +15,12 @@
    Esse saldo é debitado da carteira do jogador ao criar.
    Se o jogador não tiver saldo suficiente, o botão fica bloqueado.
 
-   VALIDAÇÕES:
-     → Nome obrigatório (mínimo 3 caracteres)
-     → Buy-in mínimo: 100 ₿C
-     → Small Blind mínimo: 5 ₿C (big blind = small blind × 2)
-     → Saldo suficiente para o buy-in
+   MUDANÇAS DESTA VERSÃO:
+     → Integração do Saldo Bônus: Agora o sistema soma usuario.saldo + usuario.bonus
+       para permitir a criação da mesa.
 
    PROPS:
-     usuario      → { uid, nome, saldo, rankPontos }
+     usuario      → { uid, nome, saldo, bonus, rankPontos }
      socket       → instância do Socket.io
      onMesaCriada → function(mesaId): chamada após criar com sucesso
      onFechar     → function(): fecha o modal
@@ -66,6 +64,12 @@ function fmt(n) {
 // ================================================================
 
 export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar }) {
+
+    // --- NOVIDADE: Calculando o saldo total (Real + Bônus) ---
+    const saldoReal  = usuario?.saldo || 0;
+    const saldoBonus = usuario?.bonus || 0; // Certifique-se de que o backend envia essa variável
+    const saldoTotal = saldoReal + saldoBonus;
+    // ---------------------------------------------------------
 
     // Estado do formulário — começa com os valores padrão
     const [form, setForm] = useState(CONFIG_PADRAO);
@@ -117,14 +121,14 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
         }
 
         // Big blind não pode ser maior que 10% do buy-in
-        // (regra padrão das mesas de poker online)
         const bigBlind = form.smallBlind * 2;
         if (bigBlind > form.buyIn * 0.1) {
             novosErros.smallBlind = `Blind muito alto para este buy-in. Máximo: ₿C ${Math.floor(form.buyIn * 0.05)}`;
         }
 
-        if ((usuario?.saldo || 0) < form.buyIn) {
-            novosErros.buyIn = `Saldo insuficiente. Você tem ₿C ${fmt(usuario?.saldo)}`;
+        // Usa o saldoTotal para validar
+        if (saldoTotal < form.buyIn) {
+            novosErros.buyIn = `Saldo insuficiente. Você tem ₿C ${fmt(saldoTotal)}`;
         }
 
         if (mesaPrivada && form.senha.length > 0 && form.senha.length < 4) {
@@ -160,7 +164,6 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
         socket.emit('criar_mesa', config);
 
         // Escuta a resposta do servidor
-        // 'once' = escuta apenas uma vez (não acumula listeners)
         socket.once('mesa_criada', ({ mesaId }) => {
             setEnviando(false);
             onMesaCriada(mesaId);
@@ -363,9 +366,9 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
                     {/* Resumo do custo */}
                     <div style={estilos.resumoCusto}>
                         <div style={estilos.resumoLinha}>
-                            <span style={estilos.resumoLabel}>Seu saldo</span>
+                            <span style={estilos.resumoLabel}>Seu saldo Total</span>
                             <span style={estilos.resumoValor}>
-                                ₿C {fmt(usuario?.saldo)}
+                                ₿C {fmt(saldoTotal)}
                             </span>
                         </div>
                         <div style={estilos.resumoLinha}>
@@ -381,10 +384,10 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
                             </span>
                             <span style={{
                                 ...estilos.resumoValor,
-                                color: (usuario?.saldo - form.buyIn) < 0 ? '#EF4444' : '#22C55E',
+                                color: (saldoTotal - form.buyIn) < 0 ? '#EF4444' : '#22C55E',
                                 fontWeight: '700',
                             }}>
-                                ₿C {fmt(Math.max(0, (usuario?.saldo || 0) - form.buyIn))}
+                                ₿C {fmt(Math.max(0, saldoTotal - form.buyIn))}
                             </span>
                         </div>
                     </div>
@@ -395,11 +398,12 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
                 <div style={estilos.rodape}>
                     <button
                         onClick={handleCriar}
-                        disabled={enviando || (usuario?.saldo || 0) < form.buyIn}
+                        // Botão desativa se o saldoTotal for menor que o buyIn
+                        disabled={enviando || saldoTotal < form.buyIn}
                         style={{
                             ...estilos.btnCriar,
-                            opacity: enviando || (usuario?.saldo || 0) < form.buyIn ? 0.5 : 1,
-                            cursor:  enviando || (usuario?.saldo || 0) < form.buyIn
+                            opacity: enviando || saldoTotal < form.buyIn ? 0.5 : 1,
+                            cursor:  enviando || saldoTotal < form.buyIn
                                 ? 'not-allowed' : 'pointer',
                         }}
                     >
