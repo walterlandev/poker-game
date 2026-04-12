@@ -7,12 +7,14 @@
    Também oferece opção de recuperação de senha por email.
 
    ADIÇÕES DESTA VERSÃO:
+   → Upload de foto do dispositivo (PC ou celular)
    → ID do jogador exibido e copiável (para transferência ₿C)
    → Temas comprados exibidos no perfil
 
    AVATARES DISPONÍVEIS:
    avata01.png até avata10.png na pasta /public/
-   O jogador escolhe clicando em um dos avatares.
+   O jogador escolhe clicando em um dos avatares
+   OU faz upload de uma foto do dispositivo.
 
    FIREBASE:
    → updateProfile()  — atualiza nome e foto no Firebase Auth
@@ -26,7 +28,7 @@
      onAtualizar → callback quando perfil é salvo com sucesso
 ================================================================ */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
     getAuth,
     updateProfile,
@@ -66,9 +68,59 @@ export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
     const [enviandoSenha, setEnviandoSenha] = useState(false);
     const [idCopiado, setIdCopiado] = useState(false);
 
+    // ── Upload de foto ──
+    const inputFotoRef = useRef(null);
+    const [fotoLocal,   setFotoLocal  ] = useState(null); // base64 da foto carregada
+    const [carregandoFoto, setCarregandoFoto] = useState(false);
+
     function mostrarFeedback(tipo, mensagem) {
         setFeedback({ tipo, mensagem });
         setTimeout(() => setFeedback(null), 4000);
+    }
+
+    // ----------------------------------------------------------------
+    // Abre o seletor de arquivo
+    // ----------------------------------------------------------------
+    function handleEscolherFoto() {
+        inputFotoRef.current?.click();
+    }
+
+    // ----------------------------------------------------------------
+    // Processa a foto escolhida — converte para base64
+    // ----------------------------------------------------------------
+    function handleFotoEscolhida(e) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Valida tipo
+        if (!file.type.startsWith('image/')) {
+            mostrarFeedback('erro', 'Selecione uma imagem válida.');
+            return;
+        }
+
+        // Valida tamanho (max 2MB)
+        if (file.size > 2 * 1024 * 1024) {
+            mostrarFeedback('erro', 'Imagem muito grande. Máximo 2MB.');
+            return;
+        }
+
+        setCarregandoFoto(true);
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const base64 = ev.target.result;
+            setFotoLocal(base64);
+            setAvatar(base64); // usa a foto local como avatar
+            setCarregandoFoto(false);
+        };
+        reader.onerror = () => {
+            mostrarFeedback('erro', 'Erro ao carregar imagem.');
+            setCarregandoFoto(false);
+        };
+        reader.readAsDataURL(file);
+
+        // Limpa o input para permitir reselecionar a mesma foto
+        e.target.value = '';
     }
 
     // ----------------------------------------------------------------
@@ -96,10 +148,19 @@ export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
             const user = auth.currentUser;
             if (!user) throw new Error('Usuário não autenticado.');
 
+            // Avatar final: foto local (base64) ou url do avatar selecionado
+            const avatarFinal = avatar;
+
             // 1. Atualiza nome e avatar no Firebase Auth
+            // Nota: Firebase Auth não aceita base64 em photoURL,
+            // então usamos a URL do avatar padrão se for base64
+            const photoURLParaAuth = avatarFinal.startsWith('data:')
+                ? (usuario?.avatar || '/avata01.png')
+                : avatarFinal;
+
             await updateProfile(user, {
                 displayName: nome.trim(),
-                photoURL:    avatar,
+                photoURL:    photoURLParaAuth,
             });
 
             // 2. Atualiza email se mudou
@@ -107,22 +168,21 @@ export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
                 await updateEmail(user, email.trim());
             }
 
-            // 3. Atualiza perfil no Firestore
+            // 3. Atualiza perfil no Firestore (aceita base64)
             const ref = doc(db, 'jogadores', user.uid);
             await updateDoc(ref, {
                 nome:     nome.trim(),
-                avatar,
+                avatar:   avatarFinal,
                 telefone: telefone.trim(),
                 email:    email.trim(),
             });
 
             mostrarFeedback('sucesso', 'Perfil atualizado com sucesso!');
 
-            // Notifica o App.jsx para atualizar o estado do usuário
             onAtualizar?.({
                 ...usuario,
                 nome:     nome.trim(),
-                avatar,
+                avatar:   avatarFinal,
                 telefone: telefone.trim(),
                 email:    email.trim(),
             });
@@ -192,22 +252,58 @@ export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
                         </div>
                     )}
 
-                    {/* Avatar atual + seletor */}
+                    {/* Avatar atual + botão de upload */}
                     <div style={estilos.avatarSecao}>
-                        <img src={avatar} alt="Avatar" style={estilos.avatarAtual}
-                            onError={e => { e.target.src = '/avata01.png'; }} />
-                        <p style={estilos.labelSecao}>Escolha seu avatar</p>
+
+                        {/* Input file escondido */}
+                        <input
+                            ref={inputFotoRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFotoEscolhida}
+                            style={{ display: 'none' }}
+                        />
+
+                        {/* Avatar com botão de câmera sobreposto */}
+                        <div style={estilos.avatarWrapper}>
+                            <img
+                                src={avatar}
+                                alt="Avatar"
+                                style={estilos.avatarAtual}
+                                onError={e => { e.target.src = '/avata01.png'; }}
+                            />
+                            <button
+                                onClick={handleEscolherFoto}
+                                style={estilos.btnCamera}
+                                title="Carregar foto do dispositivo"
+                            >
+                                {carregandoFoto ? '⏳' : '📷'}
+                            </button>
+                        </div>
+
+                        {/* Botão explícito de upload */}
+                        <button onClick={handleEscolherFoto} style={estilos.btnUpload}>
+                            📁 Carregar foto do dispositivo
+                        </button>
+
+                        {fotoLocal && (
+                            <p style={estilos.fotoLocalAviso}>
+                                ✓ Foto carregada — clique em Salvar para confirmar
+                            </p>
+                        )}
+
+                        <p style={estilos.labelSecao}>Ou escolha um avatar</p>
                         <div style={estilos.avatarGrid}>
                             {AVATARES.map(url => (
                                 <div
                                     key={url}
-                                    onClick={() => setAvatar(url)}
+                                    onClick={() => { setAvatar(url); setFotoLocal(null); }}
                                     style={{
                                         ...estilos.avatarOpcao,
-                                        border: avatar === url
+                                        border: avatar === url && !fotoLocal
                                             ? '2px solid #7C3AED'
                                             : '2px solid transparent',
-                                        boxShadow: avatar === url
+                                        boxShadow: avatar === url && !fotoLocal
                                             ? '0 0 8px rgba(124,58,237,0.5)'
                                             : 'none',
                                     }}
@@ -221,7 +317,7 @@ export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
                         </div>
                     </div>
 
-                    {/* ── ID DO JOGADOR ── */}
+                    {/* ID DO JOGADOR */}
                     <div style={estilos.idCard}>
                         <div style={estilos.idTextos}>
                             <p style={estilos.idLabel}>🆔 Seu ID — use para receber ₿C</p>
@@ -268,7 +364,7 @@ export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
 
                     </div>
 
-                    {/* ── TEMAS COMPRADOS ── */}
+                    {/* TEMAS COMPRADOS */}
                     {temasComprados.length > 0 && (
                         <div style={estilos.temasSecao}>
                             <p style={estilos.labelSecao}>🎨 Temas desbloqueados</p>
@@ -421,11 +517,55 @@ const estilos = {
     avatarSecao: {
         display:'flex', flexDirection:'column', alignItems:'center', gap:'10px',
     },
+
+    // Avatar com botão de câmera sobreposto
+    avatarWrapper: {
+        position: 'relative',
+        display:  'inline-block',
+    },
     avatarAtual: {
-        width:'72px', height:'72px', borderRadius:'50%',
+        width:'80px', height:'80px', borderRadius:'50%',
         border:'3px solid #7C3AED', objectFit:'cover',
         boxShadow:'0 0 16px rgba(124,58,237,0.4)',
+        display: 'block',
     },
+    btnCamera: {
+        position:       'absolute',
+        bottom:         '0',
+        right:          '0',
+        width:          '28px',
+        height:         '28px',
+        borderRadius:   '50%',
+        background:     '#7C3AED',
+        border:         '2px solid #111827',
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'center',
+        cursor:         'pointer',
+        fontSize:       '14px',
+        padding:        0,
+    },
+
+    // Botão explícito de upload
+    btnUpload: {
+        background:   'rgba(124,58,237,0.10)',
+        border:       '1px solid rgba(124,58,237,0.30)',
+        borderRadius: '8px',
+        color:        '#A78BFA',
+        fontSize:     '12px',
+        fontWeight:   '500',
+        padding:      '7px 14px',
+        cursor:       'pointer',
+        fontFamily:   'sans-serif',
+        WebkitTapHighlightColor: 'transparent',
+    },
+
+    fotoLocalAviso: {
+        fontSize:  '11px',
+        color:     '#4ADE80',
+        margin:    0,
+    },
+
     labelSecao: {
         fontSize:'12px', color:'rgba(255,255,255,0.4)',
         margin:0, textTransform:'uppercase', letterSpacing:'0.06em',
@@ -440,7 +580,7 @@ const estilos = {
         cursor:'pointer', transition:'border 0.2s, box-shadow 0.2s',
     },
 
-    // ── ID do jogador ──
+    // ID do jogador
     idCard: {
         display:      'flex',
         alignItems:   'center',
@@ -452,9 +592,9 @@ const estilos = {
     },
     idTextos: { flex: 1, minWidth: 0 },
     idLabel: {
-        fontSize:  '11px',
-        color:     'rgba(255,255,255,0.40)',
-        margin:    0,
+        fontSize:     '11px',
+        color:        'rgba(255,255,255,0.40)',
+        margin:       0,
         marginBottom: '3px',
     },
     idValor: {
@@ -472,7 +612,6 @@ const estilos = {
         fontSize:     '12px',
         fontWeight:   '600',
         fontFamily:   'sans-serif',
-        border:       'none',
         transition:   'all 0.2s',
         whiteSpace:   'nowrap',
     },
@@ -481,16 +620,16 @@ const estilos = {
         display:'flex', flexDirection:'column', gap:'12px',
     },
 
-    // ── Temas comprados ──
+    // Temas comprados
     temasSecao: {
         display:       'flex',
         flexDirection: 'column',
         gap:           '8px',
     },
     temasGrid: {
-        display:   'flex',
-        flexWrap:  'wrap',
-        gap:       '6px',
+        display:  'flex',
+        flexWrap: 'wrap',
+        gap:      '6px',
     },
     temaBadge: {
         display:      'flex',

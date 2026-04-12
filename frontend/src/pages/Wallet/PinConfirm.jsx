@@ -2,7 +2,7 @@
    ARQUIVO: frontend/src/pages/Lobby/Menu/Wallet/PinConfirm.jsx
 
    CONCEITO GERAL:
-   Modal de segurança que solicita o PIN numérico do jogador
+   Modal de segurança que solicita o PIN do jogador
    antes de executar qualquer ação sensível da carteira:
      → Depósito
      → Saque
@@ -10,18 +10,16 @@
 
    FLUXO:
      1. Modal abre com título e descrição da ação pendente
-     2. Jogador digita PIN de 4 a 6 dígitos via teclado numérico
-     3. Cada dígito aparece como ● (ocultado)
-     4. Ao completar 4+ dígitos, botão confirmar fica ativo
-     5. onConfirmar(pin) é chamado — o pai envia ao backend
-     6. Backend valida o PIN real — aqui só validamos o formato
+     2. Jogador digita o PIN no campo de texto
+     3. Pode mostrar/ocultar com botão de olho
+     4. Ao clicar Confirmar, onConfirmar(pin) é chamado
+     5. Backend valida o PIN real — aqui só validamos formato
 
    SEGURANÇA:
-     → PIN nunca é exibido em texto claro
+     → PIN oculto por padrão (type=password)
      → Máximo 3 tentativas antes de bloquear por 30s
-     → Teclado numérico próprio (evita autopreenchimento)
-     → Botão de apagar dígito a dígito
      → ESC ou clique no fundo cancela a ação
+     → autoComplete="off" para evitar preenchimento automático
 
    PROPS:
      titulo      → string : título da ação (ex: "Confirmar saque")
@@ -30,8 +28,7 @@
      onCancelar  → fn() : chamado ao cancelar
 ================================================================ */
 
-import { useState, useEffect, useCallback } from 'react';
-import { validarFormatoPin } from './walletUtils';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 
 // ================================================================
@@ -39,19 +36,9 @@ import { validarFormatoPin } from './walletUtils';
 // ================================================================
 
 const PIN_MIN        = 4;
-const PIN_MAX        = 6;
 const MAX_TENTATIVAS = 3;
 const BLOQUEIO_SEG   = 30;
 
-const TECLAS = [
-    ['1', '2', '3'],
-    ['4', '5', '6'],
-    ['7', '8', '9'],
-    ['⌫', '0', '✓'],
-];
-
-// Helper puro fora do componente — Date.now() aqui não é chamado durante
-// render, apenas quando invocado explicitamente em event handlers.
 function agora() { return Date.now(); }
 
 
@@ -61,20 +48,26 @@ function agora() { return Date.now(); }
 
 export default function PinConfirm({ titulo, descricao, onConfirmar, onCancelar }) {
 
-    const [pin,          setPin]          = useState('');
-    const [erro,         setErro]         = useState(null);
-    const [tentativas,   setTentativas]   = useState(0);
-    const [bloqueadoAte, setBloqueadoAte] = useState(null); // timestamp
-    const [tempoRestante,setTempoRestante]= useState(0);
-    const [agitando,     setAgitando]     = useState(false); // animação de erro
+    const [pin,           setPin          ] = useState('');
+    const [verPin,        setVerPin       ] = useState(false);
+    const [erro,          setErro         ] = useState(null);
+    const [tentativas,    setTentativas   ] = useState(0);
+    const [bloqueadoAte,  setBloqueadoAte ] = useState(null);
+    const [tempoRestante, setTempoRestante] = useState(0);
+    const [agitando,      setAgitando     ] = useState(false);
 
+    const inputRef = useRef(null);
+
+    // Foca o input ao abrir
+    useEffect(() => {
+        setTimeout(() => inputRef.current?.focus(), 100);
+    }, []);
 
     // ----------------------------------------------------------------
     // Countdown do bloqueio
     // ----------------------------------------------------------------
     useEffect(() => {
         if (!bloqueadoAte) return;
-
         const intervalo = setInterval(() => {
             const restante = Math.ceil((bloqueadoAte - Date.now()) / 1000);
             if (restante <= 0) {
@@ -87,10 +80,8 @@ export default function PinConfirm({ titulo, descricao, onConfirmar, onCancelar 
                 setTempoRestante(restante);
             }
         }, 1000);
-
         return () => clearInterval(intervalo);
     }, [bloqueadoAte]);
-
 
     // ----------------------------------------------------------------
     // Fechar com ESC
@@ -103,31 +94,23 @@ export default function PinConfirm({ titulo, descricao, onConfirmar, onCancelar 
         return () => window.removeEventListener('keydown', handleKey);
     }, [onCancelar]);
 
-
     // ----------------------------------------------------------------
-    // Animação de erro — declarada antes de handleConfirmar para evitar
-    // acesso antes da declaração (react-hooks/immutability).
+    // Animação de erro
     // ----------------------------------------------------------------
     const agitar = useCallback(() => {
         setAgitando(true);
         setTimeout(() => setAgitando(false), 500);
     }, []);
 
-
     // ----------------------------------------------------------------
-    // Confirma o PIN — declarado antes de handleTecla pois é referenciado
-    // dentro do useCallback de handleTecla.
-    // Date.now() fica dentro de um event handler (não no render), portanto
-    // é permitido — o eslint/purity só bloqueia chamadas durante render.
-    // Usamos uma variável local `agora` para deixar isso explícito.
+    // Confirma o PIN
     // ----------------------------------------------------------------
     const handleConfirmar = useCallback(() => {
         if (bloqueadoAte) return;
 
-        const { valido, erro: erroFormato } = validarFormatoPin(pin);
-        if (!valido) {
+        if (!pin || pin.length < PIN_MIN) {
             agitar();
-            setErro(erroFormato);
+            setErro(`PIN deve ter no mínimo ${PIN_MIN} caracteres.`);
             return;
         }
 
@@ -146,35 +129,13 @@ export default function PinConfirm({ titulo, descricao, onConfirmar, onCancelar 
         onConfirmar(pin);
     }, [bloqueadoAte, pin, tentativas, agitar, onConfirmar]);
 
-
-    // ----------------------------------------------------------------
-    // Processa clique em tecla do teclado numérico
-    // ----------------------------------------------------------------
-    const handleTecla = useCallback((tecla) => {
-        if (bloqueadoAte) return;
-
-        if (tecla === '⌫') {
-            setPin(p => p.slice(0, -1));
-            setErro(null);
-            return;
-        }
-
-        if (tecla === '✓') {
-            handleConfirmar();
-            return;
-        }
-
-        if (pin.length >= PIN_MAX) return;
-
-        setPin(p => p + tecla);
-        setErro(null);
-    }, [pin, bloqueadoAte, handleConfirmar]);
-
-
+    // Confirma ao pressionar Enter
+    function handleKeyDown(e) {
+        if (e.key === 'Enter') handleConfirmar();
+    }
 
     const bloqueado = !!bloqueadoAte;
     const pinValido = pin.length >= PIN_MIN && !bloqueado;
-
 
     // ================================================================
     // RENDERIZAÇÃO
@@ -182,118 +143,6 @@ export default function PinConfirm({ titulo, descricao, onConfirmar, onCancelar 
     return (
         <div style={estilos.overlay} onClick={onCancelar}>
 
-            <div
-                style={estilos.modal}
-                onClick={e => e.stopPropagation()}
-            >
-                {/* ---- Ícone de cadeado ---- */}
-                <div style={estilos.iconeBox}>
-                    <span style={estilos.icone}>🔐</span>
-                </div>
-
-                {/* ---- Título e descrição ---- */}
-                <div style={estilos.textos}>
-                    <p style={estilos.titulo}>{titulo}</p>
-                    {descricao && (
-                        <p style={estilos.descricao}>{descricao}</p>
-                    )}
-                </div>
-
-                {/* ---- Indicadores de dígitos ---- */}
-                <div style={{
-                    ...estilos.pontosRow,
-                    animation: agitando ? 'agitar 0.4s ease' : 'none',
-                }}>
-                    {Array.from({ length: PIN_MAX }).map((_, i) => (
-                        <div
-                            key={i}
-                            style={{
-                                ...estilos.ponto,
-                                background: i < pin.length
-                                    ? '#F59E0B'
-                                    : 'rgba(255,255,255,0.10)',
-                                border: i < pin.length
-                                    ? '1px solid #F59E0B'
-                                    : '1px solid rgba(255,255,255,0.15)',
-                                transform: i < pin.length ? 'scale(1.15)' : 'scale(1)',
-                            }}
-                        />
-                    ))}
-                </div>
-
-                {/* ---- Mensagem de erro / bloqueio ---- */}
-                {erro && (
-                    <p style={estilos.erroTexto}>
-                        {bloqueado ? `⏳ ${erro} (${tempoRestante}s)` : `⚠ ${erro}`}
-                    </p>
-                )}
-
-                {/* ---- Tentativas restantes ---- */}
-                {tentativas > 0 && !bloqueado && (
-                    <p style={estilos.tentativasTexto}>
-                        {MAX_TENTATIVAS - tentativas} tentativa{MAX_TENTATIVAS - tentativas !== 1 ? 's' : ''} restante{MAX_TENTATIVAS - tentativas !== 1 ? 's' : ''}
-                    </p>
-                )}
-
-                {/* ---- Teclado numérico ---- */}
-                <div style={estilos.teclado}>
-                    {TECLAS.map((linha, li) => (
-                        <div key={li} style={estilos.teclado_linha}>
-                            {linha.map(tecla => {
-                                const ehConfirmar = tecla === '✓';
-                                const ehApagar    = tecla === '⌫';
-                                const desabilitado = bloqueado ||
-                                    (ehConfirmar && !pinValido) ||
-                                    (!ehApagar && !ehConfirmar && pin.length >= PIN_MAX);
-
-                                return (
-                                    <button
-                                        key={tecla}
-                                        onClick={() => handleTecla(tecla)}
-                                        disabled={desabilitado}
-                                        style={{
-                                            ...estilos.tecla,
-                                            background: ehConfirmar
-                                                ? (pinValido ? '#F59E0B' : 'rgba(255,255,255,0.05)')
-                                                : ehApagar
-                                                    ? 'rgba(239,68,68,0.10)'
-                                                    : 'rgba(255,255,255,0.06)',
-                                            border: ehConfirmar
-                                                ? (pinValido ? '1px solid #F59E0B' : '1px solid rgba(255,255,255,0.08)')
-                                                : ehApagar
-                                                    ? '1px solid rgba(239,68,68,0.20)'
-                                                    : '1px solid rgba(255,255,255,0.08)',
-                                            color: ehConfirmar
-                                                ? (pinValido ? '#fff' : 'rgba(255,255,255,0.20)')
-                                                : ehApagar
-                                                    ? '#FCA5A5'
-                                                    : '#F8FAFC',
-                                            fontSize: ehConfirmar || ehApagar ? '18px' : '20px',
-                                            opacity:  desabilitado && !ehConfirmar ? 0.35 : 1,
-                                            cursor:   desabilitado ? 'not-allowed' : 'pointer',
-                                        }}
-                                    >
-                                        {tecla}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    ))}
-                </div>
-
-                {/* ---- Botão cancelar ---- */}
-                <button onClick={onCancelar} style={estilos.btnCancelar}>
-                    Cancelar
-                </button>
-
-                {/* ---- Aviso de segurança ---- */}
-                <p style={estilos.avisoSeguranca}>
-                    🔒 Nunca compartilhe seu PIN com ninguém
-                </p>
-
-            </div>
-
-            {/* Keyframe da animação de agitar */}
             <style>{`
                 @keyframes agitar {
                     0%,100% { transform: translateX(0); }
@@ -304,6 +153,98 @@ export default function PinConfirm({ titulo, descricao, onConfirmar, onCancelar 
                 }
             `}</style>
 
+            <div style={estilos.modal} onClick={e => e.stopPropagation()}>
+
+                {/* Ícone */}
+                <div style={estilos.iconeBox}>
+                    <span style={estilos.icone}>🔐</span>
+                </div>
+
+                {/* Título e descrição */}
+                <div style={estilos.textos}>
+                    <p style={estilos.titulo}>{titulo}</p>
+                    {descricao && (
+                        <p style={estilos.descricao}>{descricao}</p>
+                    )}
+                </div>
+
+                {/* Campo de PIN */}
+                <div style={{
+                    ...estilos.inputWrapper,
+                    animation: agitando ? 'agitar 0.4s ease' : 'none',
+                }}>
+                    <input
+                        ref={inputRef}
+                        type={verPin ? 'text' : 'password'}
+                        value={pin}
+                        onChange={e => { setPin(e.target.value); setErro(null); }}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Digite seu PIN"
+                        disabled={bloqueado}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        style={{
+                            ...estilos.input,
+                            borderColor: erro
+                                ? 'rgba(239,68,68,0.5)'
+                                : pinValido
+                                    ? 'rgba(245,158,11,0.4)'
+                                    : 'rgba(255,255,255,0.12)',
+                            opacity: bloqueado ? 0.5 : 1,
+                        }}
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setVerPin(v => !v)}
+                        style={estilos.btnOlho}
+                        tabIndex={-1}
+                    >
+                        {verPin ? '🙈' : '👁️'}
+                    </button>
+                </div>
+
+                {/* Erro */}
+                {erro && (
+                    <p style={estilos.erroTexto}>
+                        {bloqueado ? `⏳ ${erro} (${tempoRestante}s)` : `⚠ ${erro}`}
+                    </p>
+                )}
+
+                {/* Tentativas restantes */}
+                {tentativas > 0 && !bloqueado && (
+                    <p style={estilos.tentativasTexto}>
+                        {MAX_TENTATIVAS - tentativas} tentativa{MAX_TENTATIVAS - tentativas !== 1 ? 's' : ''} restante{MAX_TENTATIVAS - tentativas !== 1 ? 's' : ''}
+                    </p>
+                )}
+
+                {/* Botão confirmar */}
+                <button
+                    onClick={handleConfirmar}
+                    disabled={!pinValido}
+                    style={{
+                        ...estilos.btnConfirmar,
+                        background: pinValido
+                            ? 'linear-gradient(135deg, #D97706, #F59E0B)'
+                            : 'rgba(255,255,255,0.06)',
+                        color:  pinValido ? '#fff' : 'rgba(255,255,255,0.25)',
+                        cursor: pinValido ? 'pointer' : 'not-allowed',
+                    }}
+                >
+                    ✓ Confirmar
+                </button>
+
+                {/* Botão cancelar */}
+                <button onClick={onCancelar} style={estilos.btnCancelar}>
+                    Cancelar
+                </button>
+
+                {/* Aviso */}
+                <p style={estilos.avisoSeguranca}>
+                    🔒 Nunca compartilhe seu PIN com ninguém
+                </p>
+
+            </div>
         </div>
     );
 }
@@ -332,7 +273,7 @@ const estilos = {
         border:        '1px solid rgba(255,255,255,0.10)',
         borderRadius:  '20px',
         padding:       '28px 24px',
-        maxWidth:      '320px',
+        maxWidth:      '340px',
         width:         '100%',
         display:       'flex',
         flexDirection: 'column',
@@ -352,15 +293,14 @@ const estilos = {
         justifyContent: 'center',
     },
 
-    icone: {
-        fontSize: '26px',
-    },
+    icone:    { fontSize: '26px' },
 
     textos: {
-        textAlign: 'center',
-        display:   'flex',
+        textAlign:     'center',
+        display:       'flex',
         flexDirection: 'column',
-        gap: '6px',
+        gap:           '6px',
+        width:         '100%',
     },
 
     titulo: {
@@ -377,17 +317,39 @@ const estilos = {
         lineHeight: 1.4,
     },
 
-    // Indicadores de PIN (pontos)
-    pontosRow: {
-        display: 'flex',
-        gap:     '10px',
+    // Campo de PIN
+    inputWrapper: {
+        position: 'relative',
+        width:    '100%',
     },
 
-    ponto: {
-        width:        '14px',
-        height:       '14px',
-        borderRadius: '50%',
-        transition:   'all 0.15s ease',
+    input: {
+        width:        '100%',
+        padding:      '13px 44px 13px 16px',
+        background:   'rgba(255,255,255,0.06)',
+        border:       '1px solid rgba(255,255,255,0.12)',
+        borderRadius: '12px',
+        color:        '#F8FAFC',
+        fontSize:     '16px',
+        fontFamily:   'inherit',
+        outline:      'none',
+        boxSizing:    'border-box',
+        transition:   'border-color 0.2s',
+        letterSpacing: '0.05em',
+    },
+
+    btnOlho: {
+        position:   'absolute',
+        right:      '12px',
+        top:        '50%',
+        transform:  'translateY(-50%)',
+        background: 'none',
+        border:     'none',
+        cursor:     'pointer',
+        fontSize:   '18px',
+        padding:    '4px',
+        lineHeight: 1,
+        WebkitTapHighlightColor: 'transparent',
     },
 
     erroTexto: {
@@ -404,30 +366,16 @@ const estilos = {
         textAlign: 'center',
     },
 
-    // Teclado numérico
-    teclado: {
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '8px',
-        width:         '100%',
-    },
-
-    teclado_linha: {
-        display:             'grid',
-        gridTemplateColumns: '1fr 1fr 1fr',
-        gap:                 '8px',
-    },
-
-    tecla: {
-        height:       '54px',
-        borderRadius: '10px',
+    btnConfirmar: {
+        width:        '100%',
+        padding:      '13px',
+        border:       'none',
+        borderRadius: '12px',
+        fontSize:     '15px',
         fontWeight:   '600',
         fontFamily:   'inherit',
-        cursor:       'pointer',
-        outline:      'none',
-        transition:   'all 0.12s',
+        transition:   'opacity 0.2s',
         WebkitTapHighlightColor: 'transparent',
-        userSelect:   'none',
     },
 
     btnCancelar: {
