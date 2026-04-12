@@ -14,6 +14,7 @@ import Mesa               from './Mesa';
 import CartasJogador      from './CartasJogador';
 import CartasComunitarias from './CartasComunitarias';
 import ActionBar          from '../../components/ActionBar';
+import HandStrength       from '../../components/HandStrength';
 
 export default function Game({ socket, usuario, mesaId, onSair }) {
 
@@ -218,6 +219,13 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
                             foldado={foldado}
                             fase={mesa.fase}
                             temaId={temaId}
+                        />
+                        {/* Força da mão — só aparece quando jogo ativo e tem cartas */}
+                        <HandStrength
+                            cartasMao={minhasCartas}
+                            cartasMesa={mesa.cartasComunitarias || []}
+                            visivel={jogoAtivo && !foldado && minhasCartas.length === 2}
+                            nOponentes={Math.max(1, jogadoresArray.length - 1)}
                         />
                         {/* Fichas na mesa (durante o jogo) */}
                         {jogoAtivo && euSou && (
