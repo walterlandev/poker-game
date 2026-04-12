@@ -13,11 +13,11 @@
    quando a aba "Carteira" é selecionada.
 
    PROPS:
-     usuario  → { uid, nome, saldo, sacadoHoje, tema }
+     usuario  → { uid, nome, saldo, saldoBonus, sacadoHoje, tema }
      socket   → instância do Socket.io (para eventos em tempo real)
 
    EVENTOS SOCKET ESCUTADOS:
-     'wallet:saldo_atualizado'  → { saldo, sacadoHoje }
+     'wallet:saldo_atualizado'  → { saldo, saldoBonus, sacadoHoje }
      'wallet:tx_nova'           → objeto de transação (atualiza histórico)
 
    EVENTOS SOCKET EMITIDOS (via filhos):
@@ -66,8 +66,8 @@ export default function WalletIndex({ usuario, socket }) {
     // Aba ativa
     const [abaAtiva, setAbaAtiva] = useState('geral');
 
-    // Saldo e limite diário — socket pode sobrescrever com valores mais recentes
-    const [saldo,       setSaldo]       = useState(usuario?.saldo      || 0);
+    // ✅ CORREÇÃO: saldo inclui real + bônus
+    const [saldo,       setSaldo]       = useState((usuario?.saldo || 0) + (usuario?.saldoBonus || 0));
     const [sacadoHoje,  setSacadoHoje]  = useState(usuario?.sacadoHoje || 0);
 
     // Histórico de transações (alimentado via socket ou fetch inicial)
@@ -79,7 +79,7 @@ export default function WalletIndex({ usuario, socket }) {
     // Saldo derivado: usa o estado local (atualizado pelo socket) ou cai
     // de volta na prop caso o socket ainda não tenha enviado nada.
     // Não usamos useEffect para sincronizar props → estado (anti-pattern).
-    const saldoAtual     = saldo      ?? usuario?.saldo      ?? 0;
+    const saldoAtual     = saldo      ?? ((usuario?.saldo || 0) + (usuario?.saldoBonus || 0));
     const sacadoHojeReal = sacadoHoje ?? usuario?.sacadoHoje ?? 0;
 
 
@@ -89,9 +89,9 @@ export default function WalletIndex({ usuario, socket }) {
     useEffect(() => {
         if (!socket) return;
 
-        // Saldo atualizado pelo backend (após depósito, saque, envio)
-        socket.on('wallet:saldo_atualizado', ({ saldo: s, sacadoHoje: sh }) => {
-            setSaldo(s);
+        // ✅ CORREÇÃO: soma saldo real + bônus ao atualizar
+        socket.on('wallet:saldo_atualizado', ({ saldo: s, saldoBonus: sb, sacadoHoje: sh }) => {
+            setSaldo((s || 0) + (sb || 0));
             setSacadoHoje(sh ?? 0);
         });
 
