@@ -67,7 +67,11 @@ async function inicializarFirebase() {
 
         // ✅ CORREÇÃO: lê da variável de ambiente em produção (Railway)
         // Fallback para arquivo local em desenvolvimento
-        if (process.env.FIREBASE_CREDENTIALS) {
+        if (process.env.FIREBASE_CREDENTIALS_BASE64) {
+            const decoded = Buffer.from(process.env.FIREBASE_CREDENTIALS_BASE64, 'base64').toString('utf-8');
+            credenciais = JSON.parse(decoded);
+            console.log('🔑 Firebase: usando credenciais base64 do ambiente.');
+        } else if (process.env.FIREBASE_CREDENTIALS) {
             credenciais = JSON.parse(process.env.FIREBASE_CREDENTIALS);
             console.log('🔑 Firebase: usando credenciais da variável de ambiente.');
         } else {
