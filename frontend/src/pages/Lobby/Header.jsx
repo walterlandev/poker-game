@@ -6,15 +6,16 @@
 
    MUDANÇAS DESTA VERSÃO:
    → Item "Perfil" agora chama onAbrirPerfil (modal real)
-   → Item "Configurações" ainda em breve
+   → Item "Configurações" agora chama onAbrirConfiguracoes (real)
    → Avatar usa imagens locais (/avata01.png...) com fallback DiceBear
 
    PROPS:
-     usuario         → { uid, nome, avatar, saldo, rankPontos }
-     onAbrirLoja     → abre a loja para comprar ₿C
-     onAbrirCarteira → abre a carteira do jogador
-     onAbrirPerfil   → abre o modal de perfil (NOVO)
-     onLogout        → desloga o jogador
+     usuario              → { uid, nome, avatar, saldo, rankPontos }
+     onAbrirLoja          → abre a loja para comprar ₿C
+     onAbrirCarteira      → abre a carteira do jogador
+     onAbrirPerfil        → abre o modal de perfil
+     onAbrirConfiguracoes → abre o modal de configurações (NOVO)
+     onLogout             → desloga o jogador
 ================================================================ */
 
 import { useState } from 'react';
@@ -33,7 +34,7 @@ function formatarSaldo(valor = 0) {
     return Number(valor).toLocaleString('pt-BR');
 }
 
-export default function Header({ usuario, onAbrirLoja, onAbrirCarteira, onAbrirPerfil, onLogout }) {
+export default function Header({ usuario, onAbrirLoja, onAbrirCarteira, onAbrirPerfil, onAbrirConfiguracoes, onLogout }) {
 
     const [menuAberto, setMenuAberto] = useState(false);
     const rank = calcularRank(usuario?.rankPontos);
@@ -138,10 +139,11 @@ export default function Header({ usuario, onAbrirLoja, onAbrirCarteira, onAbrirP
 
                         {menuAberto && (
                             <MenuDropdown
-                                onAbrirCarteira={() => { onAbrirCarteira?.(); setMenuAberto(false); }}
-                                onAbrirPerfil={()   => { onAbrirPerfil?.();   setMenuAberto(false); }}
-                                onLogout={()        => { onLogout?.();         setMenuAberto(false); }}
-                                onFechar={()        => setMenuAberto(false)}
+                                onAbrirCarteira={()      => { onAbrirCarteira?.();      setMenuAberto(false); }}
+                                onAbrirPerfil={()        => { onAbrirPerfil?.();        setMenuAberto(false); }}
+                                onAbrirConfiguracoes={() => { onAbrirConfiguracoes?.(); setMenuAberto(false); }}
+                                onLogout={()             => { onLogout?.();             setMenuAberto(false); }}
+                                onFechar={()             => setMenuAberto(false)}
                             />
                         )}
                     </div>
@@ -154,7 +156,7 @@ export default function Header({ usuario, onAbrirLoja, onAbrirCarteira, onAbrirP
     );
 }
 
-function MenuDropdown({ onAbrirCarteira, onAbrirPerfil, onLogout, onFechar }) {
+function MenuDropdown({ onAbrirCarteira, onAbrirPerfil, onAbrirConfiguracoes, onLogout, onFechar }) {
 
     const itens = [
         {
@@ -167,7 +169,6 @@ function MenuDropdown({ onAbrirCarteira, onAbrirPerfil, onLogout, onFechar }) {
         {
             label:   'Perfil',
             icone:   '👤',
-            // NOVO: agora abre o modal de perfil real
             acao:    onAbrirPerfil,
             emBreve: false,
             perigo:  false,
@@ -175,8 +176,8 @@ function MenuDropdown({ onAbrirCarteira, onAbrirPerfil, onLogout, onFechar }) {
         {
             label:   'Configurações',
             icone:   '⚙️',
-            acao:    onFechar,
-            emBreve: true,
+            acao:    onAbrirConfiguracoes,
+            emBreve: false,
             perigo:  false,
         },
         {

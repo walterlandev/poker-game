@@ -9,6 +9,7 @@
      → ModalBoasVindas aparece automaticamente no 1º acesso
        (detectado via usuario.bonusResgatado === false)
      → onAbrirCarteira no Header agora abre a aba correta
+     → ModalConfiguracoes adicionado (Alterar PIN + Sons)
 
    RESPONSIVIDADE:
    Mobile  → layout vertical, max-width 480px, uma coluna
@@ -26,14 +27,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getAuth, signOut }                 from 'firebase/auth';
 
-import Header         from './Header';
-import Tabs           from './Tabs';
-import ListaMesas     from './ListaMesas';
-import Ranking        from './Ranking';
-import Loja           from './Loja';
-import ModalCriarMesa from './ModalCriarMesa';
-import ModalSenha     from './ModalSenha';
-import ModalPerfil    from './ModalPerfil';
+import Header              from './Header';
+import Tabs                from './Tabs';
+import ListaMesas          from './ListaMesas';
+import Ranking             from './Ranking';
+import Loja                from './Loja';
+import ModalCriarMesa      from './ModalCriarMesa';
+import ModalSenha          from './ModalSenha';
+import ModalPerfil         from './ModalPerfil';
+import ModalConfiguracoes  from './ModalConfiguracoes';
 
 // Wallet — primeira aba do menu do jogador
 import WalletIndex    from '../Wallet/index';
@@ -78,13 +80,14 @@ export default function Lobby({ usuario, socket, onEntrarMesa }) {
     const [modalCriar,    setModalCriar   ] = useState(false);
     const [modalSenha,    setModalSenha   ] = useState(null);
     const [modalPerfil,   setModalPerfil  ] = useState(false);
+    const [modalConfiguracoes, setModalConfiguracoes] = useState(false);
     const [carregando,    setCarregando   ] = useState(true);
     const [erro,          setErro         ] = useState(null);
 
     // Controla o modal de boas-vindas:
     // Abre automaticamente se o jogador ainda não resgatou o bônus
     const [mostrarBoasVindas, setMostrarBoasVindas] = useState(
-        usuario?.bonusResgatado === false
+        usuario?.bonusResgatado !== true
     );
 
 
@@ -229,9 +232,10 @@ export default function Lobby({ usuario, socket, onEntrarMesa }) {
             {/* ---- HEADER ---- */}
             <Header
                 usuario={usuario}
-                onAbrirLoja={     () => setTabAtiva(TABS.LOJA)}
-                onAbrirCarteira={ () => setTabAtiva(TABS.CARTEIRA)}
-                onAbrirPerfil={   () => setModalPerfil(true)}
+                onAbrirLoja={          () => setTabAtiva(TABS.LOJA)}
+                onAbrirCarteira={      () => setTabAtiva(TABS.CARTEIRA)}
+                onAbrirPerfil={        () => setModalPerfil(true)}
+                onAbrirConfiguracoes={ () => setModalConfiguracoes(true)}
                 onLogout={handleLogout}
             />
 
@@ -400,6 +404,14 @@ export default function Lobby({ usuario, socket, onEntrarMesa }) {
                         console.log('Perfil atualizado:', novoUsuario);
                         setModalPerfil(false);
                     }}
+                />
+            )}
+
+            {modalConfiguracoes && (
+                <ModalConfiguracoes
+                    usuario={usuario}
+                    socket={socket}
+                    onFechar={() => setModalConfiguracoes(false)}
                 />
             )}
 
