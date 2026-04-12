@@ -160,7 +160,7 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
             <div className="game-corpo" style={{ flex:1, overflow:'hidden' }}>
 
                 {/* Coluna esquerda: mesa + painel de ações */}
-                <div className="game-col-esq game-corpo">
+                <div className="game-col-esq">
 
                     {/* Mesa */}
                     <div className="game-mesa-area">
