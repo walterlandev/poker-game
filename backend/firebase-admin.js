@@ -63,9 +63,19 @@ async function inicializarFirebase() {
     }
 
     try {
-        const caminhoCredenciais = join(__dirname, 'firebase-credentials.json');
-        const credenciaisJson    = await readFile(caminhoCredenciais, 'utf-8');
-        const credenciais        = JSON.parse(credenciaisJson);
+        let credenciais;
+
+        // ✅ CORREÇÃO: lê da variável de ambiente em produção (Railway)
+        // Fallback para arquivo local em desenvolvimento
+        if (process.env.FIREBASE_CREDENTIALS) {
+            credenciais = JSON.parse(process.env.FIREBASE_CREDENTIALS);
+            console.log('🔑 Firebase: usando credenciais da variável de ambiente.');
+        } else {
+            const caminhoCredenciais = join(__dirname, 'firebase-credentials.json');
+            const credenciaisJson    = await readFile(caminhoCredenciais, 'utf-8');
+            credenciais              = JSON.parse(credenciaisJson);
+            console.log('🔑 Firebase: usando arquivo firebase-credentials.json.');
+        }
 
         admin.initializeApp({
             credential: admin.credential.cert(credenciais),
@@ -305,7 +315,7 @@ export async function buscarPerfil(uid) {
 
 
 // ================================================================
-// BLOCO 8: BUSCAR SALDO
+// BLOCO 8: BUSCAR SALDO (antes de sentar na mesa)
 // ================================================================
 
 export async function buscarSaldo(uid) {
