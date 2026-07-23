@@ -42,14 +42,11 @@
 import crypto from 'crypto';
 import admin  from 'firebase-admin';
 
-// Import só pelo efeito colateral: força o Node a esperar o
-// admin.initializeApp() de firebase-admin.js terminar (ele usa top-level
-// await) ANTES do código deste arquivo rodar. Sem isso, como este módulo
-// só importava o pacote 'firebase-admin' cru (não o wrapper do projeto),
-// a ordem de avaliação dos módulos ES não garantia isso — na prática a
-// blockchain tentava ler o Firestore antes da inicialização terminar e
-// sempre caía no modo só-memória.
-import '../firebase-admin.js';
+// A garantia de que admin.initializeApp() (em firebase-admin.js) já
+// rodou antes de carregarDoFirestore() ser chamado vem de quem chama —
+// server.js aguarda inicializarFirebase() antes de chamar esse método.
+// Nada de top-level await aqui: a hospedagem Node via require() (ex.:
+// Hostinger/LiteSpeed) não suporta módulo ESM com await no topo.
 
 
 // ================================================================
@@ -756,11 +753,7 @@ export class Blockchain {
 
 export const blockchain = new Blockchain();
 
-// Recarrega do Firestore antes de qualquer outro módulo terminar de
-// importar isto — mesmo padrão de top-level await já usado em
-// firebase-admin.js, garante que quem importar `blockchain` já recebe
-// a cadeia real (ou o gênesis recém-persistido, na primeira execução).
-await blockchain.carregarDoFirestore();
-
-// Log inicial para confirmar que a blockchain foi iniciada
-console.log('₿C Blockchain iniciada:', blockchain.getInfo());
+// Carregamento do Firestore é disparado explicitamente por server.js
+// (await blockchain.carregarDoFirestore()) durante a inicialização,
+// antes do servidor começar a aceitar conexões — não aqui no topo do
+// módulo, pra não exigir top-level await neste arquivo.

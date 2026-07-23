@@ -18,6 +18,7 @@ import { GameManager        } from './game-manager.js';
 import { TournamentManager  } from './tournament-manager.js';
 
 import {
+    inicializarFirebase,
     buscarRanking,
     buscarPerfil,
     buscarSaldo,
@@ -711,18 +712,6 @@ async function emitirSaldoAtualizado(socket, uid) {
 
 const PORT = process.env.PORT || 3001;
 
-server.listen(PORT, () => {
-    console.log(`
-╔══════════════════════════════════════════╗
-║   🃏 Servidor Poker Online               ║
-║   Porta:    ${PORT}                          ║
-║   Ambiente: ${(process.env.NODE_ENV || 'desenvolvimento').padEnd(16)}    ║
-║   Buy-in:   debitado ao sentar           ║
-║   Prêmio:   creditado ao sair            ║
-╚══════════════════════════════════════════╝
-    `);
-});
-
 
 // ================================================================
 // BLOCO 8: RESET DIÁRIO DO LIMITE DE SAQUE (meia-noite)
@@ -742,15 +731,46 @@ function agendarResetDiario() {
     console.log(`🕐 Reset diário em ${Math.round(ms / 60000)} minutos.`);
 }
 
-agendarResetDiario();
-
 
 // ================================================================
-// BLOCO 8B: MINERAÇÃO PERIÓDICA DA BLOCKCHAIN (a cada 20s, só se
-// houver transação pendente na mempool)
+// BLOCO 9: INICIALIZAÇÃO ASSÍNCRONA
+//
+// Nada de top-level await aqui — a Hostinger (e outros hosts que
+// carregam o servidor via require() clássico do Node) não suporta
+// um módulo ESM com await fora de função (ERR_REQUIRE_ASYNC_MODULE).
+// Por isso toda a ordem de inicialização (Firebase → blockchain →
+// só então aceitar conexões) é orquestrada aqui dentro, e chamada
+// no fim do arquivo sem await no nível do módulo.
 // ================================================================
 
-setInterval(minerarBlocoSeNecessario, 20_000);
+async function main() {
+    await inicializarFirebase();
+    await blockchain.carregarDoFirestore();
+    console.log('₿C Blockchain iniciada:', blockchain.getInfo());
+
+    agendarResetDiario();
+
+    // Mineração periódica da blockchain (a cada 20s, só se houver
+    // transação pendente na mempool)
+    setInterval(minerarBlocoSeNecessario, 20_000);
+
+    server.listen(PORT, () => {
+        console.log(`
+╔══════════════════════════════════════════╗
+║   🃏 Servidor Poker Online               ║
+║   Porta:    ${PORT}                          ║
+║   Ambiente: ${(process.env.NODE_ENV || 'desenvolvimento').padEnd(16)}    ║
+║   Buy-in:   debitado ao sentar           ║
+║   Prêmio:   creditado ao sair            ║
+╚══════════════════════════════════════════╝
+        `);
+    });
+}
+
+main().catch((erro) => {
+    console.error('❌ Erro fatal na inicialização do servidor:', erro);
+    process.exit(1);
+});
 
 
 // ================================================================
