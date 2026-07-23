@@ -26,7 +26,12 @@ export default function Mesa({ mesa, meuUid, minhasCartas = [], meuAvatar = '', 
         if (!el) return;
         const obs = new ResizeObserver(([entry]) => {
             const { width, height } = entry.contentRect;
-            if (width > 0) setDims({ w: width, h: height });
+            if (width <= 0) return;
+            setDims(prev => (
+                Math.abs(prev.w - width) < 1 && Math.abs(prev.h - height) < 1
+                    ? prev
+                    : { w: width, h: height }
+            ));
         });
         obs.observe(el);
         return () => obs.disconnect();
