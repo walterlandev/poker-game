@@ -40,6 +40,7 @@ export default function Admin({ socket }) {
     const [saques,    setSaques   ] = useState(null);
     const [erro,      setErro     ] = useState(null);
     const [confirmando, setConfirmando] = useState(null); // saqueId em confirmação
+    const [pixCopiado,  setPixCopiado ] = useState(null); // saqueId da última chave PIX copiada
 
     // ----------------------------------------------------------------
     // Socket: escuta respostas e erros
@@ -88,6 +89,13 @@ export default function Admin({ socket }) {
         if (!socket) return;
         setConfirmando(saqueId);
         socket.emit('admin:confirmar_saque', { saqueId });
+    }
+
+    function copiarPix(saqueId, chavePix) {
+        navigator.clipboard.writeText(chavePix).then(() => {
+            setPixCopiado(saqueId);
+            setTimeout(() => setPixCopiado(null), 2000);
+        });
     }
 
     return (
@@ -169,7 +177,20 @@ export default function Admin({ socket }) {
                                 <span style={css.saldo}>R$ {Number(s.brlLiquido || 0).toFixed(2)}</span>
                             </div>
                             <p style={css.linha}>
+                                👤 Titular da conta: <strong>{s.nomeTitular}</strong>
+                                {s.emailTitular && <span style={css.linhaSub}> ({s.emailTitular})</span>}
+                            </p>
+                            <p style={css.linha}>
                                 🔑 Chave PIX: <strong>{s.chavePix}</strong>
+                                <button
+                                    onClick={() => copiarPix(s.id, s.chavePix)}
+                                    style={css.btnCopiarPix}
+                                >
+                                    {pixCopiado === s.id ? '✓ Copiado' : '📋 Copiar'}
+                                </button>
+                            </p>
+                            <p style={css.avisoTitular}>
+                                ⚠️ Confira se o nome do titular da conta bancária da chave PIX bate com o nome acima antes de confirmar.
                             </p>
                             <p style={css.linhaSub}>uid: {s.uid} · pedido: {fmtData(s.criadoEm)}</p>
                             <button
@@ -218,6 +239,23 @@ const css = {
     saldo:  { fontSize: '14px', fontWeight: '700', color: '#F59E0B' },
     linha:    { fontSize: '12px', color: 'rgba(255,255,255,0.55)', margin: 0 },
     linhaSub: { fontSize: '11px', color: 'rgba(255,255,255,0.30)', margin: 0 },
+    btnCopiarPix: {
+        marginLeft:   '8px',
+        padding:      '2px 8px',
+        background:   'rgba(124,58,237,0.15)',
+        border:       '1px solid rgba(124,58,237,0.35)',
+        borderRadius: '6px',
+        color:        '#A78BFA',
+        fontSize:     '11px',
+        fontWeight:   '600',
+        cursor:       'pointer',
+        fontFamily:   'inherit',
+        WebkitTapHighlightColor: 'transparent',
+    },
+    avisoTitular: {
+        fontSize: '11px', color: '#FCD34D', margin: 0,
+        background: 'rgba(245,158,11,0.08)', padding: '6px 8px', borderRadius: '6px',
+    },
     uid:      { fontSize: '10px', color: 'rgba(255,255,255,0.20)', margin: '2px 0 0', fontFamily: 'monospace' },
     badgeAdmin: {
         fontSize: '9px', fontWeight: '700', color: '#FCA5A5',

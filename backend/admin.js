@@ -99,10 +99,30 @@ export function registrarEventosAdmin(socket, io) {
                 .where('status', '==', 'PENDENTE')
                 .get();
 
-            const saques = snap.docs.map(d => {
+            const saquesBrutos = snap.docs.map(d => {
                 const s = d.data();
                 return { id: d.id, ...s, criadoEm: serializarData(s.criadoEm) };
             });
+
+            // Busca nome + e-mail do titular de cada conta — pra o admin
+            // conferir se a chave PIX bate com quem realmente é dono da conta
+            // antes de mandar o dinheiro.
+            const uidsUnicos = [...new Set(saquesBrutos.map(s => s.uid))];
+            const perfis = {};
+            await Promise.all(uidsUnicos.map(async (uid) => {
+                const doc = await admin.firestore().collection('jogadores').doc(uid).get();
+                if (doc.exists) {
+                    const d = doc.data();
+                    perfis[uid] = { nome: d.nome || '(sem nome)', email: d.email || '' };
+                }
+            }));
+
+            const saques = saquesBrutos.map(s => ({
+                ...s,
+                nomeTitular:  perfis[s.uid]?.nome  || '(desconhecido)',
+                emailTitular: perfis[s.uid]?.email || '',
+            }));
+
             socket.emit('admin:saques_pendentes', { saques });
         } catch (e) {
             console.error('admin:listar_saques_pendentes erro:', e.message);
