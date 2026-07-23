@@ -37,6 +37,13 @@ export default function App() {
     const [tela,      setTela     ] = useState(TELAS.CARREGANDO);
     const [usuario,   setUsuario  ] = useState(null);
     const [mesaAtual, setMesaAtual] = useState(null);
+    const [erroGlobal, setErroGlobal] = useState(null);
+
+    // Convite de torneio via URL: ?torneio=TABCD
+    const [conviteTorneio] = useState(() => {
+        const p = new URLSearchParams(window.location.search);
+        return p.get('torneio') || null;
+    });
 
     // ----------------------------------------------------------------
     // Conecta o socket e autentica no servidor
@@ -45,10 +52,12 @@ export default function App() {
         if (socket.connected) return;
         socket.connect();
         socket.once('connect', () => {
+            // Avatar base64 pode ter centenas de KB — enviamos apenas URLs
+            const avatarSocket = perfil.avatar?.startsWith('data:') ? '' : (perfil.avatar || '');
             socket.emit('autenticar', {
                 uid:    perfil.uid,
                 nome:   perfil.nome,
-                avatar: perfil.avatar || '',
+                avatar: avatarSocket,
             });
         });
         socket.on('disconnect', (m) => console.warn('Desconectado:', m));
@@ -76,6 +85,14 @@ export default function App() {
                             rankPontos:     d.rankPontos      ?? 0,
                             tema:           d.tema            || 'classico',
                             temasComprados: d.temasComprados  || [],
+                            // Nunca guardamos o hash em si — só se existe ou não,
+                            // pra saber se mostra "criar PIN" ou "alterar PIN".
+                            temPin:         !!d.pinHash,
+                            dadosBancarios: d.dadosBancarios  || {},
+                            // Só pra decidir se mostra a aba Admin na tela —
+                            // a proteção de verdade é no servidor (socket.data.isAdmin
+                            // em server.js/autenticar, lido com o Admin SDK).
+                            isAdmin:        !!d.isAdmin,
                         };
                         setUsuario(perfil);
                         conectarSocket(perfil);
@@ -85,6 +102,15 @@ export default function App() {
                     }
                 } catch (e) {
                     console.error('Erro ao carregar perfil:', e);
+                    // "permission-denied" pode ser regra do Firestore ou ad-blocker bloqueando a requisição
+                    const bloqueado = e?.code === 'permission-denied'
+                        || e?.message?.toLowerCase().includes('permission')
+                        || e?.message?.toLowerCase().includes('blocked');
+                    if (bloqueado) {
+                        setErroGlobal(
+                            'Não foi possível carregar seu perfil. Se tiver um bloqueador de anúncios ativo, desative-o para este site e recarregue a página.'
+                        );
+                    }
                     setTela(TELAS.AUTH);
                 }
             } else {
@@ -147,16 +173,23 @@ export default function App() {
             // Aqui apenas logamos para debugging
         };
 
+        // PIN criado pela primeira vez → libera depósito/saque sem precisar recarregar
+        const onPinCriado = () => {
+            setUsuario(prev => prev ? { ...prev, temPin: true } : prev);
+        };
+
         socket.on('tema:ativado',          onTemaAtivado);
         socket.on('tema:comprado',         onTemaComprado);
         socket.on('wallet:saldo_atualizado', onSaldoAtualizado);
         socket.on('tema:erro',             onTemaErro);
+        socket.on('wallet:pin_criado',     onPinCriado);
 
         return () => {
             socket.off('tema:ativado',           onTemaAtivado);
             socket.off('tema:comprado',          onTemaComprado);
             socket.off('wallet:saldo_atualizado', onSaldoAtualizado);
             socket.off('tema:erro',              onTemaErro);
+            socket.off('wallet:pin_criado',      onPinCriado);
         };
     }, [uid]); // uid é string primitiva — comparação segura
 
@@ -175,7 +208,7 @@ export default function App() {
     }, []);
 
     const handleSairMesa = useCallback(() => {
-        socket.emit('sair_mesa');
+        // Game já emite 'sair_mesa' internamente; aqui apenas limpa o estado local
         setMesaAtual(null);
         setTela(TELAS.LOBBY);
     }, []);
@@ -223,7 +256,32 @@ export default function App() {
     );
 
     if (tela === TELAS.AUTH) {
-        return <Auth onAutenticado={handleAutenticado} socket={socket} />;
+        return (
+            <>
+                {erroGlobal && (
+                    <div style={{
+                        position:   'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+                        background: 'rgba(239,68,68,0.12)',
+                        border:     '1px solid rgba(239,68,68,0.35)',
+                        borderTop:  'none',
+                        borderRadius: '0 0 10px 10px',
+                        padding:    '12px 20px',
+                        display:    'flex', alignItems: 'center', gap: '10px',
+                        fontFamily: 'sans-serif',
+                    }}>
+                        <span style={{ fontSize: '18px' }}>⚠️</span>
+                        <p style={{ margin: 0, fontSize: '13px', color: '#FCA5A5', flex: 1 }}>
+                            {erroGlobal}
+                        </p>
+                        <button
+                            onClick={() => setErroGlobal(null)}
+                            style={{ background: 'none', border: 'none', color: '#FCA5A5', cursor: 'pointer', fontSize: '18px', padding: '0 4px' }}
+                        >×</button>
+                    </div>
+                )}
+                <Auth onAutenticado={handleAutenticado} socket={socket} />
+            </>
+        );
     }
 
     if (tela === TELAS.JOGO) {
@@ -243,6 +301,7 @@ export default function App() {
             socket={socket}
             onEntrarMesa={handleEntrarMesa}
             onUsuarioAtualizado={setUsuario}
+            conviteTorneio={conviteTorneio}
         />
     );
 }

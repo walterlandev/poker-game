@@ -14,6 +14,7 @@
 
 import { useState } from 'react';
 import AlterarPin from '../Wallet/AlterarPin';
+import CriarPin   from '../Auth/CriarPin';
 
 export default function ModalConfiguracoes({ usuario, socket, onFechar }) {
 
@@ -45,7 +46,9 @@ export default function ModalConfiguracoes({ usuario, socket, onFechar }) {
                             </button>
                         )}
                         <h2 style={estilos.titulo}>
-                            {secao === 'pin' ? '🔐 Alterar PIN' : '⚙️ Configurações'}
+                            {secao === 'pin'
+                                ? (usuario?.temPin ? '🔐 Alterar PIN' : '🔐 Criar PIN')
+                                : '⚙️ Configurações'}
                         </h2>
                     </div>
                     <button onClick={onFechar} style={estilos.btnFechar}>✕</button>
@@ -66,8 +69,14 @@ export default function ModalConfiguracoes({ usuario, socket, onFechar }) {
                                 >
                                     <div style={estilos.itemIcone}>🔐</div>
                                     <div style={estilos.itemTexto}>
-                                        <p style={estilos.itemTitulo}>Alterar PIN</p>
-                                        <p style={estilos.itemSub}>Mude sua senha de segurança da carteira</p>
+                                        <p style={estilos.itemTitulo}>
+                                            {usuario?.temPin ? 'Alterar PIN' : 'Criar PIN'}
+                                        </p>
+                                        <p style={estilos.itemSub}>
+                                            {usuario?.temPin
+                                                ? 'Mude sua senha de segurança da carteira'
+                                                : 'Necessário pra depositar, sacar e transferir ₿C'}
+                                        </p>
                                     </div>
                                     <span style={estilos.seta}>›</span>
                                 </button>
@@ -111,14 +120,22 @@ export default function ModalConfiguracoes({ usuario, socket, onFechar }) {
                         </>
                     )}
 
-                    {/* ---- Alterar PIN ---- */}
+                    {/* ---- Criar ou Alterar PIN (depende se já existe um) ---- */}
                     {secao === 'pin' && (
-                        <AlterarPin
-                            usuario={usuario}
-                            socket={socket}
-                            onConcluido={() => setSecao(null)}
-                            onCancelar={() => setSecao(null)}
-                        />
+                        usuario?.temPin ? (
+                            <AlterarPin
+                                usuario={usuario}
+                                socket={socket}
+                                onConcluido={() => setSecao(null)}
+                                onCancelar={() => setSecao(null)}
+                            />
+                        ) : (
+                            <CriarPin
+                                usuario={usuario}
+                                socket={socket}
+                                onConcluido={() => setSecao(null)}
+                            />
+                        )
                     )}
 
                 </div>

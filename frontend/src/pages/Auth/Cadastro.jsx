@@ -40,6 +40,7 @@ import {
 } from 'firebase/auth';
 
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { BONUS } from '../Wallet/walletUtils';
 
 // Configura o provedor do Google para o login via popup
 const googleProvider = new GoogleAuthProvider();
@@ -50,28 +51,43 @@ const googleProvider = new GoogleAuthProvider();
 // ================================================================
 
 // Cria o perfil do jogador no Firestore após cadastro
+//
+// Sem saldo real de graça aqui — o bônus de boas-vindas de verdade
+// (₿C 10.000, não sacável) é o do ModalBoasVindas/wallet:resgatar_bonus,
+// que já dispara sozinho no primeiro acesso (usuario.bonusResgatado
+// !== true). Um `saldo: 2000` direto aqui dava ₿C real SACÁVEL de graça
+// pra qualquer cadastro novo, sem nenhum depósito por trás — bug
+// encontrado em auditoria, removido.
 async function criarPerfil(userFirebase, nomePersonalizado) {
     const perfil = {
-        uid:        userFirebase.uid,
-        nome:       nomePersonalizado || userFirebase.displayName || 'Jogador',
-        email:      userFirebase.email,
-        avatar:     userFirebase.photoURL || '',
-        saldo:      2000,        // ₿C de boas-vindas
-        rankPontos: 0,
-        tema:       'classico',
-        criadoEm:   new Date().toISOString(),
+        uid:            userFirebase.uid,
+        nome:           nomePersonalizado || userFirebase.displayName || 'Jogador',
+        email:          userFirebase.email,
+        avatar:         userFirebase.photoURL || '',
+        saldo:          0,
+        saldoBonus:     0,
+        sacadoHoje:     0,
+        bonusResgatado: false,
+        rankPontos:     0,
+        tema:           'classico',
+        temasComprados: [],
+        criadoEm:       new Date().toISOString(),
     };
 
     await setDoc(doc(db, 'jogadores', userFirebase.uid), perfil);
-    return perfil;
+    return { perfil, novoCadastro: true };
 }
 
 // Busca perfil existente (para login com Google de conta já cadastrada)
+// Retorna também se era um cadastro novo ou uma conta já existente —
+// importante pra saber se deve pedir criação de PIN ou ir direto ao Lobby.
 async function buscarOuCriarPerfil(userFirebase, nomePersonalizado) {
     const ref  = doc(db, 'jogadores', userFirebase.uid);
     const snap = await getDoc(ref);
 
-    if (snap.exists()) return { uid: userFirebase.uid, ...snap.data() };
+    if (snap.exists()) {
+        return { perfil: { uid: userFirebase.uid, ...snap.data() }, novoCadastro: false };
+    }
     return criarPerfil(userFirebase, nomePersonalizado);
 }
 
@@ -109,7 +125,7 @@ function validarForm(form) {
 // BLOCO 2: COMPONENTE PRINCIPAL
 // ================================================================
 
-export default function Cadastro({ onAutenticado, onIrParaLogin }) {
+export default function Cadastro({ onAutenticado, onLoginExistente, onIrParaLogin }) {
 
     // Estado do formulário em um único objeto
     // Padrão: um useState por formulário em vez de um por campo
@@ -156,8 +172,16 @@ export default function Cadastro({ onAutenticado, onIrParaLogin }) {
 
         try {
             const resultado = await signInWithPopup(auth, googleProvider);
-            const usuario   = await buscarOuCriarPerfil(resultado.user);
-            onAutenticado(usuario);
+            const { perfil, novoCadastro } = await buscarOuCriarPerfil(resultado.user);
+
+            // Conta já existia (ex: clicou "Cadastrar com Google" de novo por
+            // engano) → vai direto pro Lobby. Só cadastro novo passa pelo
+            // fluxo de criação de PIN — senão travava em "PIN já existe".
+            if (novoCadastro) {
+                onAutenticado(perfil);
+            } else {
+                (onLoginExistente || onAutenticado)(perfil);
+            }
 
         } catch (e) {
             if (e.code === 'auth/popup-closed-by-user') return;
@@ -200,10 +224,10 @@ export default function Cadastro({ onAutenticado, onIrParaLogin }) {
             });
 
             // 3. Salva o perfil no Firestore com os dados do jogo
-            const usuario = await criarPerfil(resultado.user, form.nome.trim());
+            const { perfil } = await criarPerfil(resultado.user, form.nome.trim());
 
             // 4. Notifica o App.jsx
-            onAutenticado(usuario);
+            onAutenticado(perfil);
 
         } catch (e) {
             // Traduz erros do Firebase para português
@@ -233,7 +257,7 @@ export default function Cadastro({ onAutenticado, onIrParaLogin }) {
                 <p style={estilos.subtitulo}>
                     Ganhe{' '}
                     <span style={{ color: '#F59E0B', fontWeight: '700' }}>
-                        ₿C 2.000
+                        ₿C {BONUS.VALOR_BC.toLocaleString('pt-BR')}
                     </span>
                     {' '}de boas-vindas!
                 </p>
@@ -387,7 +411,7 @@ export default function Cadastro({ onAutenticado, onIrParaLogin }) {
                         opacity: carregando ? 0.7 : 1,
                     }}
                 >
-                    {carregando ? 'Criando conta...' : 'Criar conta e ganhar ₿C 2.000'}
+                    {carregando ? 'Criando conta...' : `Criar conta e ganhar ₿C ${BONUS.VALOR_BC.toLocaleString('pt-BR')}`}
                 </button>
 
             </form>

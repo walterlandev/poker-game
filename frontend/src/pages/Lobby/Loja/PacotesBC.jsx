@@ -100,11 +100,21 @@ export default function PacotesBC({ saldoAtual, usuario, socket, onFeedback }) {
             setEtapa('qrcode');
         });
 
+        // Sem isso, PIN errado / valor inválido / falha no PIX deixava a
+        // tela travada pra sempre no spinner "Gerando pagamento...".
+        const onErro = ({ mensagem }) => {
+            if (etapa !== 'aguardando') return;
+            setEtapa('selecao');
+            onFeedback?.('erro', mensagem || 'Não foi possível gerar o pagamento. Tente novamente.');
+        };
+        socket.on('erro', onErro);
+
         return () => {
             socket.off('wallet:deposito_confirmado');
             socket.off('wallet:deposito_iniciado');
+            socket.off('erro', onErro);
         };
-    }, [socket, onFeedback]);
+    }, [socket, onFeedback, etapa]);
 
 
     // ----------------------------------------------------------------
@@ -370,17 +380,21 @@ export default function PacotesBC({ saldoAtual, usuario, socket, onFeedback }) {
                     <p style={estilos.labelMetodo}>Pagar com</p>
                     <div style={estilos.metodos}>
                         {[
-                            { id: 'pix',    icone: '📱', label: 'PIX',    badge: 'Recomendado' },
-                            { id: 'cartao', icone: '💳', label: 'Cartão', badge: null },
+                            { id: 'pix',    icone: '📱', label: 'PIX',    badge: 'Recomendado', disponivel: true },
+                            { id: 'cartao', icone: '💳', label: 'Cartão', badge: 'Em breve',     disponivel: false },
                         ].map(m => (
                             <button
                                 key={m.id}
-                                onClick={() => setMetodo(m.id)}
+                                onClick={() => m.disponivel && setMetodo(m.id)}
+                                disabled={!m.disponivel}
+                                title={m.disponivel ? undefined : 'Pagamento por cartão ainda não está disponível'}
                                 style={{
                                     ...estilos.btnMetodo,
                                     background: metodo === m.id ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.04)',
                                     border:     metodo === m.id ? '1px solid rgba(124,58,237,0.4)' : '1px solid rgba(255,255,255,0.08)',
                                     color:      metodo === m.id ? '#A78BFA' : 'rgba(255,255,255,0.5)',
+                                    opacity:    m.disponivel ? 1 : 0.45,
+                                    cursor:     m.disponivel ? 'pointer' : 'not-allowed',
                                 }}
                             >
                                 <span style={{ fontSize: '18px' }}>{m.icone}</span>

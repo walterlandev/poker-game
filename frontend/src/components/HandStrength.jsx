@@ -214,6 +214,7 @@ export default function HandStrength({
     cartasMesa  = [],
     visivel     = true,
     nOponentes  = 1,
+    compact     = false,   // modo pill horizontal para mobile
 }) {
 
     const [dados,    setDados   ] = useState(null);
@@ -277,6 +278,40 @@ export default function HandStrength({
 
     const { nome, cor, nivel, win, tie, loss } = dados;
     const nivelPct  = Math.round((nivel / 9) * 100);
+
+    // ── Modo compacto: pill horizontal ────────────────────────────────
+    if (compact) {
+        return (
+            <div className="hs-root" style={{
+                display:      'flex',
+                alignItems:   'center',
+                gap:          '8px',
+                background:   'rgba(255,255,255,0.05)',
+                border:       `1px solid ${cor}44`,
+                borderRadius: '20px',
+                padding:      '4px 12px',
+                transition:   'border-color 0.4s',
+                flexShrink:   0,
+            }}>
+                <style>{css}</style>
+                {/* % win */}
+                <span style={{ fontSize:'14px', fontWeight:'800', color: cor, lineHeight:1 }}>
+                    {win}%
+                </span>
+                {/* Separador */}
+                <span style={{ width:'1px', height:'14px', background:'rgba(255,255,255,0.15)', flexShrink:0 }} />
+                {/* Nome da mão */}
+                <span style={{ fontSize:'11px', fontWeight:'600', color:'rgba(255,255,255,0.65)', whiteSpace:'nowrap' }}>
+                    {nome}
+                </span>
+                {/* Barra mini de nível */}
+                <div style={{ width:'40px', height:'3px', background:'rgba(255,255,255,0.08)', borderRadius:'2px', overflow:'hidden', flexShrink:0 }}>
+                    <div style={{ width: nivelPct + '%', height:'100%', background: cor, borderRadius:'2px', transition:'width 0.5s' }} />
+                </div>
+            </div>
+        );
+    }
+    // ─────────────────────────────────────────────────────────────────
     const offset    = CIRC - (CIRC * win / 100);
 
     return (

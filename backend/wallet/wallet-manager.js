@@ -14,6 +14,7 @@ import bcrypt       from 'bcrypt';
 import { depositar, sacar, bonus, confirmarTransacao, TIPOS } from './transactions.js';
 import { blockchain }                    from './blockchain.js';
 import { criarCarteira, validarEndereco } from './wallet.js';
+import { criarPagamentoPIX, enviarPIXSaida } from './mercadopago.js';
 
 
 // ================================================================
@@ -30,6 +31,8 @@ const SAQUE_MAX_DIARIO_BC  = 500_000;
 const SAQUE_MIN_BC         = 5_000;
 const ENVIO_MIN_BC         = 100;
 const ENVIO_MAX_BC         = 100_000;
+const PIN_MAX_TENTATIVAS   = 5;
+const PIN_BLOQUEIO_MS      = 5 * 60 * 1000; // 5 minutos
 
 const MODO_DEV = !process.env.MP_ACCESS_TOKEN;
 
@@ -52,16 +55,66 @@ async function getPerfil(uid) {
     return { uid, ...snap.data() };
 }
 
+// Bloqueio de força bruta feito no SERVIDOR — o front tinha um "máximo de
+// 3 tentativas" só de UI, que resetava a cada remontagem do modal e não
+// protegia nada de verdade. Aqui os contadores ficam no Firestore, então
+// nenhuma tentativa de burlar o cliente escapa do limite.
 async function verificarPin(uid, pin) {
-    const perfil = await getPerfil(uid);
-    if (!perfil?.pinHash) return false;
-    return bcrypt.compare(String(pin), perfil.pinHash);
+    const ref  = refJogador(uid);
+    const snap = await ref.get();
+    if (!snap.exists) return { ok: false, erro: 'Jogador não encontrado.' };
+
+    const d = snap.data();
+    if (!d.pinHash) return { ok: false, erro: 'PIN não configurado.' };
+
+    const bloqueadoAteMs = d.pinBloqueadoAte?.toMillis?.() || 0;
+    if (bloqueadoAteMs > Date.now()) {
+        const minutos = Math.ceil((bloqueadoAteMs - Date.now()) / 60000);
+        return { ok: false, erro: `Muitas tentativas erradas. Tente novamente em ${minutos} min.` };
+    }
+
+    const correto = await bcrypt.compare(String(pin), d.pinHash);
+
+    if (correto) {
+        if (d.pinTentativas > 0) {
+            await ref.update({
+                pinTentativas:   0,
+                pinBloqueadoAte: admin.firestore.FieldValue.delete(),
+            });
+        }
+        return { ok: true };
+    }
+
+    const tentativas = (d.pinTentativas || 0) + 1;
+    if (tentativas >= PIN_MAX_TENTATIVAS) {
+        await ref.update({
+            pinTentativas:   0,
+            pinBloqueadoAte: admin.firestore.Timestamp.fromMillis(Date.now() + PIN_BLOQUEIO_MS),
+        });
+        return { ok: false, erro: `Muitas tentativas erradas. Tente novamente em ${Math.ceil(PIN_BLOQUEIO_MS / 60000)} min.` };
+    }
+
+    await ref.update({ pinTentativas: tentativas });
+    return { ok: false, erro: 'PIN incorreto.' };
 }
 
-async function salvarEEmitirTx(uid, transacao, socket) {
+// contraparte: uid do outro lado da transação (destinatário, no caso de
+// envio P2P) — se não informado, assume que o outro lado é o próprio
+// sistema (depósito/saque/bônus são sempre jogador ↔ casa).
+async function salvarEEmitirTx(uid, transacao, socket, contraparte = 'SISTEMA_BRL') {
     try {
         await refTransacoes(uid).doc(transacao.id).set(transacao);
         socket.emit('wallet:tx_nova', formatarTxParaFrontend(transacao, uid));
+
+        // Registra na blockchain interna (ledger auditável, à prova de
+        // adulteração) — não afeta o saldo real, que continua vindo só
+        // do Firestore; isto é só o histórico imutável em paralelo.
+        const ehRemetente = transacao.remetenteUid === uid;
+        blockchain.adicionarTransacao({
+            ...transacao,
+            remetenteEndereco:    ehRemetente ? uid : contraparte,
+            destinatarioEndereco: ehRemetente ? contraparte : uid,
+        });
     } catch (e) {
         console.error('Erro ao salvar transação:', e.message);
     }
@@ -143,6 +196,14 @@ export async function creditarDeposito(intencaoId, io) {
         );
         await batch.commit();
 
+        // Registra na blockchain interna (mesmo motivo do salvarEEmitirTx —
+        // ledger auditável em paralelo, não é a fonte do saldo real)
+        blockchain.adicionarTransacao({
+            ...txConfirmada,
+            remetenteEndereco:    'SISTEMA_BRL',
+            destinatarioEndereco: uid,
+        });
+
         // Notifica o socket do jogador se ainda estiver online
         // Tenta pelo socketId salvo; se falhar, busca pelo uid
         let socketJogador = io.sockets.sockets.get(socketId);
@@ -165,6 +226,64 @@ export async function creditarDeposito(intencaoId, io) {
 
     } catch (e) {
         console.error('Erro ao creditar depósito:', e.message);
+    }
+}
+
+
+// ================================================================
+// BLOCO 3B: CONFIRMAR SAQUE (usado pelo simulador DEV e, futuramente,
+// pela confirmação real de envio de PIX do Mercado Pago)
+//
+// O ₿C já foi debitado da carteira no momento do PEDIDO de saque
+// (wallet:sacar) — aqui só marcamos que o PIX de saída foi de fato
+// enviado, fechando a transação que ficou como PENDENTE até agora.
+// ================================================================
+
+export async function confirmarSaque(saqueId, io) {
+    try {
+        const db     = admin.firestore();
+        const pedido = await db.collection('saques_pendentes').doc(saqueId).get();
+
+        if (!pedido.exists) {
+            console.error('Pedido de saque não encontrado:', saqueId);
+            return;
+        }
+
+        const data = pedido.data();
+
+        // Idempotência — não processa duas vezes
+        if (data.status === 'PROCESSADO') {
+            console.warn('Saque já processado:', saqueId);
+            return;
+        }
+
+        const { uid, valorBC, brlLiquido, transacaoId, socketId } = data;
+
+        const batch = db.batch();
+        batch.update(db.collection('saques_pendentes').doc(saqueId), {
+            status:       'PROCESSADO',
+            processadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        batch.update(
+            db.collection('jogadores').doc(uid).collection('transacoes').doc(transacaoId),
+            { status: 'CONFIRMADA', confirmadaEm: new Date().toISOString() },
+        );
+        await batch.commit();
+
+        // Notifica o socket do jogador se ainda estiver online
+        let socketJogador = io.sockets.sockets.get(socketId);
+        if (!socketJogador) {
+            socketJogador = encontrarSocket(io, uid);
+        }
+
+        if (socketJogador) {
+            socketJogador.emit('wallet:saque_confirmado', { valorBC, brlLiquido });
+        }
+
+        console.log(`✅ Saque confirmado: ₿C ${valorBC} (R$ ${brlLiquido}) para uid ${uid}`);
+
+    } catch (e) {
+        console.error('Erro ao confirmar saque:', e.message);
     }
 }
 
@@ -196,11 +315,6 @@ export function registrarEventosWallet(socket, io) {
                 return;
             }
 
-            if (perfil.bonusResgatado === true) {
-                socket.emit('wallet:bonus_erro', { mensagem: 'Bônus já resgatado anteriormente.' });
-                return;
-            }
-
             const ultimaTx  = await getUltimaTransacao(jogadorUid);
             const resultado = bonus({
                 uid:          jogadorUid,
@@ -217,10 +331,26 @@ export function registrarEventosWallet(socket, io) {
 
             const txConfirmada = confirmarTransacao(resultado.transacao);
 
-            await refJogador(jogadorUid).update({
-                saldoBonus:     admin.firestore.FieldValue.increment(BONUS_BOAS_VINDAS_BC),
-                bonusResgatado: true,
+            // Transação atômica: lê + marca resgatado numa única operação —
+            // sem isso, dois cliques rápidos (ou reconexão) podiam ambos ler
+            // bonusResgatado=false e creditar o bônus duas vezes.
+            const creditado = await admin.firestore().runTransaction(async (tx) => {
+                const ref  = refJogador(jogadorUid);
+                const snap = await tx.get(ref);
+                if (!snap.exists) return false;
+                if (snap.data().bonusResgatado === true) return false;
+
+                tx.update(ref, {
+                    saldoBonus:     admin.firestore.FieldValue.increment(BONUS_BOAS_VINDAS_BC),
+                    bonusResgatado: true,
+                });
+                return true;
             });
+
+            if (!creditado) {
+                socket.emit('wallet:bonus_erro', { mensagem: 'Bônus já resgatado anteriormente.' });
+                return;
+            }
 
             await salvarEEmitirTx(jogadorUid, txConfirmada, socket);
 
@@ -252,9 +382,9 @@ export function registrarEventosWallet(socket, io) {
 
         try {
             // Valida PIN
-            const pinOk = await verificarPin(jogadorUid, pin);
-            if (!pinOk) {
-                socket.emit('erro', { mensagem: 'PIN incorreto.' });
+            const pinCheck = await verificarPin(jogadorUid, pin);
+            if (!pinCheck.ok) {
+                socket.emit('erro', { mensagem: pinCheck.erro });
                 return;
             }
 
@@ -302,17 +432,40 @@ export function registrarEventosWallet(socket, io) {
                 }, 3000);
 
             } else {
-                // PRODUÇÃO: retorna dados para exibir QR Code real do MP
-                // O crédito acontece via webhook /webhook/mercadopago
+                // PRODUÇÃO: cria pagamento PIX real no Mercado Pago
+                const pagamento = await criarPagamentoPIX({
+                    intencaoId,
+                    valorBRL,
+                    totalBRL,
+                    uid:         jogadorUid,
+                    nomeJogador: socket.data.nome || 'Jogador',
+                });
+
+                if (!pagamento.sucesso) {
+                    await admin.firestore().collection('depositos_pendentes').doc(intencaoId).delete();
+                    socket.emit('erro', { mensagem: 'Erro ao gerar PIX. Tente novamente.' });
+                    console.error(`❌ Falha ao criar PIX para ${socket.data.nome}:`, pagamento.erro);
+                    return;
+                }
+
+                // Salva o pagamentoId do MP para correlação com o webhook
+                await admin.firestore().collection('depositos_pendentes').doc(intencaoId).update({
+                    pagamentoId: pagamento.pagamentoId,
+                });
+
                 socket.emit('wallet:deposito_iniciado', {
                     intencaoId,
                     valorBRL,
                     totalBRL,
                     bcCreditar,
-                    simulado: false,
+                    simulado:      false,
+                    pagamentoId:   pagamento.pagamentoId,
+                    qrCode:        pagamento.qrCode,
+                    pixCopiaECola: pagamento.pixCopiaECola,
+                    expiracaoEm:   pagamento.expiracaoEm,
                 });
 
-                console.log(`💰 Depósito iniciado: R$ ${totalBRL} por ${socket.data.nome}`);
+                console.log(`💰 PIX criado: R$ ${totalBRL} por ${socket.data.nome} → pagamento ${pagamento.pagamentoId}`);
             }
 
         } catch (e) {
@@ -325,33 +478,68 @@ export function registrarEventosWallet(socket, io) {
     // ----------------------------------------------------------------
     // EVENTO: wallet:sacar
     // ----------------------------------------------------------------
-    socket.on('wallet:sacar', async ({ valorBC, brlLiquido, taxaBRL, pin }) => {
+    socket.on('wallet:sacar', async ({ valorBC, chavePix, pin }) => {
         const jogadorUid = uid();
         if (!jogadorUid) return;
 
         try {
-            const pinOk = await verificarPin(jogadorUid, pin);
-            if (!pinOk) {
-                socket.emit('erro', { mensagem: 'PIN incorreto.' });
+            const pinCheck = await verificarPin(jogadorUid, pin);
+            if (!pinCheck.ok) {
+                socket.emit('erro', { mensagem: pinCheck.erro });
                 return;
             }
+
+            const valor = Math.floor(Number(valorBC));
+            if (!Number.isFinite(valor) || valor < SAQUE_MIN_BC) {
+                socket.emit('erro', { mensagem: `Saque mínimo: ₿C ${SAQUE_MIN_BC.toLocaleString('pt-BR')}` });
+                return;
+            }
+
+            const chave = String(chavePix || '').trim();
+            if (!chave) {
+                socket.emit('erro', { mensagem: 'Informe a chave PIX que vai receber o valor.' });
+                return;
+            }
+
+            // brlLiquido/taxaBRL são só o que é MOSTRADO/registrado — sempre
+            // recalculados aqui a partir de valor, nunca aceitos do cliente
+            // (senão o jogador podia inflar o valor a ser pago pelo saque
+            // mantendo o débito de ₿C mínimo).
+            const brlBruto   = parseFloat((valor / COTACAO_BC_POR_REAL).toFixed(2));
+            const taxaBRL    = parseFloat((brlBruto * TAXA_SAQUE).toFixed(2));
+            const brlLiquido = parseFloat((brlBruto - taxaBRL).toFixed(2));
 
             const perfil = await getPerfil(jogadorUid);
             if (!perfil) return;
 
-            const saldoReal  = perfil.saldo      || 0;
-            const sacadoHoje = perfil.sacadoHoje || 0;
+            // Transação atômica: lê saldo real + limite diário e debita numa
+            // única operação — evita corrida (duplo clique, reconexão) que
+            // deixaria o saldo negativo ou passaria do limite diário.
+            const resultado2 = await admin.firestore().runTransaction(async (tx) => {
+                const ref  = refJogador(jogadorUid);
+                const snap = await tx.get(ref);
+                if (!snap.exists) return { sucesso: false, erro: 'Jogador não encontrado.' };
 
-            if (valorBC < SAQUE_MIN_BC) {
-                socket.emit('erro', { mensagem: `Saque mínimo: ₿C ${SAQUE_MIN_BC.toLocaleString('pt-BR')}` });
-                return;
-            }
-            if (valorBC > saldoReal) {
-                socket.emit('erro', { mensagem: 'Saldo real insuficiente. O bônus não pode ser sacado.' });
-                return;
-            }
-            if (sacadoHoje + valorBC > SAQUE_MAX_DIARIO_BC) {
-                socket.emit('erro', { mensagem: 'Limite diário de saque atingido.' });
+                const d          = snap.data();
+                const saldoReal  = d.saldo      || 0;
+                const sacadoHoje = d.sacadoHoje || 0;
+
+                if (valor > saldoReal) {
+                    return { sucesso: false, erro: 'Saldo real insuficiente. O bônus não pode ser sacado.' };
+                }
+                if (sacadoHoje + valor > SAQUE_MAX_DIARIO_BC) {
+                    return { sucesso: false, erro: 'Limite diário de saque atingido.' };
+                }
+
+                tx.update(ref, {
+                    saldo:      admin.firestore.FieldValue.increment(-valor),
+                    sacadoHoje: admin.firestore.FieldValue.increment(valor),
+                });
+                return { sucesso: true };
+            });
+
+            if (!resultado2.sucesso) {
+                socket.emit('erro', { mensagem: resultado2.erro });
                 return;
             }
 
@@ -359,32 +547,57 @@ export function registrarEventosWallet(socket, io) {
             const resultado = sacar({
                 uid:            jogadorUid,
                 endereco:       perfil.endereco || '',
-                valor:          valorBC,
+                valor,
                 privateKeyPem:  null,
                 hashAnterior:   ultimaTx?.hash || '0'.repeat(64),
-                dadosBancarios: perfil.dadosBancarios || {},
+                dadosBancarios: { ...(perfil.dadosBancarios || {}), chavePix: chave },
             });
 
             if (!resultado.sucesso) {
+                // Saque já foi debitado na transação acima — devolve o saldo,
+                // já que a construção do registro de transação falhou depois.
+                await refJogador(jogadorUid).update({
+                    saldo:      admin.firestore.FieldValue.increment(valor),
+                    sacadoHoje: admin.firestore.FieldValue.increment(-valor),
+                });
                 socket.emit('erro', { mensagem: resultado.erro });
                 return;
             }
 
-            await refJogador(jogadorUid).update({
-                saldo:      admin.firestore.FieldValue.increment(-valorBC),
-                sacadoHoje: admin.firestore.FieldValue.increment(valorBC),
-            });
-
-            const txConfirmada = confirmarTransacao({
+            // Fica PENDENTE até o PIX de saída ser realmente enviado —
+            // diferente do resto da carteira, isso ainda não confirma na
+            // hora (ver processarSaquePIX/confirmarSaque logo abaixo).
+            const txPendente = {
                 ...resultado.transacao,
                 metadados: {
                     ...resultado.transacao.metadados,
                     taxaBRL,
                     brlLiquido,
+                    chavePix: chave,
                 },
-            });
+            };
 
-            await salvarEEmitirTx(jogadorUid, txConfirmada, socket);
+            await salvarEEmitirTx(jogadorUid, txPendente, socket);
+
+            // Lembra a chave PIX pra próxima vez, sem sobrescrever outros
+            // dados bancários que já existam no perfil.
+            await refJogador(jogadorUid).update({
+                dadosBancarios: { ...(perfil.dadosBancarios || {}), chavePix: chave },
+            }).catch(() => {});
+
+            const saqueId = `saq_${jogadorUid}_${Date.now()}`;
+            await admin.firestore().collection('saques_pendentes').doc(saqueId).set({
+                uid:         jogadorUid,
+                valorBC:     valor,
+                brlBruto,
+                taxaBRL,
+                brlLiquido,
+                chavePix:    chave,
+                transacaoId: txPendente.id,
+                status:      'PENDENTE',
+                criadoEm:    admin.firestore.FieldValue.serverTimestamp(),
+                socketId:    socket.id,
+            });
 
             const perfilAtualizado = await getPerfil(jogadorUid);
             socket.emit('wallet:saldo_atualizado', {
@@ -392,8 +605,29 @@ export function registrarEventosWallet(socket, io) {
                 saldoBonus: perfilAtualizado.saldoBonus || 0,
                 sacadoHoje: perfilAtualizado.sacadoHoje || 0,
             });
+            socket.emit('wallet:saque_pendente', { saqueId, valorBC: valor, brlLiquido, chavePix: chave });
 
-            console.log(`⬆️  Saque de ₿C ${valorBC} por ${socket.data.nome} → R$ ${brlLiquido}`);
+            if (MODO_DEV) {
+                // DEV: simula o envio do PIX e confirma automaticamente em 3s
+                console.log(`🧪 [DEV] Saque simulado: ₿C ${valor} (R$ ${brlLiquido}) para ${socket.data.nome} → chave ${chave}`);
+                setTimeout(() => confirmarSaque(saqueId, io), 3000);
+            } else {
+                const envio = await enviarPIXSaida({
+                    saqueId, valorBC: valor, brlLiquido, chavePix: chave,
+                    uid: jogadorUid, nomeJogador: socket.data.nome,
+                });
+                if (!envio.sucesso) {
+                    // Não devolve o débito automaticamente — o saque fica
+                    // registrado como PENDENTE pra processamento manual,
+                    // já que o jogador já viu a confirmação do pedido.
+                    console.error(`❌ Envio de PIX de saída falhou (saque ${saqueId}):`, envio.erro);
+                    socket.emit('notificacao', {
+                        mensagem: 'Seu saque foi registrado, mas o envio automático falhou. Nossa equipe vai processar manualmente.',
+                    });
+                }
+            }
+
+            console.log(`⬆️  Saque solicitado: ₿C ${valor} por ${socket.data.nome} → R$ ${brlLiquido} (chave ${chave})`);
 
         } catch (e) {
             console.error('Erro ao processar saque:', e.message);
@@ -405,14 +639,14 @@ export function registrarEventosWallet(socket, io) {
     // ----------------------------------------------------------------
     // EVENTO: wallet:enviar
     // ----------------------------------------------------------------
-    socket.on('wallet:enviar', async ({ destinatarioUid, valorBC, taxaBC, totalDebitado, mensagem, pin }) => {
+    socket.on('wallet:enviar', async ({ destinatarioUid, valorBC, mensagem, pin }) => {
         const jogadorUid = uid();
         if (!jogadorUid) return;
 
         try {
-            const pinOk = await verificarPin(jogadorUid, pin);
-            if (!pinOk) {
-                socket.emit('wallet:envio_erro', { mensagem: 'PIN incorreto.' });
+            const pinCheck = await verificarPin(jogadorUid, pin);
+            if (!pinCheck.ok) {
+                socket.emit('wallet:envio_erro', { mensagem: pinCheck.erro });
                 return;
             }
 
@@ -421,44 +655,64 @@ export function registrarEventosWallet(socket, io) {
                 return;
             }
 
-            if (valorBC < ENVIO_MIN_BC) {
+            // valor é a ÚNICA entrada confiada ao cliente — taxa e total sempre
+            // recalculados aqui. Nunca aceitar taxaBC/totalDebitado do cliente:
+            // permitia ao jogador creditar qualquer valorBC debitando quase nada.
+            const valor = Math.floor(Number(valorBC));
+            if (!Number.isFinite(valor) || valor < ENVIO_MIN_BC) {
                 socket.emit('wallet:envio_erro', { mensagem: `Envio mínimo: ₿C ${ENVIO_MIN_BC}` });
                 return;
             }
-            if (valorBC > ENVIO_MAX_BC) {
+            if (valor > ENVIO_MAX_BC) {
                 socket.emit('wallet:envio_erro', { mensagem: `Envio máximo: ₿C ${ENVIO_MAX_BC.toLocaleString('pt-BR')}` });
                 return;
             }
 
-            const remetente    = await getPerfil(jogadorUid);
-            const destinatario = await getPerfil(destinatarioUid);
+            const taxa          = Math.max(TAXA_ENVIO_MIN_BC, Math.ceil(valor * TAXA_ENVIO));
+            const totalDebitado = valor + taxa;
 
+            const destinatario = await getPerfil(destinatarioUid);
             if (!destinatario) {
                 socket.emit('wallet:envio_erro', { mensagem: 'Destinatário não encontrado.' });
                 return;
             }
 
-            const saldoTotal = (remetente.saldo || 0) + (remetente.saldoBonus || 0);
-            if (totalDebitado > saldoTotal) {
-                socket.emit('wallet:envio_erro', { mensagem: 'Saldo insuficiente.' });
+            // Transação atômica: lê + valida + debita/credita numa única operação —
+            // sem isso, dois envios simultâneos (duplo clique, reconexão) podiam
+            // ler o mesmo saldo e ambos passar na validação, deixando saldo negativo.
+            const resultado = await admin.firestore().runTransaction(async (tx) => {
+                const refRem  = refJogador(jogadorUid);
+                const snapRem = await tx.get(refRem);
+                if (!snapRem.exists) return { sucesso: false, erro: 'Jogador não encontrado.' };
+
+                const remetente  = snapRem.data();
+                const saldoReal  = remetente.saldo      || 0;
+                const saldoBonus = remetente.saldoBonus || 0;
+
+                if (totalDebitado > saldoReal + saldoBonus) {
+                    return { sucesso: false, erro: 'Saldo insuficiente.' };
+                }
+
+                const debitarReal  = Math.min(totalDebitado, saldoReal);
+                const debitarBonus = totalDebitado - debitarReal;
+
+                tx.update(refRem, {
+                    saldo:      admin.firestore.FieldValue.increment(-debitarReal),
+                    saldoBonus: admin.firestore.FieldValue.increment(-debitarBonus),
+                });
+                tx.update(refJogador(destinatarioUid), {
+                    saldo: admin.firestore.FieldValue.increment(valor),
+                });
+
+                return { sucesso: true, remetenteNome: remetente.nome };
+            });
+
+            if (!resultado.sucesso) {
+                socket.emit('wallet:envio_erro', { mensagem: resultado.erro });
                 return;
             }
 
-            // Debita real primeiro, complementa com bônus
-            const saldoReal  = remetente.saldo      || 0;
-            const saldoBonus = remetente.saldoBonus || 0;
-            const debitarReal  = Math.min(totalDebitado, saldoReal);
-            const debitarBonus = Math.min(totalDebitado - debitarReal, saldoBonus);
-
-            const batch = admin.firestore().batch();
-            batch.update(refJogador(jogadorUid), {
-                saldo:      admin.firestore.FieldValue.increment(-debitarReal),
-                saldoBonus: admin.firestore.FieldValue.increment(-debitarBonus),
-            });
-            batch.update(refJogador(destinatarioUid), {
-                saldo: admin.firestore.FieldValue.increment(valorBC),
-            });
-            await batch.commit();
+            const remetenteNome = resultado.remetenteNome;
 
             const ultimaTxRemetente    = await getUltimaTransacao(jogadorUid);
             const ultimaTxDestinatario = await getUltimaTransacao(destinatarioUid);
@@ -471,8 +725,8 @@ export function registrarEventosWallet(socket, io) {
                 remetenteUid: jogadorUid,
                 destinatarioUid,
                 valor:        totalDebitado,
-                taxa:         taxaBC,
-                valorLiquido: valorBC,
+                taxa,
+                valorLiquido: valor,
                 timestamp:    new Date().toISOString(),
                 status:       'CONFIRMADA',
                 metadados: {
@@ -489,23 +743,23 @@ export function registrarEventosWallet(socket, io) {
                 tipo:         'RECEBIMENTO',
                 remetenteUid: jogadorUid,
                 destinatarioUid,
-                valor:        valorBC,
+                valor,
                 taxa:         0,
-                valorLiquido: valorBC,
+                valorLiquido: valor,
                 timestamp:    new Date().toISOString(),
                 status:       'CONFIRMADA',
                 metadados: {
                     mensagem:        mensagem || null,
-                    nomeContraparte: remetente.nome,
-                    descricao:       `Recebido de ${remetente.nome}`,
+                    nomeContraparte: remetenteNome,
+                    descricao:       `Recebido de ${remetenteNome}`,
                 },
             });
 
-            await salvarEEmitirTx(jogadorUid, txEnvio, socket);
+            await salvarEEmitirTx(jogadorUid, txEnvio, socket, destinatarioUid);
 
             const socketDestinatario = encontrarSocket(io, destinatarioUid);
             if (socketDestinatario) {
-                await salvarEEmitirTx(destinatarioUid, txRecebimento, socketDestinatario);
+                await salvarEEmitirTx(destinatarioUid, txRecebimento, socketDestinatario, jogadorUid);
                 const perfilDest = await getPerfil(destinatarioUid);
                 socketDestinatario.emit('wallet:saldo_atualizado', {
                     saldo:      perfilDest.saldo      || 0,
@@ -514,6 +768,11 @@ export function registrarEventosWallet(socket, io) {
                 });
             } else {
                 await refTransacoes(destinatarioUid).doc(txRecebimento.id).set(txRecebimento);
+                blockchain.adicionarTransacao({
+                    ...txRecebimento,
+                    remetenteEndereco:    jogadorUid,
+                    destinatarioEndereco: destinatarioUid,
+                });
             }
 
             const perfilRem = await getPerfil(jogadorUid);
@@ -523,13 +782,42 @@ export function registrarEventosWallet(socket, io) {
                 sacadoHoje: perfilRem.sacadoHoje || 0,
             });
 
-            socket.emit('wallet:envio_confirmado', { valorBC, destinatario: destinatario.nome });
-            console.log(`➡️  ${remetente.nome} enviou ₿C ${valorBC} para ${destinatario.nome}`);
+            socket.emit('wallet:envio_confirmado', { valorBC: valor, destinatario: destinatario.nome });
+            console.log(`➡️  ${remetenteNome} enviou ₿C ${valor} para ${destinatario.nome}`);
 
         } catch (e) {
             console.error('Erro ao processar envio:', e.message);
             socket.emit('wallet:envio_erro', { mensagem: 'Erro ao processar envio.' });
         }
+    });
+
+
+    // ----------------------------------------------------------------
+    // EVENTO: blockchain:verificar
+    // Qualquer jogador pode conferir que a cadeia inteira ainda bate —
+    // nenhum bloco foi adulterado, o encadeamento de hashes está intacto.
+    // ----------------------------------------------------------------
+    socket.on('blockchain:verificar', () => {
+        const validacao = blockchain.validarCadeia();
+        socket.emit('blockchain:status', {
+            ...blockchain.getInfo(),
+            valida: validacao.valida,
+            motivo: validacao.motivo || null,
+        });
+    });
+
+    // ----------------------------------------------------------------
+    // EVENTO: blockchain:meu_historico
+    // Histórico do próprio jogador reconstruído DIRETO da blockchain
+    // (não do Firestore) — prova de que as transações estão mesmo
+    // registradas na cadeia, com o número do bloco de cada uma.
+    // ----------------------------------------------------------------
+    socket.on('blockchain:meu_historico', () => {
+        const jogadorUid = uid();
+        if (!jogadorUid) return;
+        socket.emit('blockchain:meu_historico_resultado', {
+            historico: blockchain.getHistoricoEndereco(jogadorUid),
+        });
     });
 
 
@@ -718,6 +1006,28 @@ export async function resetarLimiteDiario() {
 
     } catch (e) {
         console.error('Erro ao resetar limite diário:', e.message);
+    }
+}
+
+
+// ================================================================
+// BLOCO 6: MINERAÇÃO PERIÓDICA DA BLOCKCHAIN INTERNA
+//
+// Chamado por um setInterval em server.js. Não há rede de nós de
+// verdade (Fase 1 centralizada) — "minerar" aqui só fecha os blocos
+// pendentes na mempool em blocos encadeados e persistidos, deixando
+// o histórico auditável e à prova de adulteração.
+// ================================================================
+
+export async function minerarBlocoSeNecessario() {
+    if (blockchain.mempool.length === 0) return;
+    try {
+        const resultado = await blockchain.minarBloco('BC_SISTEMA_NODE_CENTRAL');
+        if (resultado.sucesso) {
+            console.log(`⛏️  Blockchain: bloco #${resultado.bloco.indice} minerado — ${resultado.transacoes} tx, ${resultado.tentativas} tentativas, ${resultado.tempoMineracao}.`);
+        }
+    } catch (e) {
+        console.error('Erro ao minerar bloco:', e.message);
     }
 }
 

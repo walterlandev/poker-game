@@ -61,75 +61,41 @@ export default function InfoMesa({ mesa }) {
     return (
         <div style={estilos.container}>
 
-            {/* ---- LINHA SUPERIOR: Nome + Fase ---- */}
-            <div style={estilos.linhaTopo}>
+            {/* Nome */}
+            <p style={estilos.nomeMesa}>
+                {mesa.nome || 'Mesa'}
+            </p>
 
-                {/* Nome da mesa */}
-                <p style={estilos.nomeMesa}>
-                    🃏 {mesa.nome || 'Mesa de Poker'}
-                </p>
-
-                {/* Badge da fase atual */}
-                <div style={{
-                    ...estilos.badgeFase,
-                    background: `${configFase.cor}20`,
-                    border:     `1px solid ${configFase.cor}50`,
-                    color:       configFase.cor,
-                }}>
-                    {/* Ponto pulsante quando em jogo */}
-                    {mesa.fase !== 'AGUARDANDO' && mesa.fase !== 'SHOWDOWN' && (
-                        <span style={{
-                            ...estilos.pontoPulsante,
-                            background: configFase.cor,
-                        }} />
-                    )}
-                    {configFase.icone} {configFase.label}
-                </div>
-
-            </div>
-
-            {/* ---- LINHA INFERIOR: Pote + Blinds ---- */}
-            <div style={estilos.linhaInfo}>
-
-                {/* Pote total */}
-                <InfoItem
-                    label="Pote"
-                    valor={`₿C ${fmt(mesa.pote)}`}
-                    destaque
-                    corValor="#F59E0B"
-                />
-
-                <Separador />
-
-                {/* Small Blind */}
-                <InfoItem
-                    label="SB"
-                    valor={`₿C ${fmt(mesa.smallBlind)}`}
-                    corValor="#94A3B8"
-                />
-
-                <Separador />
-
-                {/* Big Blind */}
-                <InfoItem
-                    label="BB"
-                    valor={`₿C ${fmt(mesa.bigBlind)}`}
-                    corValor="#94A3B8"
-                />
-
-                {/* Maior aposta — só mostra quando há aposta ativa */}
-                {temAposta && (
-                    <>
-                        <Separador />
-                        <InfoItem
-                            label="Call"
-                            valor={`₿C ${fmt(mesa.maiorAposta)}`}
-                            corValor="#22C55E"
-                        />
-                    </>
+            {/* Badge fase */}
+            <div style={{
+                ...estilos.badgeFase,
+                background: `${configFase.cor}20`,
+                border:     `1px solid ${configFase.cor}50`,
+                color:       configFase.cor,
+            }}>
+                {mesa.fase !== 'AGUARDANDO' && mesa.fase !== 'SHOWDOWN' && (
+                    <span style={{ ...estilos.pontoPulsante, background: configFase.cor }} />
                 )}
-
+                {configFase.label}
             </div>
+
+            <Separador />
+
+            {/* Pote */}
+            <InfoItem label="Pote" valor={`₿C ${fmt(mesa.pote)}`} corValor="#F59E0B" />
+
+            <Separador />
+
+            {/* BB */}
+            <InfoItem label="BB" valor={fmt(mesa.bigBlind)} corValor="#94A3B8" />
+
+            {/* Call */}
+            {temAposta && (
+                <>
+                    <Separador />
+                    <InfoItem label="Call" valor={`₿C ${fmt(mesa.maiorAposta)}`} corValor="#22C55E" />
+                </>
+            )}
 
         </div>
     );
@@ -142,16 +108,11 @@ export default function InfoMesa({ mesa }) {
 
 // Item de informação com label e valor
 // destaque → valor em tamanho maior
-function InfoItem({ label, valor, destaque = false, corValor = '#F8FAFC' }) {
+function InfoItem({ label, valor, corValor = '#F8FAFC' }) {
     return (
         <div style={estilos.infoItem}>
             <span style={estilos.infoLabel}>{label}</span>
-            <span style={{
-                ...estilos.infoValor,
-                color:    corValor,
-                fontSize: destaque ? '14px' : '11px',
-                fontWeight: destaque ? '700' : '600',
-            }}>
+            <span style={{ ...estilos.infoValor, color: corValor, fontSize:'11px', fontWeight:'600' }}>
                 {valor}
             </span>
         </div>
@@ -170,74 +131,51 @@ function Separador() {
 
 const estilos = {
 
-    // Container principal do painel
-    // Fica fixo no topo da tela do jogo
+    // Uma única linha horizontal — compacta
     container: {
-        background:   '#0d1424',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        padding:      '8px 14px',
-        display:      'flex',
-        flexDirection: 'column',
-        gap:          '6px',
-        flexShrink:   0,
+        display:     'flex',
+        alignItems:  'center',
+        gap:         '8px',
+        flex:        1,
+        minWidth:    0,
+        padding:     '0 10px',
+        overflowX:   'auto',
+        scrollbarWidth: 'none',
     },
 
-    // Linha do topo: nome + fase
-    linhaTopo: {
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'space-between',
-        gap:            '8px',
-    },
-
-    // Nome da mesa
     nomeMesa: {
-        fontSize:     '13px',
+        fontSize:     '12px',
         fontWeight:   '600',
         color:        '#F8FAFC',
         margin:       0,
         overflow:     'hidden',
         textOverflow: 'ellipsis',
         whiteSpace:   'nowrap',
-        flex:         1,
+        flexShrink:   1,
+        minWidth:     0,
     },
 
-    // Badge colorido da fase atual
     badgeFase: {
         display:      'flex',
         alignItems:   'center',
-        gap:          '5px',
-        padding:      '3px 8px',
-        borderRadius: '20px',
-        fontSize:     '11px',
+        gap:          '4px',
+        padding:      '2px 7px',
+        borderRadius: '12px',
+        fontSize:     '10px',
         fontWeight:   '600',
         flexShrink:   0,
         whiteSpace:   'nowrap',
     },
 
-    // Ponto pulsante dentro do badge de fase
-    // Indica visualmente que o jogo está ativo
     pontoPulsante: {
         width:        '5px',
         height:       '5px',
         borderRadius: '50%',
         display:      'inline-block',
-        animation:    'pulsar 1.5s ease-in-out infinite',
+        animation:    'pulse 1.5s ease-in-out infinite',
         flexShrink:   0,
     },
 
-    // Linha inferior: pote, blinds, call
-    linhaInfo: {
-        display:    'flex',
-        alignItems: 'center',
-        gap:        '8px',
-        overflowX:  'auto',                // scroll horizontal se precisar
-        scrollbarWidth: 'none',            // esconde scrollbar no Firefox
-        msOverflowStyle: 'none',           // esconde scrollbar no IE
-        paddingBottom: '2px',
-    },
-
-    // Item individual (label + valor)
     infoItem: {
         display:       'flex',
         flexDirection: 'column',
@@ -246,26 +184,23 @@ const estilos = {
         flexShrink:    0,
     },
 
-    // Label pequeno acima do valor
     infoLabel: {
-        fontSize:      '9px',
-        color:         'rgba(255,255,255,0.35)',
+        fontSize:      '8px',
+        color:         'rgba(255,255,255,0.30)',
         textTransform: 'uppercase',
         letterSpacing: '0.06em',
         lineHeight:    1,
     },
 
-    // Valor em destaque
     infoValor: {
         lineHeight: 1,
         whiteSpace: 'nowrap',
     },
 
-    // Separador vertical entre itens
     separador: {
-        width:        '1px',
-        height:       '24px',
-        background:   'rgba(255,255,255,0.08)',
-        flexShrink:   0,
+        width:     '1px',
+        height:    '20px',
+        background:'rgba(255,255,255,0.08)',
+        flexShrink: 0,
     },
 };

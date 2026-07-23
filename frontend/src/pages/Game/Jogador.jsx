@@ -1,30 +1,15 @@
-/* ================================================================
-   ARQUIVO: frontend/src/pages/Game/Jogador.jsx
-
-   Representa um assento da mesa de poker.
-   NOVO: Temporizador circular ao redor do avatar.
-
-   PROPS:
-     jogador        → { nome, avatar, saldo, aposta, status, cartas }
-     souEu          → true se for o jogador local
-     ehVez          → true se for a vez deste jogador
-     cartasPrivadas → cartas reais (só para souEu)
-     ehDealer/ehSB/ehBB → badges de posição
-     tempoMs        → tempo total do timer (humano=90000, bot=30000)
-================================================================ */
-
 import Temporizador from './Temporizador';
-
-const COR_NAIPE     = { h:'#DC2626', d:'#DC2626', s:'#111827', c:'#111827' };
-const SIMBOLO_NAIPE = { h:'♥', d:'♦', s:'♠', c:'♣' };
+import { getTema }  from '../../core/temas';
+import { corPorValor } from '../../core/chipCores';
+import ChipPoker    from '../../components/ChipPoker';
 
 function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
 
 function parsearCarta(codigo) {
     if (!codigo || codigo === 'XX') return null;
-    const naipe = codigo.slice(-1).toLowerCase();
+    const naipe = codigo.slice(-1);   // Unicode: '♥' '♦' '♠' '♣' — não aplicar toLowerCase
     const valor = codigo.slice(0, -1);
-    return { codigo, valor, naipe, simbolo: SIMBOLO_NAIPE[naipe]||naipe, cor: COR_NAIPE[naipe]||'#111827' };
+    return { codigo, valor, naipe };
 }
 
 export default function Jogador({
@@ -35,208 +20,256 @@ export default function Jogador({
     ehDealer       = false,
     ehSB           = false,
     ehBB           = false,
-    tempoMs        = 90000,
+    tempoMs        = 45000,
+    avatarSz       = 58,     // escala responsiva vinda do Mesa.jsx
+    tema           = 'classico',
 }) {
     if (!jogador) return null;
 
-    const foldado   = jogador.status === 'FOLD';
-    const allIn     = jogador.status === 'ALL-IN';
-    const temAposta = (jogador.aposta || 0) > 0;
+    const foldado   = jogador.status === 'fold' || jogador.status === 'FOLD';
+    const allIn     = jogador.status === 'all-in' || jogador.status === 'ALL-IN';
+    const apostaVal = jogador.apostaRodada || jogador.aposta || 0;
 
-    let corBorda = 'rgba(255,255,255,0.12)';
-    if (ehVez)   corBorda = '#F59E0B';
-    if (souEu)   corBorda = '#7C3AED';
-    if (foldado) corBorda = 'rgba(255,255,255,0.06)';
+    // Dimensões escaladas proporcionalmente ao avatarSz
+    const cardW      = Math.round(avatarSz * 0.47);  // ex: 58→27px
+    const cardH      = Math.round(cardW * 1.40);
+    const cardFv     = Math.max(8,  Math.round(cardW * 0.36));
+    const cardFn     = Math.max(10, Math.round(cardW * 0.50));
+    const nomeFont   = Math.max(9,  Math.round(avatarSz * 0.18));
+    const saldoFont  = Math.max(8,  Math.round(avatarSz * 0.16));
+    const chipFont   = Math.max(8,  Math.round(avatarSz * 0.15));
+    const badgeFont  = Math.max(6,  Math.round(avatarSz * 0.13));
+
+    const cartas = souEu && cartasPrivadas.length > 0
+        ? cartasPrivadas
+        : (jogador.cartas || []);
 
     return (
         <div style={{
-            ...estilos.assento,
-            borderColor: corBorda,
-            opacity:     foldado ? 0.45 : 1,
-            boxShadow:   ehVez
-                ? '0 0 0 2px rgba(245,158,11,0.3), 0 4px 16px rgba(0,0,0,0.5)'
-                : '0 2px 10px rgba(0,0,0,0.4)',
+            display:       'flex',
+            flexDirection: 'column',
+            alignItems:    'center',
+            gap:           Math.round(avatarSz * 0.07) + 'px',
+            position:      'relative',
+            opacity:        foldado ? 0.38 : 1,
         }}>
 
-            {/* Badges D / SB / BB */}
-            <div style={estilos.badges}>
-                {ehDealer && <Badge texto="D"  cor="#F59E0B" />}
-                {ehSB     && <Badge texto="SB" cor="#3B82F6" />}
-                {ehBB     && <Badge texto="BB" cor="#8B5CF6" />}
-            </div>
+            {/* Chip de aposta flutuante acima do avatar */}
+            {apostaVal > 0 && !foldado && (
+                <div style={{
+                    position:     'absolute',
+                    top:          -(Math.round(avatarSz * 0.38)) + 'px',
+                    left:         '50%',
+                    transform:    'translateX(-50%)',
+                    display:      'flex',
+                    alignItems:   'center',
+                    gap:          '4px',
+                    background:   'rgba(8,12,24,0.75)',
+                    border:       '1px solid rgba(255,255,255,0.18)',
+                    borderRadius: '20px',
+                    padding:      '2px 8px 2px 4px',
+                    whiteSpace:   'nowrap',
+                    zIndex:       6,
+                    boxShadow:    '0 2px 8px rgba(0,0,0,0.5)',
+                }}>
+                    <ChipPoker size={Math.max(14, Math.round(avatarSz * 0.28))} {...corPorValor(apostaVal)} />
+                    <span style={{ fontSize: chipFont+'px', fontWeight:'800', color:'#fff', letterSpacing:'0.02em' }}>
+                        ₿C {fmt(apostaVal)}
+                    </span>
+                </div>
+            )}
 
-            {/* Avatar + Temporizador circular */}
+            {/* Avatar + ring de turno */}
             <div style={{
-                ...estilos.avatarWrapper,
-                boxShadow: souEu ? '0 0 0 2px #7C3AED' : 'none',
+                position:     'relative',
+                width:        avatarSz + 'px',
+                height:       avatarSz + 'px',
+                borderRadius: '50%',
+                flexShrink:   0,
+                transition:   'box-shadow 0.3s',
+                boxShadow: ehVez
+                    ? `0 0 0 ${Math.round(avatarSz*0.05)}px #F59E0B, 0 0 20px rgba(245,158,11,0.55)`
+                    : souEu
+                        ? `0 0 0 ${Math.round(avatarSz*0.04)}px #7C3AED, 0 0 12px rgba(124,58,237,0.4)`
+                        : `0 0 0 ${Math.round(avatarSz*0.03)}px rgba(255,255,255,0.12)`,
             }}>
-                {/* Avatar */}
-                <div style={estilos.avatarInner}>
+                {/* Face do avatar */}
+                <div style={{
+                    width:          '100%',
+                    height:         '100%',
+                    borderRadius:   '50%',
+                    background:     'linear-gradient(135deg,#1f2937,#111827)',
+                    display:        'flex',
+                    alignItems:     'center',
+                    justifyContent: 'center',
+                    overflow:       'hidden',
+                    position:       'relative',
+                    zIndex:         1,
+                }}>
                     {jogador.avatar ? (
-                        <img src={jogador.avatar} alt={jogador.nome} style={estilos.avatarImg}
-                            onError={e => { e.target.onerror=null; e.target.style.display='none'; }} />
+                        <img
+                            src={jogador.avatar}
+                            alt={jogador.nome}
+                            style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:'50%' }}
+                            onError={e => { e.target.onerror=null; e.target.style.display='none'; }}
+                        />
                     ) : (
-                        <span style={{ fontSize:'18px', lineHeight:1 }}>
+                        <span style={{ fontSize: Math.round(avatarSz * 0.40) + 'px', lineHeight:1 }}>
                             {jogador.bot ? '🤖' : '🧑'}
                         </span>
                     )}
                 </div>
 
-                {/* Temporizador circular — aparece só quando é a vez */}
-                <Temporizador totalMs={tempoMs} ativo={ehVez} tamanho={50} />
+                {/* Anel de tempo */}
+                <Temporizador totalMs={tempoMs} ativo={ehVez} tamanho={avatarSz} />
+
+                {/* Badges ALL-IN / FOLD */}
+                {allIn && (
+                    <div style={{
+                        position:'absolute', bottom:'-4px', left:'50%',
+                        transform:'translateX(-50%)',
+                        background:'#EF4444', color:'#fff',
+                        fontSize: badgeFont+'px', fontWeight:'900',
+                        padding:`1px ${Math.round(badgeFont*0.6)}px`,
+                        borderRadius:'4px', zIndex:5, whiteSpace:'nowrap',
+                        letterSpacing:'0.05em',
+                    }}>ALL-IN</div>
+                )}
+                {foldado && (
+                    <div style={{
+                        position:'absolute', bottom:'-4px', left:'50%',
+                        transform:'translateX(-50%)',
+                        background:'#6B7280', color:'#fff',
+                        fontSize: badgeFont+'px', fontWeight:'900',
+                        padding:`1px ${Math.round(badgeFont*0.6)}px`,
+                        borderRadius:'4px', zIndex:5, whiteSpace:'nowrap',
+                        letterSpacing:'0.05em',
+                    }}>FOLD</div>
+                )}
             </div>
-
-            {/* Nome */}
-            <p style={{ ...estilos.nome, color: souEu ? '#A78BFA' : '#F8FAFC' }}>
-                {jogador.nome?.split(' ')[0] || 'Jogador'}
-                {souEu && <span style={{ fontSize:'8px', color:'rgba(167,139,250,0.7)' }}> (você)</span>}
-            </p>
-
-            {/* Saldo */}
-            <p style={estilos.saldo}>₿C {fmt(jogador.saldo)}</p>
 
             {/* Cartas mini */}
-            <div style={estilos.cartasContainer}>
-                {souEu && cartasPrivadas.length > 0 ? (
-                    cartasPrivadas.map((c,i) => {
+            {cartas.length > 0 && (
+                <div style={{ display:'flex', gap: Math.round(cardW*0.12)+'px' }}>
+                    {cartas.map((c, i) => {
                         const carta = parsearCarta(c);
-                        return carta ? <CartaMini key={i} carta={carta}/> : <CartaVerso key={i}/>;
-                    })
-                ) : jogador.cartas?.length > 0 ? (
-                    jogador.cartas.map((c,i) => {
-                        const carta = parsearCarta(c);
-                        return carta ? <CartaMini key={i} carta={carta}/> : <CartaVerso key={i}/>;
-                    })
-                ) : null}
-            </div>
-
-            {/* Aposta */}
-            {temAposta && (
-                <div style={estilos.aposta}>
-                    <span style={estilos.apostaTexto}>₿C {fmt(jogador.aposta)}</span>
+                        return carta
+                            ? <CartaMini key={i} carta={carta} w={cardW} h={cardH} fv={cardFv} fn={cardFn} tema={tema} />
+                            : <CartaVerso key={i} w={cardW} h={cardH} tema={tema} />;
+                    })}
                 </div>
             )}
 
-            {allIn   && <div style={estilos.badgeAllIn}>ALL-IN</div>}
-            {foldado && <div style={estilos.badgeFold}>FOLD</div>}
+            {/* Painel nome + saldo */}
+            <div style={{
+                background:     'rgba(8,12,24,0.88)',
+                border:         `1px solid ${ehVez ? 'rgba(245,158,11,0.4)' : souEu ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                borderRadius:   '8px',
+                padding:        `2px ${Math.round(avatarSz * 0.17)}px`,
+                display:        'flex',
+                flexDirection:  'column',
+                alignItems:     'center',
+                gap:            '1px',
+                minWidth:       Math.round(avatarSz * 1.22) + 'px',
+                backdropFilter: 'blur(6px)',
+            }}>
+                <span style={{
+                    fontSize:     nomeFont+'px',
+                    fontWeight:   700,
+                    color:        souEu ? '#A78BFA' : '#F0F0F0',
+                    maxWidth:     Math.round(avatarSz * 1.4) + 'px',
+                    overflow:     'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace:   'nowrap',
+                    lineHeight:   1.2,
+                }}>
+                    {jogador.nome?.split(' ')[0] || 'Jogador'}
+                </span>
+                <span style={{ fontSize:saldoFont+'px', fontWeight:'600', color:'#38BDF8', lineHeight:1.2 }}>
+                    ₿C {fmt(jogador.saldo)}
+                </span>
+            </div>
+
+            {/* Badges D / SB / BB */}
+            {(ehDealer || ehSB || ehBB) && (
+                <div style={{ display:'flex', gap:'3px', flexWrap:'wrap', justifyContent:'center' }}>
+                    {ehDealer && <BadgePos texto="D"  cor="#F59E0B" fs={badgeFont} />}
+                    {ehSB     && <BadgePos texto="SB" cor="#3B82F6" fs={badgeFont} />}
+                    {ehBB     && <BadgePos texto="BB" cor="#8B5CF6" fs={badgeFont} />}
+                </div>
+            )}
 
         </div>
     );
 }
 
-function Badge({ texto, cor }) {
+function BadgePos({ texto, cor, fs }) {
     return (
-        <div style={{ fontSize:'8px', fontWeight:'800', color:'white',
-            padding:'1px 4px', borderRadius:'3px', letterSpacing:'0.02em',
-            lineHeight:'14px', background:cor, boxShadow:`0 0 6px ${cor}60` }}>
+        <div style={{
+            fontSize:     fs+'px',
+            fontWeight:   800,
+            color:        '#fff',
+            padding:      `1px ${Math.round(fs*0.6)}px`,
+            borderRadius: '4px',
+            lineHeight:   '1.4',
+            background:   cor,
+            boxShadow:    `0 0 8px ${cor}80`,
+            letterSpacing:'0.03em',
+        }}>
             {texto}
         </div>
     );
 }
 
-function CartaMini({ carta }) {
+function CartaMini({ carta, w, h, fv, fn, tema = 'classico' }) {
+    const t       = getTema(tema);
+    const cor     = t.naipes[carta.naipe]?.cor || '#111827';
+    const fundo   = t.frente.fundo  || '#FFFFFF';
+    const borda   = t.frente.borda  || '#D1D5DB';
+    const premium = !!t.premium;
+    const raio    = Math.max(t.frente.raio || 8, Math.round(w * 0.13));
     return (
-        <div style={estilos.cartaMini}>
-            <span style={{ fontSize:'7px', fontWeight:'800', lineHeight:1, fontFamily:'Georgia,serif', color:carta.cor }}>{carta.valor}</span>
-            <span style={{ fontSize:'7px', lineHeight:1, color:carta.cor }}>{carta.simbolo}</span>
+        <div style={{
+            width:          w+'px',
+            height:         h+'px',
+            background:     fundo,
+            borderRadius:   raio+'px',
+            border:         premium ? `2px solid ${borda}` : `1px solid ${borda}`,
+            display:        'flex',
+            flexDirection:  'column',
+            alignItems:     'center',
+            justifyContent: 'center',
+            boxShadow:      premium
+                ? `0 2px 8px rgba(0,0,0,0.6), inset 0 0 0 1.5px ${fundo}, inset 0 0 0 2.5px ${borda}80`
+                : '0 2px 8px rgba(0,0,0,0.6)',
+            flexShrink:     0,
+            gap:            '1px',
+        }}>
+            <span style={{ fontSize:fv+'px', fontWeight:'900', color:cor, lineHeight:1 }}>
+                {carta.valor}
+            </span>
+            <span style={{ fontSize:fn+'px', color:cor, lineHeight:1 }}>
+                {carta.naipe}
+            </span>
         </div>
     );
 }
 
-function CartaVerso() {
-    return <div style={estilos.cartaVerso} />;
+function CartaVerso({ w, h, tema = 'classico' }) {
+    const t       = getTema(tema);
+    const fundo   = t.verso.fundo   || '#1E3A8A';
+    const premium = !!t.premium;
+    return (
+        <div style={{
+            width:        w+'px',
+            height:       h+'px',
+            background:   `linear-gradient(135deg, ${fundo}, ${t.verso.detalhe || fundo})`,
+            borderRadius: Math.round(w*0.13)+'px',
+            border:       premium ? `1.5px solid rgba(255,255,255,0.45)` : '1px solid rgba(255,255,255,0.25)',
+            boxShadow:    premium
+                ? `0 2px 8px rgba(0,0,0,0.6), inset 0 0 0 2px ${t.verso.detalhe || fundo}`
+                : '0 2px 8px rgba(0,0,0,0.6)',
+            flexShrink:   0,
+        }} />
+    );
 }
-
-const estilos = {
-    assento: {
-        position:      'relative',
-        background:    'rgba(10,15,30,0.92)',
-        borderRadius:  '12px',
-        border:        '2px solid',
-        padding:       '6px 8px 8px',
-        display:       'flex',
-        flexDirection: 'column',
-        alignItems:    'center',
-        gap:           '2px',
-        minWidth:      '68px',
-        maxWidth:      '84px',
-        backdropFilter:'blur(4px)',
-        transition:    'border-color 0.3s, box-shadow 0.3s, opacity 0.3s',
-    },
-    badges: {
-        position:'absolute', top:'-8px', left:'50%',
-        transform:'translateX(-50%)', display:'flex', gap:'2px', zIndex:5,
-    },
-    // Wrapper do avatar com overflow:visible para o temporizador aparecer
-    avatarWrapper: {
-        position:       'relative',
-        width:          '40px',
-        height:         '40px',
-        borderRadius:   '50%',
-        flexShrink:     0,
-        marginTop:      '4px',
-        transition:     'box-shadow 0.3s',
-    },
-    avatarInner: {
-        width:          '40px',
-        height:         '40px',
-        borderRadius:   '50%',
-        background:     'rgba(255,255,255,0.08)',
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        overflow:       'hidden',
-        position:       'relative',
-        zIndex:         1,
-    },
-    avatarImg: {
-        width:'100%', height:'100%', objectFit:'cover', borderRadius:'50%',
-    },
-    nome: {
-        fontSize:'10px', fontWeight:'600', margin:0, textAlign:'center',
-        maxWidth:'72px', overflow:'hidden', textOverflow:'ellipsis',
-        whiteSpace:'nowrap', lineHeight:1.2,
-    },
-    saldo: {
-        fontSize:'9px', fontWeight:'600', color:'#F59E0B', margin:0,
-    },
-    cartasContainer: {
-        display:'flex', gap:'2px', marginTop:'2px',
-    },
-    cartaMini: {
-        width:'18px', height:'26px', background:'#FFFFFF',
-        borderRadius:'2px', border:'1px solid #D1D5DB',
-        display:'flex', flexDirection:'column', alignItems:'center',
-        justifyContent:'center', boxShadow:'0 1px 3px rgba(0,0,0,0.3)',
-        flexShrink:0, lineHeight:1,
-    },
-    cartaVerso: {
-        width:'18px', height:'26px',
-        background:'linear-gradient(135deg,#1E3A8A,#1E40AF)',
-        borderRadius:'2px', border:'1px solid rgba(255,255,255,0.15)',
-        boxShadow:'0 1px 3px rgba(0,0,0,0.3)', flexShrink:0,
-    },
-    aposta: {
-        position:'absolute', bottom:'-20px', left:'50%',
-        transform:'translateX(-50%)',
-        background:'rgba(245,158,11,0.15)',
-        border:'1px solid rgba(245,158,11,0.35)',
-        borderRadius:'10px', padding:'2px 6px',
-        whiteSpace:'nowrap', zIndex:4,
-    },
-    apostaTexto: { fontSize:'9px', fontWeight:'700', color:'#F59E0B' },
-    badgeAllIn: {
-        position:'absolute', top:'50%', left:'50%',
-        transform:'translate(-50%,-50%)',
-        background:'rgba(239,68,68,0.85)', color:'white',
-        fontSize:'8px', fontWeight:'800', padding:'2px 5px',
-        borderRadius:'3px', zIndex:5, whiteSpace:'nowrap',
-    },
-    badgeFold: {
-        position:'absolute', top:'50%', left:'50%',
-        transform:'translate(-50%,-50%)',
-        background:'rgba(107,114,128,0.85)', color:'white',
-        fontSize:'8px', fontWeight:'800', padding:'2px 5px',
-        borderRadius:'3px', zIndex:5, whiteSpace:'nowrap',
-    },
-};

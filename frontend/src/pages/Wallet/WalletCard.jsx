@@ -22,8 +22,9 @@
      onFeedback  → fn(tipo, msg) : exibe feedback no index pai
 ================================================================ */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import PinConfirm from './PinConfirm';
+import ChipPoker  from '../../components/ChipPoker';
 import {
     calcularDeposito,
     calcularSaque,
@@ -50,6 +51,7 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
     // Valores dos inputs
     const [valorDeposito, setValorDeposito] = useState('');
     const [valorSaque,    setValorSaque]    = useState('');
+    const [chavePix,      setChavePix]      = useState(usuario?.dadosBancarios?.chavePix || '');
 
     // Controle do modal de PIN
     const [pinAberto,    setPinAberto]    = useState(false);
@@ -58,6 +60,89 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
     // Erros de validação inline
     const [erroDeposito, setErroDeposito] = useState(null);
     const [erroSaque,    setErroSaque]    = useState(null);
+
+    // QR Code PIX — exibido após depósito em produção
+    const [pixPendente, setPixPendente] = useState(null); // { pixCopiaECola, qrCode, bcCreditar, expiracaoEm }
+    const [pixCopiado,  setPixCopiado]  = useState(false);
+
+    // Saque fica PENDENTE até o PIX de saída ser confirmado (DEV simula em 3s)
+    const [saquePendente, setSaquePendente] = useState(null); // { saqueId, valorBC, brlLiquido, chavePix }
+
+    // Verificação da blockchain interna (ledger auditável)
+    const [statusBlockchain, setStatusBlockchain] = useState(null);
+    const [verificando,      setVerificando]      = useState(false);
+
+    function verificarBlockchain() {
+        if (!socket) return;
+        setVerificando(true);
+        socket.emit('blockchain:verificar');
+    }
+
+    useEffect(() => {
+        if (!socket) return;
+        const onStatus = (status) => {
+            setStatusBlockchain(status);
+            setVerificando(false);
+        };
+        socket.on('blockchain:status', onStatus);
+        return () => socket.off('blockchain:status', onStatus);
+    }, [socket]);
+
+    // Escuta confirmação de depósito (DEV auto-confirma; PROD via webhook)
+    useEffect(() => {
+        if (!socket) return;
+
+        const onIniciado = (data) => {
+            if (data.simulado) {
+                onFeedback('sucesso', `⚙️ Depósito simulado — ₿C ${fmtBC(data.bcCreditar)} creditado em 3s.`);
+            } else {
+                setPixPendente({
+                    pixCopiaECola: data.pixCopiaECola,
+                    qrCode:        data.qrCode,
+                    bcCreditar:    data.bcCreditar,
+                    totalBRL:      data.totalBRL,
+                    expiracaoEm:   data.expiracaoEm,
+                });
+            }
+        };
+
+        const onConfirmado = ({ bcCreditar }) => {
+            setPixPendente(null);
+            onFeedback('sucesso', `✅ Depósito confirmado — ₿C ${fmtBC(bcCreditar)} creditados!`);
+        };
+
+        // Saque fica pendente até o PIX de saída ser (de fato) enviado —
+        // ver backend/wallet/wallet-manager.js (wallet:sacar/confirmarSaque).
+        const onSaquePendente = (data) => {
+            setSaquePendente(data);
+        };
+
+        const onSaqueConfirmado = ({ brlLiquido }) => {
+            setSaquePendente(null);
+            onFeedback('sucesso', `✅ Saque confirmado — R$ ${fmt(brlLiquido)} enviados via PIX!`);
+        };
+
+        // Sem isso, PIN errado / falha no depósito ou saque não mostrava
+        // nada — o formulário só fechava em silêncio, sem o jogador saber
+        // que a operação não foi concluída.
+        const onErro = ({ mensagem }) => {
+            onFeedback('erro', mensagem || 'Não foi possível concluir a operação. Tente novamente.');
+        };
+
+        socket.on('wallet:deposito_iniciado',   onIniciado);
+        socket.on('wallet:deposito_confirmado', onConfirmado);
+        socket.on('wallet:saque_pendente',      onSaquePendente);
+        socket.on('wallet:saque_confirmado',    onSaqueConfirmado);
+        socket.on('erro', onErro);
+
+        return () => {
+            socket.off('wallet:deposito_iniciado',   onIniciado);
+            socket.off('wallet:deposito_confirmado', onConfirmado);
+            socket.off('wallet:saque_pendente',      onSaquePendente);
+            socket.off('wallet:saque_confirmado',    onSaqueConfirmado);
+            socket.off('erro', onErro);
+        };
+    }, [socket, onFeedback]);
 
 
     // ----------------------------------------------------------------
@@ -91,6 +176,10 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
     // Submete depósito → valida → abre PIN
     // ----------------------------------------------------------------
     function handleSubmitDeposito() {
+        if (!usuario?.temPin) {
+            onFeedback('erro', 'Você ainda não tem um PIN de segurança. Crie um em Configurações antes de depositar.');
+            return;
+        }
         const v   = parseFloat(valorDeposito);
         const val = validarDeposito(v);
         if (!val.valido) { setErroDeposito(val.erro); return; }
@@ -104,6 +193,14 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
     // Submete saque → valida → abre PIN
     // ----------------------------------------------------------------
     function handleSubmitSaque() {
+        if (!usuario?.temPin) {
+            onFeedback('erro', 'Você ainda não tem um PIN de segurança. Crie um em Configurações antes de sacar.');
+            return;
+        }
+        if (!chavePix.trim()) {
+            setErroSaque('Informe a chave PIX que vai receber o valor.');
+            return;
+        }
         const v   = parseFloat(valorSaque);
         const val = validarSaque(v, saldo, sacadoHoje);
         if (!val.valido) { setErroSaque(val.erro); return; }
@@ -133,24 +230,22 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
 
         if (tipo === 'saque') {
             socket.emit('wallet:sacar', {
-                uid:        usuario?.uid,
-                valorBC:    payload.bcDebitado,
-                brlLiquido: payload.brlLiquido,
-                taxaBRL:    payload.taxaBRL,
+                uid:       usuario?.uid,
+                valorBC:   payload.bcDebitado,
+                chavePix:  chavePix.trim(),
                 pin,
             });
         }
 
-        // Limpa tudo — o feedback vem pelo socket no index pai
         setPinAberto(false);
         setAcaoPendente(null);
         setValorDeposito('');
         setValorSaque('');
         setAcao(null);
-        onFeedback('sucesso', tipo === 'deposito'
-            ? `Depósito de R$ ${fmt(payload.totalBRL)} enviado para processamento.`
-            : `Saque de ₿C ${fmtBC(payload.bcDebitado)} enviado para processamento.`
-        );
+
+        // Feedback real vem via socket: wallet:deposito_iniciado/confirmado
+        // (depósito) ou wallet:saque_pendente/confirmado (saque) — nunca
+        // fingir sucesso aqui antes do servidor confirmar de verdade.
     }
 
 
@@ -166,7 +261,9 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
             <div style={estilos.cardSaldo}>
 
                 <div style={estilos.saldoTopo}>
-                    <span style={estilos.saldoIcone}>₿C</span>
+                    <div style={estilos.saldoIcone}>
+                        <ChipPoker size={36} />
+                    </div>
                     <div>
                         <p style={estilos.saldoLabel}>Saldo disponível</p>
                         <p style={estilos.saldoBig}>
@@ -244,6 +341,41 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
                         Todo o saldo pode ser sacado a qualquer momento, descontada apenas a taxa.
                     </p>
                 </div>
+            </div>
+
+
+            {/* ======================================================
+                SEÇÃO 2B — BLOCKCHAIN (ledger auditável)
+            ====================================================== */}
+            <div style={estilos.blockchainCard}>
+                <div style={estilos.blockchainTopo}>
+                    <div>
+                        <p style={estilos.blockchainTitulo}>⛓️ Ledger da ₿C</p>
+                        <p style={estilos.blockchainSub}>
+                            Todo depósito, saque e envio fica registrado numa cadeia de
+                            blocos encadeada — qualquer alteração no histórico quebra a
+                            corrente e fica visível na hora.
+                        </p>
+                    </div>
+                    <button onClick={verificarBlockchain} style={estilos.btnVerificar} disabled={verificando}>
+                        {verificando ? '...' : '🔍 Verificar'}
+                    </button>
+                </div>
+
+                {statusBlockchain && (
+                    <div style={estilos.blockchainStatus}>
+                        <span style={{
+                            ...estilos.blockchainBadge,
+                            background: statusBlockchain.valida ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                            color:      statusBlockchain.valida ? '#4ADE80' : '#FCA5A5',
+                        }}>
+                            {statusBlockchain.valida ? '✓ Cadeia íntegra' : '✕ Adulteração detectada'}
+                        </span>
+                        <span style={estilos.blockchainInfo}>
+                            {statusBlockchain.totalBlocos} bloco(s) · {statusBlockchain.totalTransacoes} transação(ões)
+                        </span>
+                    </div>
+                )}
             </div>
 
 
@@ -383,6 +515,21 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
                         </button>
                     )}
 
+                    {/* Chave PIX que vai receber o valor */}
+                    <div style={estilos.inputGroup}>
+                        <span style={estilos.inputPrefix}>🔑</span>
+                        <input
+                            type="text"
+                            placeholder="Sua chave PIX (CPF, e-mail, telefone...)"
+                            value={chavePix}
+                            onChange={e => {
+                                setChavePix(e.target.value);
+                                setErroSaque(null);
+                            }}
+                            style={estilos.input}
+                        />
+                    </div>
+
                     {erroSaque && (
                         <p style={estilos.erroTexto}>⚠ {erroSaque}</p>
                     )}
@@ -400,12 +547,12 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
 
                     <button
                         onClick={handleSubmitSaque}
-                        disabled={!previewSaque}
+                        disabled={!previewSaque || !chavePix.trim()}
                         style={{
                             ...estilos.btnConfirmar,
-                            background: previewSaque ? '#F59E0B' : 'rgba(255,255,255,0.08)',
-                            color:      previewSaque ? '#fff'    : 'rgba(255,255,255,0.3)',
-                            cursor:     previewSaque ? 'pointer' : 'not-allowed',
+                            background: previewSaque && chavePix.trim() ? '#F59E0B' : 'rgba(255,255,255,0.08)',
+                            color:      previewSaque && chavePix.trim() ? '#fff'    : 'rgba(255,255,255,0.3)',
+                            cursor:     previewSaque && chavePix.trim() ? 'pointer' : 'not-allowed',
                         }}
                     >
                         {previewSaque
@@ -413,6 +560,96 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
                             : 'Informe o valor'}
                     </button>
 
+                </div>
+            )}
+
+
+            {/* ======================================================
+                SEÇÃO 5B — SAQUE PENDENTE (aguardando PIX de saída)
+            ====================================================== */}
+            {saquePendente && (
+                <div style={estilos.pixCard}>
+                    <div style={estilos.pixHeader}>
+                        <span style={{ fontSize: '22px' }}>⏳</span>
+                        <div>
+                            <p style={estilos.pixTitulo}>Processando seu saque</p>
+                            <p style={estilos.pixSub}>
+                                R$ {fmt(saquePendente.brlLiquido)} sendo enviados via PIX pra chave{' '}
+                                <strong>{saquePendente.chavePix}</strong>
+                            </p>
+                        </div>
+                    </div>
+                    <p style={estilos.pixAviso}>
+                        Isso pode levar alguns instantes. Você recebe uma notificação assim que confirmar.
+                    </p>
+                </div>
+            )}
+
+
+            {/* ======================================================
+                SEÇÃO 6 — PIX QR CODE (depósito em produção)
+            ====================================================== */}
+            {pixPendente && (
+                <div style={estilos.pixCard}>
+                    <div style={estilos.pixHeader}>
+                        <span style={{ fontSize: '22px' }}>📱</span>
+                        <div>
+                            <p style={estilos.pixTitulo}>Aguardando pagamento PIX</p>
+                            <p style={estilos.pixSub}>
+                                Escaneie o QR Code ou copie o código abaixo
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setPixPendente(null)}
+                            style={estilos.pixFechar}
+                            title="Fechar"
+                        >×</button>
+                    </div>
+
+                    <div style={estilos.pixResumo}>
+                        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>
+                            R$ {fmt(pixPendente.totalBRL)} → ₿C {fmtBC(pixPendente.bcCreditar)}
+                        </span>
+                    </div>
+
+                    {/* QR Code em base64 */}
+                    {pixPendente.qrCode && (
+                        <div style={estilos.qrWrap}>
+                            <img
+                                src={`data:image/png;base64,${pixPendente.qrCode}`}
+                                alt="QR Code PIX"
+                                style={estilos.qrImg}
+                            />
+                        </div>
+                    )}
+
+                    {/* Pix Copia e Cola */}
+                    {pixPendente.pixCopiaECola && (
+                        <div style={estilos.pixCopiaWrap}>
+                            <p style={estilos.pixCodigoTexto}>
+                                {pixPendente.pixCopiaECola}
+                            </p>
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(pixPendente.pixCopiaECola);
+                                    setPixCopiado(true);
+                                    setTimeout(() => setPixCopiado(false), 2500);
+                                }}
+                                style={{
+                                    ...estilos.pixBtnCopiar,
+                                    background: pixCopiado ? 'rgba(34,197,94,0.15)' : 'rgba(124,58,237,0.15)',
+                                    color:      pixCopiado ? '#4ADE80' : '#A78BFA',
+                                    border:     pixCopiado ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(124,58,237,0.3)',
+                                }}
+                            >
+                                {pixCopiado ? '✓ Copiado!' : '📋 Copiar código'}
+                            </button>
+                        </div>
+                    )}
+
+                    <p style={estilos.pixAviso}>
+                        Após pagar, o saldo será creditado automaticamente em segundos.
+                    </p>
                 </div>
             )}
 
@@ -543,14 +780,13 @@ const estilos = {
     },
 
     saldoIcone: {
-        fontSize:     '28px',
-        fontWeight:   '900',
-        color:        '#F59E0B',
-        background:   'rgba(245,158,11,0.12)',
-        border:       '1px solid rgba(245,158,11,0.25)',
-        borderRadius: '10px',
-        padding:      '10px 12px',
-        lineHeight:    1,
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'center',
+        background:     'rgba(245,158,11,0.12)',
+        border:         '1px solid rgba(245,158,11,0.25)',
+        borderRadius:   '10px',
+        padding:        '10px 12px',
     },
 
     saldoLabel: {
@@ -682,6 +918,65 @@ const estilos = {
         color:      'rgba(255,255,255,0.40)',
         margin:     0,
         lineHeight: 1.5,
+    },
+
+    // Painel de verificação da blockchain
+    blockchainCard: {
+        background:   'rgba(124,58,237,0.05)',
+        border:       '1px solid rgba(124,58,237,0.18)',
+        borderRadius: '12px',
+        padding:      '14px',
+        display:      'flex',
+        flexDirection:'column',
+        gap:          '10px',
+    },
+    blockchainTopo: {
+        display:        'flex',
+        alignItems:     'flex-start',
+        justifyContent: 'space-between',
+        gap:            '10px',
+    },
+    blockchainTitulo: {
+        fontSize:   '13px',
+        fontWeight: '600',
+        color:      '#C4B5FD',
+        margin:     0,
+    },
+    blockchainSub: {
+        fontSize:   '11px',
+        color:      'rgba(255,255,255,0.35)',
+        margin:     '3px 0 0',
+        lineHeight: 1.5,
+        maxWidth:   '320px',
+    },
+    btnVerificar: {
+        background:   'rgba(124,58,237,0.15)',
+        border:       '1px solid rgba(124,58,237,0.35)',
+        borderRadius: '8px',
+        color:        '#C4B5FD',
+        fontSize:     '12px',
+        fontWeight:   '600',
+        padding:      '7px 12px',
+        cursor:       'pointer',
+        whiteSpace:   'nowrap',
+        fontFamily:   'inherit',
+        flexShrink:   0,
+    },
+    blockchainStatus: {
+        display:    'flex',
+        alignItems: 'center',
+        gap:        '10px',
+        flexWrap:   'wrap',
+    },
+    blockchainBadge: {
+        fontSize:     '11px',
+        fontWeight:   '700',
+        padding:      '3px 9px',
+        borderRadius: '20px',
+    },
+    blockchainInfo: {
+        fontSize: '11px',
+        color:    'rgba(255,255,255,0.35)',
     },
 
     // Botões de ação depósito/saque
@@ -849,5 +1144,100 @@ const estilos = {
         transition:   'opacity 0.2s',
         fontFamily:   'inherit',
         WebkitTapHighlightColor: 'transparent',
+    },
+
+    // PIX QR Code panel
+    pixCard: {
+        background:    '#111827',
+        border:        '1px solid rgba(34,197,94,0.30)',
+        borderRadius:  '14px',
+        padding:       '16px',
+        display:       'flex',
+        flexDirection: 'column',
+        gap:           '12px',
+    },
+
+    pixHeader: {
+        display:    'flex',
+        alignItems: 'center',
+        gap:        '10px',
+    },
+
+    pixTitulo: {
+        fontSize:   '14px',
+        fontWeight: '700',
+        color:      '#4ADE80',
+        margin:     0,
+    },
+
+    pixSub: {
+        fontSize: '11px',
+        color:    'rgba(255,255,255,0.40)',
+        margin:   '2px 0 0',
+    },
+
+    pixFechar: {
+        marginLeft:   'auto',
+        background:   'transparent',
+        border:       'none',
+        color:        'rgba(255,255,255,0.4)',
+        fontSize:     '20px',
+        cursor:       'pointer',
+        lineHeight:   1,
+        padding:      '0 4px',
+    },
+
+    pixResumo: {
+        textAlign: 'center',
+    },
+
+    qrWrap: {
+        display:        'flex',
+        justifyContent: 'center',
+    },
+
+    qrImg: {
+        width:        '180px',
+        height:       '180px',
+        borderRadius: '8px',
+        border:       '3px solid rgba(255,255,255,0.08)',
+    },
+
+    pixCopiaWrap: {
+        display:       'flex',
+        flexDirection: 'column',
+        gap:           '8px',
+    },
+
+    pixCodigoTexto: {
+        fontSize:     '9px',
+        color:        'rgba(255,255,255,0.40)',
+        background:   'rgba(255,255,255,0.04)',
+        border:       '1px solid rgba(255,255,255,0.08)',
+        borderRadius: '6px',
+        padding:      '8px',
+        wordBreak:    'break-all',
+        margin:       0,
+        lineHeight:   1.5,
+        maxHeight:    '60px',
+        overflowY:    'auto',
+    },
+
+    pixBtnCopiar: {
+        padding:      '10px',
+        borderRadius: '8px',
+        fontSize:     '13px',
+        fontWeight:   '600',
+        cursor:       'pointer',
+        fontFamily:   'inherit',
+        transition:   'all 0.2s',
+        WebkitTapHighlightColor: 'transparent',
+    },
+
+    pixAviso: {
+        fontSize:   '11px',
+        color:      'rgba(255,255,255,0.30)',
+        textAlign:  'center',
+        margin:     0,
     },
 };

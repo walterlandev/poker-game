@@ -30,6 +30,7 @@ import { useState, useEffect, useCallback } from 'react';
 import WalletCard from './WalletCard';
 import History    from './History';
 import SendBC     from './SendBC';
+import ChipPoker  from '../../components/ChipPoker';
 
 // ================================================================
 // BLOCO 1: DEFINIÇÃO DAS ABAS
@@ -89,20 +90,22 @@ export default function WalletIndex({ usuario, socket }) {
     useEffect(() => {
         if (!socket) return;
 
-        // ✅ CORREÇÃO: soma saldo real + bônus ao atualizar
-        socket.on('wallet:saldo_atualizado', ({ saldo: s, saldoBonus: sb, sacadoHoje: sh }) => {
+        const handleSaldo = ({ saldo: s, saldoBonus: sb, sacadoHoje: sh }) => {
             setSaldo((s || 0) + (sb || 0));
             setSacadoHoje(sh ?? 0);
-        });
+        };
 
-        // Nova transação — adiciona no topo do histórico
-        socket.on('wallet:tx_nova', (tx) => {
+        const handleTxNova = (tx) => {
             setTransacoes(prev => [tx, ...prev]);
-        });
+        };
+
+        socket.on('wallet:saldo_atualizado', handleSaldo);
+        socket.on('wallet:tx_nova',          handleTxNova);
 
         return () => {
-            socket.off('wallet:saldo_atualizado');
-            socket.off('wallet:tx_nova');
+            // Passa o handler para remover APENAS este listener, não os do App.jsx
+            socket.off('wallet:saldo_atualizado', handleSaldo);
+            socket.off('wallet:tx_nova',          handleTxNova);
         };
     }, [socket]);
 
@@ -164,7 +167,7 @@ export default function WalletIndex({ usuario, socket }) {
             <div style={estilos.cabecalho}>
                 <div>
                     <h2 style={estilos.titulo}>
-                        💰 Carteira
+                        <ChipPoker size={20} /> Carteira
                     </h2>
                     <p style={estilos.subtitulo}>
                         Seu banco interno do jogo
@@ -265,6 +268,9 @@ const estilos = {
     },
 
     titulo: {
+        display:    'flex',
+        alignItems: 'center',
+        gap:        '7px',
         fontSize:   '18px',
         fontWeight: '700',
         color:      '#F8FAFC',

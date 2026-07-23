@@ -92,6 +92,7 @@ export default function Auth({ onAutenticado, socket }) {
                 {tela === 'cadastro' && (
                     <Cadastro
                         onAutenticado={handleCadastrado}
+                        onLoginExistente={onAutenticado}
                         onIrParaLogin={() => setTela('login')}
                     />
                 )}

@@ -122,10 +122,11 @@ export function registrarEventosTemas(socket) {
             });
 
             // Atualiza saldo na wallet do frontend
+            const perfilAtualizado = await refJogador(jogadorUid).get();
             socket.emit('wallet:saldo_atualizado', {
-                saldo:      resultado.novoSaldo,
-                saldoBonus: resultado.novoBonus,
-                sacadoHoje: 0,
+                saldo:      perfilAtualizado.data()?.saldo      || 0,
+                saldoBonus: perfilAtualizado.data()?.saldoBonus || 0,
+                sacadoHoje: perfilAtualizado.data()?.sacadoHoje || 0,
             });
 
             console.log(`🎨 Tema "${temaId}" comprado por ${socket.data.nome}`);

@@ -17,9 +17,12 @@
 
    SEGURANÇA:
      → PIN oculto por padrão (type=password)
-     → Máximo 3 tentativas antes de bloquear por 30s
      → ESC ou clique no fundo cancela a ação
      → autoComplete="off" para evitar preenchimento automático
+     → O bloqueio por tentativas erradas é feito no SERVIDOR
+       (backend/wallet/wallet-manager.js, verificarPin) — um limite
+       só no cliente não protegia nada de verdade, já que o modal
+       remonta do zero a cada tentativa.
 
    PROPS:
      titulo      → string : título da ação (ex: "Confirmar saque")
@@ -35,12 +38,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 // CONSTANTES
 // ================================================================
 
-const PIN_MIN        = 4;
-const MAX_TENTATIVAS = 3;
-const BLOQUEIO_SEG   = 30;
-
-function agora() { return Date.now(); }
-
+const PIN_MIN = 4;
 
 // ================================================================
 // COMPONENTE PRINCIPAL
@@ -48,13 +46,10 @@ function agora() { return Date.now(); }
 
 export default function PinConfirm({ titulo, descricao, onConfirmar, onCancelar }) {
 
-    const [pin,           setPin          ] = useState('');
-    const [verPin,        setVerPin       ] = useState(false);
-    const [erro,          setErro         ] = useState(null);
-    const [tentativas,    setTentativas   ] = useState(0);
-    const [bloqueadoAte,  setBloqueadoAte ] = useState(null);
-    const [tempoRestante, setTempoRestante] = useState(0);
-    const [agitando,      setAgitando     ] = useState(false);
+    const [pin,      setPin     ] = useState('');
+    const [verPin,   setVerPin  ] = useState(false);
+    const [erro,     setErro    ] = useState(null);
+    const [agitando, setAgitando] = useState(false);
 
     const inputRef = useRef(null);
 
@@ -62,26 +57,6 @@ export default function PinConfirm({ titulo, descricao, onConfirmar, onCancelar 
     useEffect(() => {
         setTimeout(() => inputRef.current?.focus(), 100);
     }, []);
-
-    // ----------------------------------------------------------------
-    // Countdown do bloqueio
-    // ----------------------------------------------------------------
-    useEffect(() => {
-        if (!bloqueadoAte) return;
-        const intervalo = setInterval(() => {
-            const restante = Math.ceil((bloqueadoAte - Date.now()) / 1000);
-            if (restante <= 0) {
-                setBloqueadoAte(null);
-                setTempoRestante(0);
-                setTentativas(0);
-                setErro(null);
-                clearInterval(intervalo);
-            } else {
-                setTempoRestante(restante);
-            }
-        }, 1000);
-        return () => clearInterval(intervalo);
-    }, [bloqueadoAte]);
 
     // ----------------------------------------------------------------
     // Fechar com ESC
@@ -103,39 +78,24 @@ export default function PinConfirm({ titulo, descricao, onConfirmar, onCancelar 
     }, []);
 
     // ----------------------------------------------------------------
-    // Confirma o PIN
+    // Confirma o PIN — a validação de tentativas/bloqueio é toda do
+    // servidor; aqui só checamos o formato antes de enviar.
     // ----------------------------------------------------------------
     const handleConfirmar = useCallback(() => {
-        if (bloqueadoAte) return;
-
         if (!pin || pin.length < PIN_MIN) {
             agitar();
             setErro(`PIN deve ter no mínimo ${PIN_MIN} caracteres.`);
             return;
         }
-
-        const novasTentativas = tentativas + 1;
-
-        if (novasTentativas >= MAX_TENTATIVAS) {
-            setBloqueadoAte(agora() + BLOQUEIO_SEG * 1000);
-            setTempoRestante(BLOQUEIO_SEG);
-            setPin('');
-            agitar();
-            setErro(`Muitas tentativas. Aguarde ${BLOQUEIO_SEG} segundos.`);
-            return;
-        }
-
-        setTentativas(novasTentativas);
         onConfirmar(pin);
-    }, [bloqueadoAte, pin, tentativas, agitar, onConfirmar]);
+    }, [pin, agitar, onConfirmar]);
 
     // Confirma ao pressionar Enter
     function handleKeyDown(e) {
         if (e.key === 'Enter') handleConfirmar();
     }
 
-    const bloqueado = !!bloqueadoAte;
-    const pinValido = pin.length >= PIN_MIN && !bloqueado;
+    const pinValido = pin.length >= PIN_MIN;
 
     // ================================================================
     // RENDERIZAÇÃO
@@ -180,7 +140,6 @@ export default function PinConfirm({ titulo, descricao, onConfirmar, onCancelar 
                         onChange={e => { setPin(e.target.value); setErro(null); }}
                         onKeyDown={handleKeyDown}
                         placeholder="Digite seu PIN"
-                        disabled={bloqueado}
                         autoComplete="off"
                         autoCorrect="off"
                         spellCheck={false}
@@ -191,7 +150,6 @@ export default function PinConfirm({ titulo, descricao, onConfirmar, onCancelar 
                                 : pinValido
                                     ? 'rgba(245,158,11,0.4)'
                                     : 'rgba(255,255,255,0.12)',
-                            opacity: bloqueado ? 0.5 : 1,
                         }}
                     />
                     <button
@@ -206,16 +164,7 @@ export default function PinConfirm({ titulo, descricao, onConfirmar, onCancelar 
 
                 {/* Erro */}
                 {erro && (
-                    <p style={estilos.erroTexto}>
-                        {bloqueado ? `⏳ ${erro} (${tempoRestante}s)` : `⚠ ${erro}`}
-                    </p>
-                )}
-
-                {/* Tentativas restantes */}
-                {tentativas > 0 && !bloqueado && (
-                    <p style={estilos.tentativasTexto}>
-                        {MAX_TENTATIVAS - tentativas} tentativa{MAX_TENTATIVAS - tentativas !== 1 ? 's' : ''} restante{MAX_TENTATIVAS - tentativas !== 1 ? 's' : ''}
-                    </p>
+                    <p style={estilos.erroTexto}>⚠ {erro}</p>
                 )}
 
                 {/* Botão confirmar */}

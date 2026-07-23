@@ -95,6 +95,12 @@ export default function SendBC({ saldo, usuario, socket, onFeedback }) {
             if (!socket) return;
             setEtapa(ETAPA.BUSCANDO);
 
+            // Remove qualquer listener de uma busca anterior ainda pendente —
+            // sem isso, duas buscas em sequência rápida podiam deixar a
+            // resposta da busca antiga sobrescrever a mais recente.
+            socket.off('wallet:jogador_encontrado');
+            socket.off('wallet:jogador_nao_encontrado');
+
             socket.emit('wallet:buscar_jogador', { query: query.trim() });
 
             socket.once('wallet:jogador_encontrado', (data) => {

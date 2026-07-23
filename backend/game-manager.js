@@ -23,8 +23,8 @@ import { salvarResultadoRodada }   from './firebase-admin.js';
 const mesas = new Map();
 
 const CONFIG = {
-    TEMPO_HUMANO:   90_000,  // 90 segundos
-    TEMPO_BOT:      30_000,  // 30 segundos
+    TEMPO_HUMANO:   45_000,  // 45 segundos
+    TEMPO_BOT:      10_000,  // 10 segundos
     DELAY_SHOWDOWN:  8_000,  // 8 segundos antes da próxima rodada
     MAX_FALTAS:          3,  // faltas seguidas antes de remover da mesa
 };
@@ -69,8 +69,13 @@ function proximoNaOrdem(mesa, startUid, predicado) {
 export class GameManager {
 
     constructor(io) {
-        this.io     = io;
-        this.timers = new Map();
+        this.io                = io;
+        this.timers            = new Map();
+        this.tournamentManager = null;  // setado após criação via setTournamentManager()
+    }
+
+    setTournamentManager(tm) {
+        this.tournamentManager = tm;
     }
 
 
@@ -95,8 +100,13 @@ export class GameManager {
         const jogadoresFiltrados = {};
 
         Object.entries(mesa.jogadores).forEach(([uid, jogador]) => {
+            // Avatar base64 pode ter centenas de KB — não trafega pelo socket.
+            // O frontend já tem o avatar do jogador local; para oponentes usa emoji.
+            const avatar = jogador.avatar?.startsWith('data:') ? '' : (jogador.avatar || '');
+
             jogadoresFiltrados[uid] = {
                 ...jogador,
+                avatar,
                 cartas: (uid === meuUid || mesa.fase === 'SHOWDOWN')
                     ? jogador.cartas
                     : jogador.cartas.map(() => 'XX'),
@@ -161,7 +171,12 @@ export class GameManager {
         const mesa = mesas.get(mesaId);
         if (!mesa)                                         return { sucesso: false, erro: 'Mesa não encontrada.' };
         if (Object.keys(mesa.jogadores).length >= 9)       return { sucesso: false, erro: 'Mesa cheia.' };
-        if (mesa.jogadores[usuario.uid])                   return { sucesso: true,  mesaId };
+        if (mesa.jogadores[usuario.uid]) {
+            // Jogador já está na mesa (reconexão ou torneio) — garante que o socket
+            // entre na sala para receber broadcasts de estado_mesa
+            socket.join(mesaId);
+            return { sucesso: true, mesaId };
+        }
 
         mesa.ordem.push(usuario.uid);
         mesa.jogadores[usuario.uid] = this._criarJogador(usuario, mesa.valorBuyIn, 'humano');
@@ -177,6 +192,12 @@ export class GameManager {
         const mesa = mesas.get(mesaId);
         if (!mesa || !mesa.jogadores[uid]) return;
 
+        const jogador   = mesa.jogadores[uid];
+        const maoAtiva  = jogador.cartas?.length > 0
+                        && mesa.fase !== 'AGUARDANDO'
+                        && mesa.fase !== 'SHOWDOWN';
+        const eraSuaVez = mesa.turno === uid;
+
         mesa.ordem = mesa.ordem.filter(id => id !== uid);
         delete mesa.jogadores[uid];
 
@@ -188,6 +209,29 @@ export class GameManager {
         }
 
         if (mesa.host === uid) mesa.host = humanos[0].uid;
+
+        // Saída no meio de uma mão em andamento: trata como desistência.
+        // Sem isso, a mesa pode travar pra sempre (turno apontando pra
+        // alguém que não existe mais) ou o vencedor por W.O. nunca ser
+        // detectado enquanto os outros esperam a vez de quem já saiu.
+        if (maoAtiva) {
+            const aindaAtivos = mesa.ordem.filter(id => {
+                const j = mesa.jogadores[id];
+                return j && j.cartas?.length > 0 && j.status !== 'fold' && j.status !== 'sitout';
+            });
+
+            if (aindaAtivos.length === 1) {
+                this._limparTimers(mesaId);
+                this._finalizarMao(mesaId, aindaAtivos[0], true);
+                return;
+            }
+
+            if (eraSuaVez) {
+                this._limparTimers(mesaId);
+                this._avancarJogo(mesaId);
+                return;
+            }
+        }
 
         this.emitirEstado(mesaId);
     }
@@ -803,20 +847,45 @@ export class GameManager {
             mesa.jogadores[uid].saldo += premio;
         });
 
-        const nomesVencedores = Object.keys(premiados).map(uid => {
-            const j   = mesa.jogadores[uid];
-            const mao = descricoesMao[uid] || '';
-            return `${j.nome} (${mao} +$${premiados[uid]})`;
-        });
+        const potTotal = mesa.pote;  // salva antes de zerar
 
         mesa.pote                 = 0;
         mesa.turno                = null;
         mesa.fase                 = 'SHOWDOWN';
-        mesa.mensagemVitoria      = `🏆 ${nomesVencedores.join(' | ')}`;
-        mesa.ultimaAcaoDescritiva = `Fim da mão. ${mesa.mensagemVitoria}`;
+
+        // Resultado estruturado — usado pelo frontend para exibição profissional
+        mesa.resultadoMao = {
+            tipo:      'showdown',
+            vencedores: Object.keys(premiados).map(uid => ({
+                uid,
+                nome:  mesa.jogadores[uid].nome,
+                mao:   descricoesMao[uid] || 'Carta Alta',
+                premio: premiados[uid],
+            })),
+            potTotal,
+        };
+
+        const resumo = mesa.resultadoMao.vencedores
+            .map(v => `${v.nome} — ${v.mao}`)
+            .join(' | ');
+        mesa.mensagemVitoria      = resumo;
+        mesa.ultimaAcaoDescritiva = `Fim da mão. ${resumo}`;
 
         this.emitirEstado(mesaId);
-        this._agendarProximaRodada(mesaId);
+
+        // Em modo torneio, verifica se restou apenas 1 jogador com fichas
+        if (mesa.torneioId && this.tournamentManager) {
+            const comFichas = Object.entries(mesa.jogadores)
+                .filter(([, j]) => j.saldo > 0)
+                .map(([uid]) => uid);
+            if (comFichas.length === 1) {
+                this.tournamentManager.notificarVencedorMesa(mesa.torneioId, mesaId, comFichas[0]);
+            } else {
+                this._agendarProximaRodada(mesaId);
+            }
+        } else {
+            this._agendarProximaRodada(mesaId);
+        }
 
         const resultados = elegiveis.map(({ uid, jogador }) => ({
             uid,
@@ -919,13 +988,33 @@ export class GameManager {
         mesa.pote                 = 0;
         mesa.turno                = null;
         mesa.fase                 = 'SHOWDOWN';
+
+        mesa.resultadoMao = {
+            tipo:      porWO ? 'wo' : 'direto',
+            vencedores: [{
+                uid:    vencedorUid,
+                nome:   j.nome,
+                mao:    porWO ? null : 'Melhor mão',
+                premio: potGanho,
+            }],
+            potTotal: potGanho,
+        };
+
         mesa.mensagemVitoria      = porWO
-            ? `🏆 ${j.nome} levou o pote! (W.O.)`
-            : `🏆 ${j.nome} venceu!`;
-        mesa.ultimaAcaoDescritiva = `${j.nome} ganhou $${potGanho} (todos desistiram).`;
+            ? `${j.nome} — todos desistiram`
+            : `${j.nome} venceu`;
+        mesa.ultimaAcaoDescritiva = porWO
+            ? `${j.nome} levou ₿C ${potGanho} — todos desistiram.`
+            : `${j.nome} venceu ₿C ${potGanho}.`;
 
         this.emitirEstado(mesaId);
-        this._agendarProximaRodada(mesaId);
+
+        // Notifica torneio se aplicável
+        if (mesa.torneioId && this.tournamentManager) {
+            this.tournamentManager.notificarVencedorMesa(mesa.torneioId, mesaId, vencedorUid);
+        } else {
+            this._agendarProximaRodada(mesaId);
+        }
 
         salvarResultadoRodada([{
             uid:            vencedorUid,
@@ -1012,6 +1101,61 @@ export class GameManager {
 
         this.emitirEstado(mesaId);
         return { sucesso: true };
+    }
+
+
+    // ================================================================
+    // MESA DE TORNEIO
+    // ================================================================
+
+    /**
+     * Cria uma mesa pré-populada com jogadores em modo torneio.
+     * O buy-in já foi debitado pelo TournamentManager — não debita novamente.
+     * @param {object} config   – nome, buyIn, smallBlind, torneioId
+     * @param {Array}  jogadores – array de { uid, nome, avatar }
+     * @param {string} torneioId
+     * @param {string} mesaId   – ID fixo gerado pelo TournamentManager
+     */
+    criarMesaTorneio(config, jogadores, torneioId, mesaId) {
+        const bb = (config.smallBlind || 10) * 2;
+
+        const mesa = {
+            id:                   mesaId,
+            nome:                 config.nome || 'Mesa Torneio',
+            host:                 jogadores[0]?.uid || 'torneio',
+            fase:                 'AGUARDANDO',
+            pote:                 0,
+            maiorAposta:          0,
+            ultimoRaiseVal:       bb,
+            bigBlind:             bb,
+            smallBlind:           config.smallBlind || 10,
+            valorBuyIn:           config.buyIn      || 500,
+            dealer:               null,
+            sbId:                 null,
+            bbId:                 null,
+            primeiroJogador:      null,
+            turno:                null,
+            baralho:              [],
+            cartasComunitarias:   [],
+            mensagemVitoria:      null,
+            ultimaAcaoDescritiva: 'Mesa de torneio criada.',
+            ordem:                jogadores.map(j => j.uid),
+            jogadores:            {},
+            torneioId,              // ← liga ao torneio
+            senha:                null,
+        };
+
+        jogadores.forEach(j => {
+            mesa.jogadores[j.uid] = this._criarJogador(j, config.buyIn || 500, 'humano');
+        });
+
+        mesas.set(mesaId, mesa);
+
+        // Inicia a rodada automaticamente após 2s
+        setTimeout(() => this.iniciarRodada(mesaId), 2000);
+
+        console.log(`🃏 Mesa de torneio ${mesaId} criada (torneio ${torneioId})`);
+        return { sucesso: true, mesaId };
     }
 
 

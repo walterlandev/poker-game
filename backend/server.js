@@ -14,7 +14,8 @@ import { createServer } from 'http';
 import { Server       } from 'socket.io';
 import cors             from 'cors';
 import dotenv           from 'dotenv';
-import { GameManager  } from './game-manager.js';
+import { GameManager        } from './game-manager.js';
+import { TournamentManager  } from './tournament-manager.js';
 
 import {
     buscarRanking,
@@ -24,9 +25,11 @@ import {
     creditarSaidaMesa,
 } from './firebase-admin.js';
 
-import { registrarEventosWallet, resetarLimiteDiario } from './wallet/wallet-manager.js';
+import { registrarEventosWallet, resetarLimiteDiario, minerarBlocoSeNecessario } from './wallet/wallet-manager.js';
+import { blockchain } from './wallet/blockchain.js';
 import { processarWebhookMP }                          from './wallet/mercadopago.js';
 import { registrarEventosTemas }                       from './temas.js';
+import { registrarEventosAdmin }                       from './admin.js';
 
 dotenv.config();
 
@@ -40,6 +43,7 @@ const server = createServer(app);
 
 const ORIGENS_PERMITIDAS = [
     'http://localhost:5173',
+    'http://localhost:5174',
     'http://localhost:3000',
     'https://poker-game-tawny-rho.vercel.app',
     process.env.CLIENT_URL,
@@ -54,11 +58,14 @@ const io = new Server(server, {
         methods:     ['GET', 'POST'],
         credentials: true,
     },
-    pingTimeout:  60000,
-    pingInterval: 25000,
+    pingTimeout:       60000,
+    pingInterval:      25000,
+    maxHttpBufferSize: 5e6,   // 5 MB — cobre avatares base64 grandes
 });
 
-const gameManager = new GameManager(io);
+const gameManager        = new GameManager(io);
+const tournamentManager  = new TournamentManager(io, gameManager);
+gameManager.setTournamentManager(tournamentManager);
 
 
 // ================================================================
@@ -123,9 +130,10 @@ app.get('/ranking', async (req, res) => {
 app.get('/jogador/:uid', async (req, res) => {
     const perfil = await buscarPerfil(req.params.uid);
     if (!perfil) return res.status(404).json({ erro: 'Jogador não encontrado.' });
-    // Nunca expõe pinHash ou dados bancários ao cliente
+    // Nunca expõe pinHash ou dados bancários ao cliente — só um booleano
+    // dizendo se o PIN já foi configurado, pra saber se mostra "criar" ou "alterar"
     const { pinHash, dadosBancarios, chavePrivadaCriptografada, ...publico } = perfil;
-    res.json(publico);
+    res.json({ ...publico, temPin: !!pinHash });
 });
 
 app.post('/webhook/mercadopago', processarWebhookMP(io));
@@ -152,11 +160,14 @@ io.on('connection', (socket) => {
     // Registra eventos de temas (comprar, ativar)
     registrarEventosTemas(socket);
 
+    // Registra eventos do painel de administração
+    registrarEventosAdmin(socket, io);
+
 
     // ----------------------------------------------------------------
     // autenticar
     // ----------------------------------------------------------------
-    socket.on('autenticar', (dados) => {
+    socket.on('autenticar', async (dados) => {
         if (!dados?.uid) {
             socket.emit('erro', { mensagem: 'UID inválido.' });
             return;
@@ -166,8 +177,13 @@ io.on('connection', (socket) => {
         socket.data.nome   = dados.nome   || 'Anônimo';
         socket.data.avatar = dados.avatar || '';
 
-        console.log(`✅ Autenticado: ${dados.nome} (${dados.uid})`);
-        socket.emit('autenticado', { sucesso: true });
+        // Checagem de admin fica no SERVIDOR (não dá pra confiar em nada
+        // que o cliente mande sobre isso) — lida direto do Firestore.
+        const perfil = await buscarPerfil(dados.uid);
+        socket.data.isAdmin = !!perfil?.isAdmin;
+
+        console.log(`✅ Autenticado: ${dados.nome} (${dados.uid})${socket.data.isAdmin ? ' [admin]' : ''}`);
+        socket.emit('autenticado', { sucesso: true, isAdmin: socket.data.isAdmin });
     });
 
 
@@ -432,7 +448,7 @@ io.on('connection', (socket) => {
     // ----------------------------------------------------------------
     // pedir_estado
     // ----------------------------------------------------------------
-    socket.on('pedir_estado', () => {
+    socket.on('pedir_estado', async () => {
         const mesaId = socket.data.mesaId;
         if (!mesaId) return;
 
@@ -441,6 +457,191 @@ io.on('connection', (socket) => {
 
         const estadoFiltrado = gameManager.filtrarEstadoParaJogador(mesa, socket.data.uid);
         socket.emit('estado_mesa', estadoFiltrado);
+
+        // Emite saldo atualizado para que o header do jogo exiba o valor correto
+        await emitirSaldoAtualizado(socket, socket.data.uid);
+    });
+
+
+    // ================================================================
+    // EVENTOS DE TORNEIO
+    // ================================================================
+
+    // ----------------------------------------------------------------
+    // criar_torneio
+    // ----------------------------------------------------------------
+    socket.on('criar_torneio', async (config) => {
+        if (!socket.data.uid) {
+            socket.emit('erro', { mensagem: 'Autentique-se primeiro.' });
+            return;
+        }
+
+        const buyIn = config.buyIn || 500;
+        const fichasIniciais = config.fichasIniciais || buyIn * 20;
+
+        // Debita buy-in do host
+        const debito = await debitarEntradaMesa(socket.data.uid, buyIn);
+        if (!debito.sucesso) {
+            socket.emit('erro', { mensagem: debito.erro });
+            return;
+        }
+
+        const host = {
+            uid:    socket.data.uid,
+            nome:   socket.data.nome,
+            avatar: socket.data.avatar || '',
+        };
+
+        const resultado = tournamentManager.criarTorneio(config, host);
+        if (!resultado.sucesso) {
+            await creditarSaidaMesa(socket.data.uid, buyIn);
+            socket.emit('erro', { mensagem: resultado.erro });
+            return;
+        }
+
+        const { torneioId } = resultado;
+        socket.join(`torneio:${torneioId}`);
+        socket.data.torneioId = torneioId;
+
+        socket.emit('torneio:criado', { torneioId });
+        await emitirSaldoAtualizado(socket, socket.data.uid);
+
+        // Notifica lobby sobre a atualização dos torneios
+        io.emit('torneios_atualizados', tournamentManager.listarTorneios());
+
+        console.log(`🏆 Torneio ${torneioId} criado por ${host.nome}`);
+    });
+
+
+    // ----------------------------------------------------------------
+    // entrar_torneio
+    // ----------------------------------------------------------------
+    socket.on('entrar_torneio', async ({ torneioId }) => {
+        if (!socket.data.uid) {
+            socket.emit('erro', { mensagem: 'Autentique-se primeiro.' });
+            return;
+        }
+        if (!torneioId) {
+            socket.emit('erro', { mensagem: 'ID do torneio inválido.' });
+            return;
+        }
+
+        const torneio = tournamentManager.getTorneio(torneioId);
+        if (!torneio) {
+            socket.emit('erro', { mensagem: 'Torneio não encontrado.' });
+            return;
+        }
+
+        const jaEstaNaTorneio = !!torneio.jogadores[socket.data.uid];
+
+        if (!jaEstaNaTorneio) {
+            const debito = await debitarEntradaMesa(socket.data.uid, torneio.buyIn);
+            if (!debito.sucesso) {
+                socket.emit('erro', { mensagem: debito.erro });
+                return;
+            }
+        }
+
+        const usuario = {
+            uid:    socket.data.uid,
+            nome:   socket.data.nome,
+            avatar: socket.data.avatar || '',
+        };
+
+        const resultado = tournamentManager.entrarTorneio(torneioId, usuario);
+        if (!resultado.sucesso) {
+            if (!jaEstaNaTorneio) await creditarSaidaMesa(socket.data.uid, torneio.buyIn);
+            socket.emit('erro', { mensagem: resultado.erro });
+            return;
+        }
+
+        socket.join(`torneio:${torneioId}`);
+        socket.data.torneioId = torneioId;
+        socket.emit('torneio:entrou', { torneioId });
+
+        if (!jaEstaNaTorneio) {
+            await emitirSaldoAtualizado(socket, socket.data.uid);
+        }
+
+        // Atualiza a lista de torneios para todos no lobby
+        io.emit('torneios_atualizados', tournamentManager.listarTorneios());
+
+        console.log(`🎫 ${usuario.nome} entrou no torneio ${torneioId}`);
+    });
+
+
+    // ----------------------------------------------------------------
+    // iniciar_torneio
+    // ----------------------------------------------------------------
+    socket.on('iniciar_torneio', ({ torneioId }) => {
+        if (!socket.data.uid) return;
+
+        const resultado = tournamentManager.iniciarTorneio(torneioId, socket.data.uid);
+        if (!resultado.sucesso) {
+            socket.emit('erro', { mensagem: resultado.erro });
+            return;
+        }
+
+        io.emit('torneios_atualizados', tournamentManager.listarTorneios());
+        console.log(`▶️  Torneio ${torneioId} iniciado`);
+    });
+
+
+    // ----------------------------------------------------------------
+    // listar_torneios
+    // ----------------------------------------------------------------
+    socket.on('listar_torneios', () => {
+        socket.emit('torneios_lista', tournamentManager.listarTorneios());
+    });
+
+
+    // ----------------------------------------------------------------
+    // pedir_estado_torneio
+    // ----------------------------------------------------------------
+    socket.on('pedir_estado_torneio', ({ torneioId }) => {
+        if (!torneioId) return;
+        const torneio = tournamentManager.getTorneio(torneioId);
+        if (!torneio) return;
+        tournamentManager.emitirEstadoTorneio(torneioId);
+    });
+
+
+    // ----------------------------------------------------------------
+    // torneio_rebuy — jogador paga para re-entrar no próximo round
+    // ----------------------------------------------------------------
+    socket.on('torneio_rebuy', async ({ torneioId }) => {
+        if (!socket.data.uid) {
+            socket.emit('erro', { mensagem: 'Autentique-se primeiro.' });
+            return;
+        }
+        if (!torneioId) {
+            socket.emit('erro', { mensagem: 'ID do torneio inválido.' });
+            return;
+        }
+
+        const verificacao = tournamentManager.checarRebuy(torneioId, socket.data.uid);
+        if (!verificacao.sucesso) {
+            socket.emit('erro', { mensagem: verificacao.erro });
+            return;
+        }
+
+        const torneio = tournamentManager.getTorneio(torneioId);
+        const debito  = await debitarEntradaMesa(socket.data.uid, torneio.buyIn);
+        if (!debito.sucesso) {
+            socket.emit('erro', { mensagem: debito.erro });
+            return;
+        }
+
+        const resultado = tournamentManager.processarRebuy(torneioId, socket.data.uid);
+        if (!resultado.sucesso) {
+            await creditarSaidaMesa(socket.data.uid, torneio.buyIn);
+            socket.emit('erro', { mensagem: resultado.erro });
+            return;
+        }
+
+        await emitirSaldoAtualizado(socket, socket.data.uid);
+        socket.emit('torneio:rebuy_confirmado', { torneioId });
+        console.log(`🔄 Rebuy: ${socket.data.nome} no torneio ${torneioId}`);
     });
 
 });
@@ -542,6 +743,14 @@ function agendarResetDiario() {
 }
 
 agendarResetDiario();
+
+
+// ================================================================
+// BLOCO 8B: MINERAÇÃO PERIÓDICA DA BLOCKCHAIN (a cada 20s, só se
+// houver transação pendente na mempool)
+// ================================================================
+
+setInterval(minerarBlocoSeNecessario, 20_000);
 
 
 // ================================================================

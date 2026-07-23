@@ -2,4 +2,5 @@ backend/firebase-credentials.json
 node_modules
 .env
 dist
+.claude/settings.local.json
 
