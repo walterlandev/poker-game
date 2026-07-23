@@ -52,11 +52,17 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
             timerRef.current = setTimeout(() => setNotificacao(null), 4000);
         };
         const onSaldoAtualizado = ({ saldo }) => setSaldoReal(saldo || 0);
+        const onErro            = ({ mensagem }) => {
+            setNotificacao(mensagem);
+            if (timerRef.current) clearTimeout(timerRef.current);
+            timerRef.current = setTimeout(() => setNotificacao(null), 4000);
+        };
 
         socket.on('estado_mesa',             onEstado);
         socket.on('carta_privada',           onCartas);
         socket.on('notificacao',             onNotificacao);
         socket.on('wallet:saldo_atualizado', onSaldoAtualizado);
+        socket.on('erro',                    onErro);
         socket.emit('pedir_estado');
 
         return () => {
@@ -64,6 +70,7 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
             socket.off('carta_privada',           onCartas);
             socket.off('notificacao',             onNotificacao);
             socket.off('wallet:saldo_atualizado', onSaldoAtualizado);
+            socket.off('erro',                    onErro);
             if (timerRef.current) clearTimeout(timerRef.current);
             if (ganhoRef.current) clearTimeout(ganhoRef.current);
         };
@@ -71,6 +78,7 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
 
     const handleAcao    = useCallback((a, v=0) => socket?.emit('acao', { acao: a, valor: v }), [socket]);
     const handleIniciar = useCallback(()       => socket?.emit('iniciar_rodada'), [socket]);
+    const handleRebuy    = useCallback((valor) => socket?.emit('rebuy', { valor }), [socket]);
     const handleSair    = useCallback(()       => { socket?.emit('sair_mesa'); onSair?.(); }, [socket, onSair]);
 
     const handleCompartilhar = useCallback(() => {
@@ -145,6 +153,29 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
 
             {/* ── Painel inferior flutuante ─────────── */}
             <div style={css.painel}>
+
+                {/* Sem fichas na mesa: oferece recompra com o saldo real */}
+                {euSou && fichasMesa <= 0 && (
+                    <div style={css.semFichas}>
+                        <p style={css.semFichasTexto}>
+                            Você ficou sem fichas nesta mesa.
+                        </p>
+                        <button
+                            onClick={() => handleRebuy(mesa.valorBuyIn || 1000)}
+                            disabled={saldoReal < (mesa.valorBuyIn || 1000)}
+                            style={{
+                                ...css.btnRebuy,
+                                opacity: saldoReal < (mesa.valorBuyIn || 1000) ? 0.5 : 1,
+                                cursor:  saldoReal < (mesa.valorBuyIn || 1000) ? 'not-allowed' : 'pointer',
+                            }}
+                        >
+                            💰 Comprar mais ₿C {(mesa.valorBuyIn || 1000).toLocaleString('pt-BR')} pra continuar
+                        </button>
+                        {saldoReal < (mesa.valorBuyIn || 1000) && (
+                            <p style={css.semFichasAviso}>Saldo insuficiente pra recomprar.</p>
+                        )}
+                    </div>
+                )}
 
                 {/* Linha compacta: força da mão + fichas */}
                 {jogoAtivo && euSou && (
@@ -549,6 +580,36 @@ const css = {
         display:'inline-block', width:'7px', height:'7px',
         borderRadius:'50%', background:'#F59E0B',
         animation:'pulse 1.4s ease-in-out infinite', flexShrink:0,
+    },
+    semFichas: {
+        display:        'flex',
+        flexDirection:  'column',
+        alignItems:     'center',
+        gap:            '8px',
+        padding:        '14px 12px',
+    },
+    semFichasTexto: {
+        fontSize: '13px',
+        color:    'rgba(255,255,255,0.55)',
+        margin:   0,
+    },
+    semFichasAviso: {
+        fontSize: '11px',
+        color:    '#F87171',
+        margin:   0,
+    },
+    btnRebuy: {
+        width:        '100%',
+        padding:      '14px',
+        background:   'linear-gradient(135deg,#F59E0B,#D97706)',
+        border:       'none',
+        borderRadius: '12px',
+        color:        '#fff',
+        fontSize:     '14px',
+        fontWeight:   '700',
+        fontFamily:   'inherit',
+        boxShadow:    '0 4px 20px rgba(245,158,11,0.35)',
+        WebkitTapHighlightColor: 'transparent',
     },
     btnCompartilhar: {
         margin:       '0 12px 8px',
