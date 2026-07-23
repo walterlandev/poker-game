@@ -239,8 +239,6 @@ export default function App() {
             gap:            '32px',
             fontFamily:     'sans-serif',
         }}>
-            <style>{`@keyframes girar { to { transform: rotate(360deg); } }`}</style>
-
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'8px' }}>
                 <img src="/logo.png" alt="Poker Game"
                     style={{ width:'80px', height:'80px', objectFit:'contain' }} />

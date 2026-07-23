@@ -114,6 +114,63 @@ const estilosGlobais = `
     50%       { opacity: 0.4; }
   }
 
+  /* ================================================================
+     Animações movidas de <style> soltos dentro de componentes que
+     entram/saem do DOM (spinners, modal de PIN, troca AGUARDANDO→jogo
+     ativo). Um <style> preso a um bloco condicional é desmontado e
+     remontado junto com ele — em alguns navegadores (reproduzido no
+     Chrome, celular e PC) isso coincidiu com um erro do React
+     ('NotFoundError: insertBefore') bem no momento da troca. Aqui elas
+     nunca desmontam, então esse risco desaparece.
+     ================================================================ */
+
+  @keyframes girar {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes agitar {
+    0%,100% { transform: translateX(0); }
+    20%     { transform: translateX(-8px); }
+    40%     { transform: translateX(8px); }
+    60%     { transform: translateX(-5px); }
+    80%     { transform: translateX(5px); }
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50%     { opacity: 0.35; }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  @keyframes winIn {
+    from { opacity: 0; transform: translateY(-16px) scale(0.9); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes winGlow {
+    0%,100% { box-shadow: 0 0 30px rgba(245,158,11,0.4); }
+    50%      { box-shadow: 0 0 60px rgba(245,158,11,0.8); }
+  }
+
+  /* Layout da tela de jogo (era um <style> dentro do componente Game) */
+  .game-pagina { max-width: 100vw; }
+  @media (min-width: 900px) {
+    .game-pagina {
+      max-width:  920px;
+      margin:     0 auto;
+      border-left:  1px solid rgba(255,255,255,0.06);
+      border-right: 1px solid rgba(255,255,255,0.06);
+    }
+  }
+
   /* Slider personalizado (usado no ActionBar e ModalCriarMesa) */
   input[type="range"] {
     -webkit-appearance: none;
