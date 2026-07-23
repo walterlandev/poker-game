@@ -174,12 +174,16 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
             setErros({ geral: mensagem });
         });
 
-        // Timeout de segurança: se o servidor não responder em 10s
+        // Timeout de segurança: se o servidor não responder em 10s.
+        // Usa a forma funcional de setEnviando pra checar o valor ATUAL
+        // (não o `enviando` capturado no closure, que sempre seria o
+        // valor de antes do submit — por isso esse timeout nunca disparava).
         setTimeout(() => {
-            if (enviando) {
-                setEnviando(false);
+            setEnviando(atual => {
+                if (!atual) return atual;
                 setErros({ geral: 'Tempo esgotado. Tente novamente.' });
-            }
+                return false;
+            });
         }, 10000);
     }
 
