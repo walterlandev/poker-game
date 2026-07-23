@@ -65,9 +65,8 @@ function fmt(n) {
 
 export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar }) {
 
-    // --- NOVIDADE: Calculando o saldo total (Real + Bônus) ---
-    const saldoReal  = usuario?.saldo || 0;
-    const saldoBonus = usuario?.bonus || 0; // Certifique-se de que o backend envia essa variável
+    const saldoReal  = usuario?.saldo      || 0;
+    const saldoBonus = usuario?.saldoBonus || 0;
     const saldoTotal = saldoReal + saldoBonus;
     // ---------------------------------------------------------
 

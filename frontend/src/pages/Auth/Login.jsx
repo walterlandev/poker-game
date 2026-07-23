@@ -38,6 +38,7 @@ import { auth, db } from '../../services/firebase-config';
 import {
     signInWithPopup,
     signInWithEmailAndPassword,
+    sendPasswordResetEmail,
     GoogleAuthProvider,
 } from 'firebase/auth';
 
@@ -107,6 +108,9 @@ export default function Login({ onAutenticado, onIrParaCadastro }) {
     // Mostra/esconde senha
     const [verSenha, setVerSenha] = useState(false);
 
+    // Estado do reset de senha
+    const [resetEnviado, setResetEnviado] = useState(false);
+
 
     // ----------------------------------------------------------------
     // Login com Google
@@ -139,6 +143,24 @@ export default function Login({ onAutenticado, onIrParaCadastro }) {
 
 
     // ----------------------------------------------------------------
+    // Enviar link de redefinição de senha
+    // ----------------------------------------------------------------
+    async function handleEsqueceuSenha() {
+        if (!email) {
+            setErro('Digite seu email acima para receber o link de redefinição.');
+            return;
+        }
+        try {
+            await sendPasswordResetEmail(auth, email);
+            setResetEnviado(true);
+            setErro('');
+        } catch {
+            setErro('Não foi possível enviar o email. Verifique o endereço digitado.');
+        }
+    }
+
+
+    // ----------------------------------------------------------------
     // Login com email e senha
     // ----------------------------------------------------------------
     async function handleEmailSenha(e) {
@@ -161,11 +183,11 @@ export default function Login({ onAutenticado, onIrParaCadastro }) {
         } catch (e) {
             // Traduz os códigos de erro do Firebase para português
             const mensagens = {
-                'auth/invalid-credential': 'Email ou senha incorretos.',
-                'auth/user-not-found':     'Usuário não encontrado.',
+                'auth/invalid-credential': 'Email ou senha incorretos. Se entrou pelo Google antes, use o botão "Continuar com Google".',
+                'auth/user-not-found':     'Conta não encontrada. Crie uma conta primeiro.',
                 'auth/wrong-password':     'Senha incorreta.',
                 'auth/invalid-email':      'Email inválido.',
-                'auth/too-many-requests':  'Muitas tentativas. Tente mais tarde.',
+                'auth/too-many-requests':  'Muitas tentativas. Aguarde alguns minutos ou redefina sua senha.',
             };
             setErro(mensagens[e.code] || 'Erro ao fazer login. Tente novamente.');
             console.error(e);
@@ -257,6 +279,22 @@ export default function Login({ onAutenticado, onIrParaCadastro }) {
                 {erro && (
                     <div style={estilos.erro}>{erro}</div>
                 )}
+
+                {/* Confirmação de reset enviado */}
+                {resetEnviado && (
+                    <div style={estilos.sucesso}>
+                        ✓ Link de redefinição enviado para {email}. Verifique sua caixa de entrada.
+                    </div>
+                )}
+
+                {/* Esqueceu a senha */}
+                <button
+                    type="button"
+                    onClick={handleEsqueceuSenha}
+                    style={estilos.btnLink}
+                >
+                    Esqueceu a senha?
+                </button>
 
                 {/* Botão entrar */}
                 <button
@@ -409,6 +447,15 @@ const estilos = {
         borderRadius: '8px',
         fontSize:     '13px',
         color:        '#FCA5A5',
+    },
+
+    sucesso: {
+        padding:      '10px 12px',
+        background:   'rgba(34,197,94,0.1)',
+        border:       '1px solid rgba(34,197,94,0.3)',
+        borderRadius: '8px',
+        fontSize:     '13px',
+        color:        '#4ADE80',
     },
 
     btnEntrar: {

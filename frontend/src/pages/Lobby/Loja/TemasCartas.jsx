@@ -171,21 +171,27 @@ export default function TemasCartas({ saldoAtual, temaAtual, temasComprados = []
         setOperando(true);
         socket.emit('comprar_tema', { temaId: tema.id });
 
-        socket.once('tema:comprado', () => {
+        const onComprado = () => {
             setOperando(false);
             onFeedback('sucesso', `Tema "${tema.nome}" comprado com sucesso!`);
-        });
-
-        socket.once('tema:erro', ({ mensagem }) => {
+            socket.off('tema:comprado', onComprado);
+            socket.off('tema:erro',     onErroCompra);
+        };
+        const onErroCompra = ({ mensagem }) => {
             setOperando(false);
             onFeedback('erro', mensagem || 'Erro ao comprar tema.');
-        });
+            socket.off('tema:comprado', onComprado);
+            socket.off('tema:erro',     onErroCompra);
+        };
+
+        socket.on('tema:comprado', onComprado);
+        socket.on('tema:erro',     onErroCompra);
 
         // Timeout de segurança em caso de falha silenciosa
         setTimeout(() => {
+            socket.off('tema:comprado', onComprado);
+            socket.off('tema:erro',     onErroCompra);
             setOperando(false);
-            socket.off('tema:comprado');
-            socket.off('tema:erro');
         }, 8000);
 
     }, [socket, operando, saldoAtual, onFeedback]);
@@ -197,20 +203,26 @@ export default function TemasCartas({ saldoAtual, temaAtual, temasComprados = []
         setOperando(true);
         socket.emit('ativar_tema', { temaId: tema.id });
 
-        socket.once('tema:ativado', () => {
+        const onAtivado = () => {
             setOperando(false);
             onFeedback('sucesso', `Tema "${tema.nome}" ativado!`);
-        });
-
-        socket.once('tema:erro', ({ mensagem }) => {
+            socket.off('tema:ativado', onAtivado);
+            socket.off('tema:erro',    onErroAtiva);
+        };
+        const onErroAtiva = ({ mensagem }) => {
             setOperando(false);
             onFeedback('erro', mensagem || 'Erro ao ativar tema.');
-        });
+            socket.off('tema:ativado', onAtivado);
+            socket.off('tema:erro',    onErroAtiva);
+        };
+
+        socket.on('tema:ativado', onAtivado);
+        socket.on('tema:erro',    onErroAtiva);
 
         setTimeout(() => {
+            socket.off('tema:ativado', onAtivado);
+            socket.off('tema:erro',    onErroAtiva);
             setOperando(false);
-            socket.off('tema:ativado');
-            socket.off('tema:erro');
         }, 5000);
 
     }, [socket, operando, onFeedback]);
@@ -242,7 +254,14 @@ export default function TemasCartas({ saldoAtual, temaAtual, temasComprados = []
                         selecionado={temaSelecionado.id === tema.id}
                         ativo={temaAtual === tema.id}
                         comprado={estaComprado(tema)}
-                        onSelecionar={() => setTemaSelecionado(tema)}
+                        onSelecionar={() => {
+                            setTemaSelecionado(tema);
+                            // Já possui o tema? Ativa na hora — clicar na miniatura
+                            // não deveria exigir um segundo clique em "Usar este tema".
+                            if (estaComprado(tema) && tema.id !== temaAtual) {
+                                handleAtivar(tema);
+                            }
+                        }}
                     />
                 ))}
             </div>

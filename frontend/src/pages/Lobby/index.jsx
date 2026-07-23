@@ -32,6 +32,7 @@ import Tabs                from './Tabs';
 import ListaMesas          from './ListaMesas';
 import Ranking             from './Ranking';
 import Loja                from './Loja';
+import Admin                from '../Admin/index';
 import ModalCriarMesa      from './ModalCriarMesa';
 import ModalSenha          from './ModalSenha';
 import ModalPerfil         from './ModalPerfil';
@@ -43,16 +44,21 @@ import WalletIndex    from '../Wallet/index';
 // Bônus de boas-vindas — aparece automaticamente no 1º acesso
 import ModalBoasVindas from '../Wallet/BonasVindas';
 
+// Torneios (Campeonato)
+import Campeonato from '../Campeonato/index';
+
 
 // ================================================================
 // BLOCO 1: CONSTANTES
 // ================================================================
 
 const TABS = {
-    CARTEIRA: 'carteira',   // 1ª aba — WalletIndex
-    MESAS:    'mesas',      // agrupa públicas + privadas com sub-filtro
-    RANKING:  'ranking',
-    LOJA:     'loja',
+    CARTEIRA:   'carteira',    // 1ª aba — WalletIndex
+    MESAS:      'mesas',       // agrupa públicas + privadas com sub-filtro
+    CAMPEONATO: 'campeonato',  // torneios
+    RANKING:    'ranking',
+    LOJA:       'loja',
+    ADMIN:      'admin',       // só aparece pra quem é admin (usuario.isAdmin)
 };
 
 // Sub-filtro dentro da aba Mesas
@@ -70,19 +76,25 @@ const INTERVALO_RANKING = 60000;
 // BLOCO 2: COMPONENTE PRINCIPAL
 // ================================================================
 
-export default function Lobby({ usuario, socket, onEntrarMesa }) {
+export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio }) {
 
-    const [tabAtiva,      setTabAtiva     ] = useState(TABS.CARTEIRA);
+    const [tabAtiva,      setTabAtiva     ] = useState(() =>
+        conviteTorneio ? TABS.CAMPEONATO : TABS.CARTEIRA
+    );
     const [filtroMesas,   setFiltroMesas  ] = useState(FILTRO_MESAS.PUBLICAS);
     const [mesasPublicas, setMesasPublicas] = useState([]);
     const [mesasPrivadas, setMesasPrivadas] = useState([]);
     const [ranking,       setRanking      ] = useState([]);
+    const [qtdTorneios,   setQtdTorneios  ] = useState(0);
     const [modalCriar,    setModalCriar   ] = useState(false);
     const [modalSenha,    setModalSenha   ] = useState(null);
     const [modalPerfil,   setModalPerfil  ] = useState(false);
     const [modalConfiguracoes, setModalConfiguracoes] = useState(false);
     const [carregando,    setCarregando   ] = useState(true);
     const [erro,          setErro         ] = useState(null);
+    const [backendOnline, setBackendOnline] = useState(true);
+    const [erroEntrada,   setErroEntrada  ] = useState(null);
+    const [entrando,      setEntrando     ] = useState(false);
 
     // Controla o modal de boas-vindas:
     // Abre automaticamente se o jogador ainda não resgatou o bônus
@@ -100,11 +112,12 @@ export default function Lobby({ usuario, socket, onEntrarMesa }) {
             const res  = await fetch(`${SERVER_URL}/mesas`);
             if (!res.ok) throw new Error(`Servidor retornou ${res.status}`);
             const data = await res.json();
+            setBackendOnline(true);
             setMesasPublicas(data.mesas.filter(m => !m.temSenha));
             setMesasPrivadas(data.mesas.filter(m =>  m.temSenha));
-        } catch (e) {
-            console.error('Erro ao buscar mesas:', e);
-            setErro('Não foi possível carregar as mesas.');
+        } catch {
+            setBackendOnline(false);
+            setErro('Servidor offline. Verifique se o backend está rodando.');
         } finally {
             setCarregando(false);
         }
@@ -147,13 +160,57 @@ export default function Lobby({ usuario, socket, onEntrarMesa }) {
         return () => socket.off('mesas_atualizadas', buscarMesas);
     }, [socket, buscarMesas]);
 
+    // Socket: torneios em tempo real
+    useEffect(() => {
+        if (!socket) return;
+        const onTorneios = (lista) => setQtdTorneios((lista || []).length);
+        socket.on('torneios_atualizados', onTorneios);
+        socket.on('torneios_lista',       onTorneios);
+        // Solicita lista inicial para ter o badge correto
+        socket.emit('listar_torneios');
+        return () => {
+            socket.off('torneios_atualizados', onTorneios);
+            socket.off('torneios_lista',       onTorneios);
+        };
+    }, [socket]);
+
 
     // ----------------------------------------------------------------
     // Handlers de mesa
     // ----------------------------------------------------------------
+    function _emitirEntrarMesa(mesaId, senha) {
+        setEntrando(true);
+        setErroEntrada(null);
+
+        socket.emit('entrar_mesa', { mesaId, senha });
+
+        // Aguarda confirmação do servidor antes de trocar de tela
+        function onEntrou({ mesaId: id }) {
+            cleanup();
+            onEntrarMesa(id);
+        }
+        function onErro({ mensagem }) {
+            cleanup();
+            setErroEntrada(mensagem);
+        }
+        function cleanup() {
+            setEntrando(false);
+            socket.off('entrou_mesa', onEntrou);
+            socket.off('erro',        onErro);
+        }
+
+        socket.once('entrou_mesa', onEntrou);
+        socket.once('erro',        onErro);
+
+        // Timeout de segurança: 8 s
+        setTimeout(() => {
+            cleanup();
+            setErroEntrada('Tempo esgotado. Tente novamente.');
+        }, 8000);
+    }
+
     function handleEntrarPublica(mesaId) {
-        socket.emit('entrar_mesa', { mesaId });
-        onEntrarMesa(mesaId);
+        _emitirEntrarMesa(mesaId, undefined);
     }
 
     function handleClicarPrivada(mesaId) {
@@ -162,12 +219,13 @@ export default function Lobby({ usuario, socket, onEntrarMesa }) {
 
     function handleConfirmarSenha(senha) {
         if (!modalSenha) return;
-        socket.emit('entrar_mesa', { mesaId: modalSenha, senha });
-        onEntrarMesa(modalSenha);
+        const mesaId = modalSenha;
         setModalSenha(null);
+        _emitirEntrarMesa(mesaId, senha);
     }
 
     function handleMesaCriada(mesaId) {
+        // Para criador: servidor já adicionou o jogador antes de emitir mesa_criada
         setModalCriar(false);
         onEntrarMesa(mesaId);
     }
@@ -239,6 +297,24 @@ export default function Lobby({ usuario, socket, onEntrarMesa }) {
                 onLogout={handleLogout}
             />
 
+            {/* ---- Banner servidor offline ---- */}
+            {!backendOnline && (
+                <div style={{
+                    background:   'rgba(239,68,68,0.12)',
+                    border:       '1px solid rgba(239,68,68,0.30)',
+                    borderRadius: '0',
+                    padding:      '8px 16px',
+                    display:      'flex',
+                    alignItems:   'center',
+                    gap:          '8px',
+                    fontSize:     '13px',
+                    color:        '#FCA5A5',
+                }}>
+                    <span>🔴</span>
+                    <span>Servidor offline — inicie o backend com <code style={{ background:'rgba(0,0,0,0.3)', padding:'1px 5px', borderRadius:'4px' }}>cd backend && npm run dev</code></span>
+                </div>
+            )}
+
             {/* ---- CORPO ---- */}
             <div className="lobby-body">
 
@@ -250,6 +326,8 @@ export default function Lobby({ usuario, socket, onEntrarMesa }) {
                         onMudar={setTabAtiva}
                         qtdPublicas={mesasPublicas.length}
                         qtdPrivadas={mesasPrivadas.length}
+                        qtdTorneios={qtdTorneios}
+                        isAdmin={!!usuario?.isAdmin}
                     />
 
                     <div className="lobby-conteudo">
@@ -260,6 +338,13 @@ export default function Lobby({ usuario, socket, onEntrarMesa }) {
                                 <button onClick={buscarMesas} style={estilos.btnTentar}>
                                     Tentar novamente
                                 </button>
+                            </div>
+                        )}
+
+                        {erroEntrada && (
+                            <div style={{ ...estilos.erro, cursor: 'pointer' }}
+                                 onClick={() => setErroEntrada(null)}>
+                                <span>⚠️ {erroEntrada}</span>
                             </div>
                         )}
 
@@ -341,6 +426,16 @@ export default function Lobby({ usuario, socket, onEntrarMesa }) {
                             </>
                         )}
 
+                        {/* ---- ABA: CAMPEONATO ---- */}
+                        {tabAtiva === TABS.CAMPEONATO && (
+                            <Campeonato
+                                usuario={usuario}
+                                socket={socket}
+                                onEntrarMesa={onEntrarMesa}
+                                conviteTorneio={conviteTorneio}
+                            />
+                        )}
+
                         {/* ---- ABA: RANKING (mobile) ---- */}
                         {tabAtiva === TABS.RANKING && (
                             <Ranking ranking={ranking} meuUid={usuario?.uid} />
@@ -349,6 +444,11 @@ export default function Lobby({ usuario, socket, onEntrarMesa }) {
                         {/* ---- ABA: LOJA ---- */}
                         {tabAtiva === TABS.LOJA && (
                             <Loja usuario={usuario} socket={socket} />
+                        )}
+
+                        {/* ---- ABA: ADMIN (só quem é admin vê a tab) ---- */}
+                        {tabAtiva === TABS.ADMIN && usuario?.isAdmin && (
+                            <Admin socket={socket} />
                         )}
 
                     </div>
@@ -424,6 +524,28 @@ export default function Lobby({ usuario, socket, onEntrarMesa }) {
                 />
             )}
 
+            {/* Overlay de "entrando na mesa" */}
+            {entrando && (
+                <div style={{
+                    position: 'fixed', inset: 0, zIndex: 999,
+                    background: 'rgba(10,15,30,0.80)',
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center',
+                    gap: '14px', backdropFilter: 'blur(4px)',
+                }}>
+                    <style>{`@keyframes girar { to { transform:rotate(360deg); } }`}</style>
+                    <div style={{
+                        width: '36px', height: '36px',
+                        border: '3px solid rgba(255,255,255,0.10)',
+                        borderTop: '3px solid #7C3AED',
+                        borderRadius: '50%', animation: 'girar 0.8s linear infinite',
+                    }} />
+                    <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.55)' }}>
+                        Entrando na mesa...
+                    </span>
+                </div>
+            )}
+
         </div>
     );
 }
@@ -437,7 +559,7 @@ const estilos = {
 
     pagina: {
         minHeight:     '100vh',
-        background:    '#0a0f1e',
+        background:    'radial-gradient(ellipse 900px 500px at 50% -8%, rgba(16,94,52,0.30) 0%, rgba(16,94,52,0) 60%), #0a0f1e',
         color:         '#F8FAFC',
         display:       'flex',
         flexDirection: 'column',

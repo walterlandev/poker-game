@@ -48,9 +48,15 @@ const DEFINICAO_TABS = [
         badgeKey: 'qtdTotal',   // soma públicas + privadas
     },
     {
+        id:       'campeonato',
+        label:    'Torneio',
+        icone:    '🏆',
+        badgeKey: 'qtdTorneios',
+    },
+    {
         id:       'ranking',
         label:    'Ranking',
-        icone:    '🏆',
+        icone:    '📊',
         badgeKey: null,
     },
     {
@@ -61,12 +67,22 @@ const DEFINICAO_TABS = [
     },
 ];
 
+// Só aparece pra quem é admin (checagem de verdade é sempre no servidor)
+const TAB_ADMIN = {
+    id:       'admin',
+    label:    'Admin',
+    icone:    '🛠️',
+    badgeKey: null,
+};
+
 // Cor de cada tab quando ativa
 const CORES_TABS = {
-    carteira: '#F59E0B',   // âmbar — moeda, carteira
-    mesas:    '#7C3AED',   // roxo  — mesas de jogo
-    ranking:  '#22C55E',   // verde — conquista, troféu
-    loja:     '#D97706',   // laranja — loja, compras
+    carteira:   '#F59E0B',   // âmbar — moeda, carteira
+    mesas:      '#7C3AED',   // roxo  — mesas de jogo
+    campeonato: '#F59E0B',   // dourado — torneio, troféu
+    ranking:    '#22C55E',   // verde — conquista
+    loja:       '#D97706',   // laranja — loja, compras
+    admin:      '#EF4444',   // vermelho — área restrita
 };
 
 
@@ -74,17 +90,20 @@ const CORES_TABS = {
 // BLOCO 2: COMPONENTE PRINCIPAL
 // ================================================================
 
-export default function Tabs({ tabAtiva, onMudar, qtdPublicas = 0, qtdPrivadas = 0 }) {
+export default function Tabs({ tabAtiva, onMudar, qtdPublicas = 0, qtdPrivadas = 0, qtdTorneios = 0, isAdmin = false }) {
 
     // Badge de mesas = soma de públicas + privadas
     const badges = {
-        qtdTotal: qtdPublicas + qtdPrivadas,
+        qtdTotal:    qtdPublicas + qtdPrivadas,
+        qtdTorneios,
     };
+
+    const tabs = isAdmin ? [...DEFINICAO_TABS, TAB_ADMIN] : DEFINICAO_TABS;
 
     return (
         <nav style={estilos.nav} role="tablist" aria-label="Seções do lobby">
 
-            {DEFINICAO_TABS.map(tab => {
+            {tabs.map(tab => {
                 const ativa    = tabAtiva === tab.id;
                 const corAtiva = CORES_TABS[tab.id];
                 const badge    = tab.badgeKey ? badges[tab.badgeKey] : null;

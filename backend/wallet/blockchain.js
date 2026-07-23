@@ -40,7 +40,16 @@
 ================================================================ */
 
 import crypto from 'crypto';
-import { verificarCadeia, verificarTransacao } from './transactions.js';
+import admin  from 'firebase-admin';
+
+// Import só pelo efeito colateral: força o Node a esperar o
+// admin.initializeApp() de firebase-admin.js terminar (ele usa top-level
+// await) ANTES do código deste arquivo rodar. Sem isso, como este módulo
+// só importava o pacote 'firebase-admin' cru (não o wrapper do projeto),
+// a ordem de avaliação dos módulos ES não garantia isso — na prática a
+// blockchain tentava ler o Firestore antes da inicialização terminar e
+// sempre caía no modo só-memória.
+import '../firebase-admin.js';
 
 
 // ================================================================
@@ -60,13 +69,19 @@ import { verificarCadeia, verificarTransacao } from './transactions.js';
 //
 // RECOMPENSA_MINERADOR: ₿C dados ao validador do bloco.
 //   Bitcoin: começou com 50 BTC, reduz à metade a cada 4 anos (halving).
-//   Nós: recompensa fixa de 10 ₿C por bloco por enquanto.
+//   Aqui fica ZERO — esta é a Fase 1 (ledger centralizado, sem rede de
+//   nós de verdade). O papel do "minerador" é só o próprio servidor
+//   selando os blocos; dar recompensa criaria ₿C do nada, sem lastro em
+//   depósito real, o que quebraria a contabilidade da carteira (saldo
+//   real de cada jogador continua sendo a fonte de verdade — a
+//   blockchain aqui é o registro auditável e à prova de adulteração
+//   desse histórico, não uma segunda fonte de saldo).
 // ================================================================
 
 const CONFIG_BLOCKCHAIN = {
     DIFICULDADE:                 2,
     MAX_TRANSACOES_POR_BLOCO:    10,
-    RECOMPENSA_MINERADOR:        10,
+    RECOMPENSA_MINERADOR:        0,
     VERSAO:                      '1.0',
     NOME_REDE:                   'Bitchager Mainnet',
     SIMBOLO:                     'BC',
@@ -99,13 +114,35 @@ const CONFIG_BLOCKCHAIN = {
 //   Isso é fundamental para "light clients" (carteiras leves).
 // ================================================================
 
+// Hash calculado a partir do CONTEÚDO real da transação — não do campo
+// tx.hash já gravado nela. Se calcularMerkleRoot confiasse em tx.hash,
+// alguém poderia mudar tx.valor sem tocar em tx.hash e a raiz de Merkle
+// recalculada bateria do mesmo jeito (bug real encontrado em teste:
+// adulterar o valor de uma tx minerada não derrubava validarCadeia()).
+// Recalculando o hash do conteúdo aqui, qualquer alteração em qualquer
+// campo muda a folha da árvore, muda a raiz, e derruba a validação.
+function hashConteudoTx(tx) {
+    const payload = JSON.stringify({
+        tipo:                 tx.tipo,
+        remetenteUid:         tx.remetenteUid,
+        remetenteEndereco:    tx.remetenteEndereco,
+        destinatarioEndereco: tx.destinatarioEndereco,
+        valor:                tx.valor,
+        taxa:                 tx.taxa,
+        valorLiquido:         tx.valorLiquido,
+        timestamp:            tx.timestamp,
+        hashAnterior:         tx.hashAnterior,
+    });
+    return crypto.createHash('sha256').update(payload).digest('hex');
+}
+
 function calcularMerkleRoot(transacoes) {
     if (!transacoes || transacoes.length === 0) {
         return '0'.repeat(64);
     }
 
-    // Começa com os hashes individuais de cada transação
-    let nivel = transacoes.map(tx => tx.hash || tx.id);
+    // Começa com os hashes do CONTEÚDO de cada transação (não tx.hash)
+    let nivel = transacoes.map(hashConteudoTx);
 
     // Sobe a árvore até restar apenas um hash (a raiz)
     while (nivel.length > 1) {
@@ -199,7 +236,7 @@ function criarBloco({ indice, transacoes, hashAnterior, minerador }) {
 
 function minerar(bloco, dificuldade = CONFIG_BLOCKCHAIN.DIFICULDADE) {
     // O prefixo que o hash deve ter (ex: "00" para dificuldade 2)
-    const prefixoAlvo = '0'.repeat(dificuldade);
+    let prefixoAlvo = '0'.repeat(dificuldade);
 
     let tentativas = 0;
     const inicio   = Date.now();
@@ -229,6 +266,7 @@ function minerar(bloco, dificuldade = CONFIG_BLOCKCHAIN.DIFICULDADE) {
         if (tentativas > 10000000) {
             console.warn('Limite de tentativas atingido. Reduzindo dificuldade.');
             dificuldade = Math.max(1, dificuldade - 1);
+            prefixoAlvo = '0'.repeat(dificuldade); // sem isso a redução não tinha efeito nenhum
         }
     }
 }
@@ -359,7 +397,7 @@ export class Blockchain {
     //   5. Adiciona à cadeia
     //   6. Remove as transações processadas da mempool
     // ----------------------------------------------------------------
-    minarBloco(enderecoMinerador) {
+    async minarBloco(enderecoMinerador) {
         if (this.mempool.length === 0) {
             return { sucesso: false, erro: 'Mempool vazia. Nada para minerar.' };
         }
@@ -370,29 +408,26 @@ export class Blockchain {
             CONFIG_BLOCKCHAIN.MAX_TRANSACOES_POR_BLOCO
         );
 
-        // Adiciona transação de recompensa ao minerador
-        // Esta é a única transação que cria novos ₿C sem depósito
-        // É o "salário" de quem valida a rede
-        const recompensa = {
-            id:                   crypto.randomBytes(32).toString('hex'),
-            hash:                 crypto.randomBytes(32).toString('hex'),
-            tipo:                 'BONUS',
-            remetenteUid:         'SISTEMA',
-            remetenteEndereco:    'BC_SISTEMA_MINT_000000000000',
-            destinatarioEndereco: enderecoMinerador,
-            valor:                CONFIG_BLOCKCHAIN.RECOMPENSA_MINERADOR,
-            taxa:                 0,
-            valorLiquido:         CONFIG_BLOCKCHAIN.RECOMPENSA_MINERADOR,
-            timestamp:            new Date().toISOString(),
-            metadados: {
-                descricao: `Recompensa de mineração — Bloco #${this.cadeia.length}`,
-            },
-            status:    'CONFIRMADA',
-            assinatura: null,
-            hashAnterior: '0'.repeat(64),
-        };
-
-        const todasTransacoes = [recompensa, ...transacoesDoBloco];
+        // Recompensa de mineração fica em 0 (ver CONFIG_BLOCKCHAIN) — não
+        // criamos transação de recompensa pra não inflar ₿C sem depósito.
+        const todasTransacoes = CONFIG_BLOCKCHAIN.RECOMPENSA_MINERADOR > 0
+            ? [{
+                id:                   crypto.randomBytes(32).toString('hex'),
+                hash:                 crypto.randomBytes(32).toString('hex'),
+                tipo:                 'BONUS',
+                remetenteUid:         'SISTEMA',
+                remetenteEndereco:    'BC_SISTEMA_MINT_000000000000',
+                destinatarioEndereco: enderecoMinerador,
+                valor:                CONFIG_BLOCKCHAIN.RECOMPENSA_MINERADOR,
+                taxa:                 0,
+                valorLiquido:         CONFIG_BLOCKCHAIN.RECOMPENSA_MINERADOR,
+                timestamp:            new Date().toISOString(),
+                metadados: { descricao: `Recompensa de mineração — Bloco #${this.cadeia.length}` },
+                status:       'CONFIRMADA',
+                assinatura:   null,
+                hashAnterior: '0'.repeat(64),
+              }, ...transacoesDoBloco]
+            : transacoesDoBloco;
 
         // Cria o bloco
         const novoBloco = criarBloco({
@@ -412,6 +447,7 @@ export class Blockchain {
 
         // Adiciona à cadeia
         this.cadeia.push(blocoMinerado);
+        await this.persistirBloco(blocoMinerado);
 
         // Remove as transações processadas da mempool
         this.mempool = this.mempool.slice(
@@ -429,6 +465,76 @@ export class Blockchain {
             tentativas:      blocoMinerado.tentativas,
             tempoMineracao:  blocoMinerado.tempoMineracao + 'ms',
         };
+    }
+
+
+    // ================================================================
+    // PERSISTÊNCIA (Firestore)
+    //
+    // Sem isso, a cadeia inteira vivia só em memória — um restart do
+    // servidor "esquecia" tudo e recomeçava do bloco gênesis, o que
+    // anula qualquer alegação de histórico imutável. Cada bloco minerado
+    // é salvo assim que fechado; no boot, a cadeia é recarregada do
+    // Firestore em vez de sempre recriar do zero.
+    // ================================================================
+
+    async persistirBloco(bloco) {
+        if (!admin.apps.length) return;
+        try {
+            await admin.firestore()
+                .collection('blockchain_blocos')
+                .doc(String(bloco.indice))
+                .set(bloco);
+        } catch (e) {
+            console.error('Erro ao persistir bloco da blockchain:', e.message);
+        }
+    }
+
+    async carregarDoFirestore() {
+        if (!admin.apps.length) {
+            console.warn('⚠️  Blockchain: Firebase não inicializado — rodando só em memória (não sobrevive a restarts).');
+            return;
+        }
+
+        try {
+            const snap = await admin.firestore()
+                .collection('blockchain_blocos')
+                .orderBy('indice', 'asc')
+                .get();
+
+            if (snap.empty) {
+                // Primeira vez rodando — persiste o gênesis já criado no construtor
+                await this.persistirBloco(this.cadeia[0]);
+                console.log('⛓️  Blockchain: bloco gênesis persistido no Firestore (primeira execução).');
+                return;
+            }
+
+            const cadeiaCarregada = snap.docs.map(d => d.data());
+            const validacao = this._validarCadeiaArray(cadeiaCarregada);
+
+            if (!validacao.valida) {
+                console.error('❌ Blockchain persistida está inválida:', validacao.motivo, '— mantendo apenas o gênesis em memória.');
+                return;
+            }
+
+            this.cadeia = cadeiaCarregada;
+            this.stats.totalBlocos     = cadeiaCarregada.length;
+            this.stats.totalTransacoes = cadeiaCarregada.reduce((t, b) => t + b.transacoes.length, 0);
+            console.log(`⛓️  Blockchain: ${cadeiaCarregada.length} bloco(s) carregado(s) do Firestore.`);
+
+        } catch (e) {
+            console.error('Erro ao carregar blockchain do Firestore:', e.message);
+        }
+    }
+
+    // Valida um array de blocos já carregado (antes de assumi-lo como this.cadeia)
+    _validarCadeiaArray(cadeia) {
+        for (let i = 1; i < cadeia.length; i++) {
+            if (!this.validarBloco(cadeia[i], cadeia[i - 1])) {
+                return { valida: false, motivo: `Bloco #${i} é inválido.` };
+            }
+        }
+        return { valida: true };
     }
 
 
@@ -599,13 +705,14 @@ export class Blockchain {
         }
 
         // Aceita a cadeia mais longa e válida
+        const blocosNovos = cadeiaExterna.length - this.cadeia.length; // antes de reatribuir — senão dá sempre 0
         this.cadeia = cadeiaExterna;
         this.stats.totalBlocos     = cadeiaExterna.length;
         this.stats.totalTransacoes = cadeiaExterna.reduce(
             (total, bloco) => total + bloco.transacoes.length, 0
         );
 
-        return { aceita: true, novossBlocos: cadeiaExterna.length - this.cadeia.length };
+        return { aceita: true, blocosNovos };
     }
 
 
@@ -648,6 +755,12 @@ export class Blockchain {
 // ================================================================
 
 export const blockchain = new Blockchain();
+
+// Recarrega do Firestore antes de qualquer outro módulo terminar de
+// importar isto — mesmo padrão de top-level await já usado em
+// firebase-admin.js, garante que quem importar `blockchain` já recebe
+// a cadeia real (ou o gênesis recém-persistido, na primeira execução).
+await blockchain.carregarDoFirestore();
 
 // Log inicial para confirmar que a blockchain foi iniciada
 console.log('₿C Blockchain iniciada:', blockchain.getInfo());

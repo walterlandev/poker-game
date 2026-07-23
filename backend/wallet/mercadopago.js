@@ -106,6 +106,44 @@ export async function criarPagamentoPIX({ intencaoId, valorBRL, totalBRL, uid, n
 
 
 // ================================================================
+// BLOCO 2B: ENVIAR PIX DE SAÍDA (SAQUE)
+//
+// Chamada por wallet-manager.js (wallet:sacar) quando MP_ACCESS_TOKEN
+// está configurado (produção). Em DEV, o saque é simulado direto no
+// wallet-manager.js (confirmarSaque após 3s) — esta função não é
+// chamada nesse modo.
+//
+// ⚠️  AINDA NÃO INTEGRADO COM A API REAL DO MERCADO PAGO.
+// Diferente do PIX de entrada (criarPagamentoPIX acima, que usa o
+// endpoint padrão /v1/payments), enviar PIX de saída pela conta MP
+// normalmente passa pelo produto "Dinheiro na conta"/transferências,
+// que costuma exigir aprovação adicional na conta e uma verificação
+// cuidadosa do schema atual da API antes de implementar — não é uma
+// chamada simétrica ao recebimento. Por isso, por enquanto, isto só
+// registra a intenção e devolve erro — o saque fica PENDENTE no
+// Firestore (coleção saques_pendentes) pra processamento manual até
+// essa integração real ser feita.
+// ================================================================
+
+export async function enviarPIXSaida({ saqueId, valorBC, brlLiquido, chavePix, uid, nomeJogador }) {
+    if (!MP_ACCESS_TOKEN) {
+        return { sucesso: false, erro: 'MP_ACCESS_TOKEN não configurado.' };
+    }
+
+    // TODO: chamar aqui o endpoint real de PIX de saída do Mercado Pago
+    // (confirmar o schema atual na documentação antes de implementar —
+    // não usar o endpoint /v1/payments, que é só para recebimento).
+    console.warn(`⚠️  PIX de saída não implementado — saque ${saqueId} (uid ${uid}, ₿C ${valorBC} → R$ ${brlLiquido}, chave ${chavePix}) ficou pendente para processamento manual.`);
+
+    void nomeJogador;
+    return {
+        sucesso: false,
+        erro:    'Envio automático de PIX ainda não integrado. Saque registrado como pendente.',
+    };
+}
+
+
+// ================================================================
 // BLOCO 3: CRIAR PAGAMENTO COM CARTÃO
 //
 // Cria uma preferência de checkout para pagamento com cartão.

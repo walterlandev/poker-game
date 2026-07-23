@@ -34,9 +34,9 @@ export const COTACAO = {
 };
 
 export const TAXAS = {
-    DEPOSITO:  0.10,         // 5% sobre R$ (cobrada em R$ além do valor)
-    SAQUE:     0.10,         // 3% sobre R$ equivalente (descontada do valor)
-    ENVIO:     0.10,         // 1% sobre ₿C enviados
+    DEPOSITO:  0.05,         // 5% sobre R$ (cobrada em R$ além do valor)
+    SAQUE:     0.03,         // 3% sobre R$ equivalente (descontada do valor)
+    ENVIO:     0.01,         // 1% sobre ₿C enviados
     ENVIO_MIN: 10,           // taxa mínima de envio em ₿C
 };
 
@@ -58,6 +58,7 @@ export const TIPO_TX = {
     PREMIO:      'premio',
     COMPRA:      'compra',       // compra de tema, item na loja
     TAXA:        'taxa',
+    BONUS:       'bonus',
 };
 
 // Labels legíveis para cada tipo
@@ -69,6 +70,7 @@ export const LABEL_TX = {
     premio:      'Prêmio de mesa',
     compra:      'Compra na loja',
     taxa:        'Taxa',
+    bonus:       'Bônus',
 };
 
 // Ícone para cada tipo de transação
@@ -80,6 +82,7 @@ export const ICONE_TX = {
     premio:      '🏆',
     compra:      '🛒',
     taxa:        '📋',
+    bonus:       '🎁',
 };
 
 
@@ -306,7 +309,7 @@ export function fmtData(data) {
  * Verde = entrada de ₿C, Vermelho = saída, Amarelo = neutro/taxa
  */
 export function corTipoTx(tipo) {
-    const entradas = [TIPO_TX.DEPOSITO, TIPO_TX.RECEBIMENTO, TIPO_TX.PREMIO];
+    const entradas = [TIPO_TX.DEPOSITO, TIPO_TX.RECEBIMENTO, TIPO_TX.PREMIO, TIPO_TX.BONUS];
     const saidas   = [TIPO_TX.SAQUE, TIPO_TX.ENVIO, TIPO_TX.COMPRA];
     if (entradas.includes(tipo)) return '#22C55E';   // verde
     if (saidas.includes(tipo))   return '#EF4444';   // vermelho
@@ -317,7 +320,7 @@ export function corTipoTx(tipo) {
  * Retorna sinal de uma transação: '+' para entradas, '-' para saídas.
  */
 export function sinalTx(tipo) {
-    const entradas = [TIPO_TX.DEPOSITO, TIPO_TX.RECEBIMENTO, TIPO_TX.PREMIO];
+    const entradas = [TIPO_TX.DEPOSITO, TIPO_TX.RECEBIMENTO, TIPO_TX.PREMIO, TIPO_TX.BONUS];
     return entradas.includes(tipo) ? '+' : '-';
 }
 
@@ -336,13 +339,15 @@ export function resumoExtrato(transacoes = []) {
     let totalSaidas   = 0;
     let totalTaxas    = 0;
 
-    const entradas = [TIPO_TX.DEPOSITO, TIPO_TX.RECEBIMENTO, TIPO_TX.PREMIO];
+    const entradas = [TIPO_TX.DEPOSITO, TIPO_TX.RECEBIMENTO, TIPO_TX.PREMIO, TIPO_TX.BONUS];
     const saidas   = [TIPO_TX.SAQUE, TIPO_TX.ENVIO, TIPO_TX.COMPRA];
 
     for (const tx of transacoes) {
         if (entradas.includes(tx.tipo)) totalEntradas += tx.valorBC || 0;
         if (saidas.includes(tx.tipo))   totalSaidas   += tx.valorBC || 0;
-        if (tx.tipo === TIPO_TX.TAXA)   totalTaxas    += tx.valorBC || 0;
+        // Taxa nunca vem como transação própria (tipo 'taxa' não existe no
+        // backend) — vem como campo `taxaBC` dentro de cada transação.
+        totalTaxas += tx.taxaBC || 0;
     }
 
     return {

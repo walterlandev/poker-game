@@ -47,6 +47,7 @@ const FILTROS_TIPO = [
     { id: TIPO_TX.RECEBIMENTO,    label: 'Recebidos'   },
     { id: TIPO_TX.PREMIO,         label: 'Prêmios'     },
     { id: TIPO_TX.COMPRA,         label: 'Compras'     },
+    { id: TIPO_TX.BONUS,          label: 'Bônus'       },
 ];
 
 const FILTROS_PERIODO = [
@@ -99,6 +100,10 @@ export default function History({ transacoes, socket, onCarregar }) {
         setFiltroPeriodo(p);
         if (!socket) return;
         setCarregando(true);
+        // Remove qualquer listener de uma troca de período anterior ainda
+        // pendente — sem isso, clicar rápido entre períodos podia aplicar
+        // a resposta errada (a que chegasse primeiro) a ambos os pedidos.
+        socket.off('wallet:historico');
         socket.emit('wallet:buscar_historico', { periodo: p });
         socket.once('wallet:historico', (data) => {
             onCarregar(data?.transacoes || []);

@@ -282,7 +282,7 @@ export default function ActionBar({
                     <span className="ab-raise-label">Raise</span>
 
                     <div className={`ab-raise-val${ehAllIn ? ' allin' : ''}`}>
-                        {ehAllIn ? `ALL-IN $${maxRaise}` : `$${valorRaise}`}
+                        {ehAllIn ? `ALL-IN ₿C ${maxRaise}` : `₿C ${valorRaise}`}
                     </div>
 
                     <input
@@ -305,7 +305,7 @@ export default function ActionBar({
                                 onPointerDown={() => setValorRaise(val)}
                             >
                                 {label}
-                                <span>${val}</span>
+                                <span>₿C {val}</span>
                             </button>
                         ))}
                     </div>
@@ -331,7 +331,7 @@ export default function ActionBar({
                         onPointerDown={handleCheckCall}
                     >
                         <span className="lbl">
-                            {ehCheck ? 'Check' : `Call $${custo}`}
+                            {ehCheck ? 'Check' : `Call ₿C ${custo}`}
                         </span>
                         <span className="hkey ab-hkeys">C</span>
                     </button>
@@ -361,16 +361,16 @@ export default function ActionBar({
                 {/* ── Linha de info ─────────────────────────────────── */}
                 <div className="ab-info">
                     <span className="ab-info-item">
-                        Fichas <b>${saldoAtual.toLocaleString('pt-BR')}</b>
+                        Fichas <b>₿C {saldoAtual.toLocaleString('pt-BR')}</b>
                     </span>
                     <span className="ab-info-item">
                         {ehCheck
                             ? <><b style={{ color: '#4ade80' }}>Check grátis</b></>
-                            : <>Para pagar <b>${custo.toLocaleString('pt-BR')}</b></>
+                            : <>Para pagar <b>₿C {custo.toLocaleString('pt-BR')}</b></>
                         }
                     </span>
                     <span className="ab-info-item">
-                        Pote <b>${pote.toLocaleString('pt-BR')}</b>
+                        Pote <b>₿C {pote.toLocaleString('pt-BR')}</b>
                     </span>
 
                     {ehMinhaVez && (
