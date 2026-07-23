@@ -56,7 +56,7 @@ const __dirname  = dirname(__filename);
 
 let db = null;
 
-async function inicializarFirebase() {
+export async function inicializarFirebase() {
     if (admin.apps.length > 0) {
         db = admin.firestore();
         return;
@@ -94,7 +94,10 @@ async function inicializarFirebase() {
     }
 }
 
-await inicializarFirebase();
+// Chamado explicitamente por server.js (await inicializarFirebase())
+// durante a inicialização — nunca no topo do módulo. Node só permite
+// await no topo em ESM puro; a Hostinger carrega o servidor via
+// require() (CommonJS), que não suporta isso (ERR_REQUIRE_ASYNC_MODULE).
 
 
 // ================================================================
