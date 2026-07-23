@@ -148,6 +148,10 @@ export default function SendBC({ saldo, usuario, socket, onFeedback }) {
     // Valida valor e abre PIN
     // ----------------------------------------------------------------
     function handleConfirmarValor() {
+        if (!usuario?.temPin) {
+            setErroValor('Você ainda não tem um PIN de segurança. Crie um em Configurações antes de enviar.');
+            return;
+        }
         const v   = parseFloat(valorEnvio);
         const val = validarEnvio(v, saldo);
         if (!val.valido) { setErroValor(val.erro); return; }
