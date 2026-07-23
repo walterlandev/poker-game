@@ -130,6 +130,10 @@ export default function PacotesBC({ saldoAtual, usuario, socket, onFeedback }) {
     // Inicia pagamento → valida → abre PIN
     // ----------------------------------------------------------------
     function handleComprar() {
+        if (!usuario?.temPin) {
+            onFeedback?.('erro', 'Você ainda não tem um PIN de segurança. Crie um em Configurações antes de comprar.');
+            return;
+        }
         if (!valorNum || valorNum < LIMITES.DEPOSITO_MIN_BRL) {
             setErroValor(`Valor mínimo: R$ ${fmt(LIMITES.DEPOSITO_MIN_BRL)}`);
             return;
