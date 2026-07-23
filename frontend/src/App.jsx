@@ -45,6 +45,12 @@ export default function App() {
         return p.get('torneio') || null;
     });
 
+    // Convite de mesa via URL: ?mesa=ABCD
+    const [conviteMesa] = useState(() => {
+        const p = new URLSearchParams(window.location.search);
+        return p.get('mesa') || null;
+    });
+
     // ----------------------------------------------------------------
     // Conecta o socket e autentica no servidor
     // ----------------------------------------------------------------
@@ -302,6 +308,7 @@ export default function App() {
             onEntrarMesa={handleEntrarMesa}
             onUsuarioAtualizado={setUsuario}
             conviteTorneio={conviteTorneio}
+            conviteMesa={conviteMesa}
         />
     );
 }
