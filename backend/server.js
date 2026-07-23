@@ -187,6 +187,22 @@ io.on('connection', (socket) => {
         const perfil = await buscarPerfil(dados.uid);
         socket.data.isAdmin = !!perfil?.isAdmin;
 
+        // Reconexão: se esse jogador já está sentado em alguma mesa (caiu a
+        // conexão e o Socket.io reconectou sozinho — o socket é novo pro
+        // servidor, então perde a sala e o socket.data antigo), reencontra
+        // a mesa e reentra na sala automaticamente. Sem isso, depois de uma
+        // queda de WebSocket o jogador ficava "fantasma": não recebia mais
+        // estado_mesa e os cliques de ação não faziam nada (silenciosamente).
+        const mesaExistente = gameManager.getMesasAtivas().find(m => m.jogadores[dados.uid]);
+        if (mesaExistente) {
+            socket.data.mesaId = mesaExistente.id;
+            socket.join(mesaExistente.id);
+            socketMesa.set(socket.id, mesaExistente.id);
+            const estadoFiltrado = gameManager.filtrarEstadoParaJogador(mesaExistente, dados.uid);
+            socket.emit('estado_mesa', estadoFiltrado);
+            console.log(`🔁 ${dados.nome} reconectado à mesa ${mesaExistente.id}`);
+        }
+
         console.log(`✅ Autenticado: ${dados.nome} (${dados.uid})${socket.data.isAdmin ? ' [admin]' : ''}`);
         socket.emit('autenticado', { sucesso: true, isAdmin: socket.data.isAdmin });
     });

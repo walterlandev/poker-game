@@ -57,7 +57,13 @@ export default function App() {
     const conectarSocket = useCallback((perfil) => {
         if (socket.connected) return;
         socket.connect();
-        socket.once('connect', () => {
+        // .on (não .once): precisa reautenticar em TODA reconexão, não só
+        // na primeira. Depois de uma queda de WebSocket o Socket.io
+        // reconecta sozinho, mas o servidor vê isso como uma conexão nova
+        // (perde socket.data e a sala da mesa) — sem reautenticar de novo
+        // aqui, o jogador virava "fantasma": parava de receber atualização
+        // de estado e os cliques de ação (fold/call/raise) não faziam nada.
+        socket.on('connect', () => {
             // Avatar base64 pode ter centenas de KB — enviamos apenas URLs
             const avatarSocket = perfil.avatar?.startsWith('data:') ? '' : (perfil.avatar || '');
             socket.emit('autenticar', {
