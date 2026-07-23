@@ -76,10 +76,10 @@ const INTERVALO_RANKING = 60000;
 // BLOCO 2: COMPONENTE PRINCIPAL
 // ================================================================
 
-export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio }) {
+export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, conviteMesa }) {
 
     const [tabAtiva,      setTabAtiva     ] = useState(() =>
-        conviteTorneio ? TABS.CAMPEONATO : TABS.CARTEIRA
+        conviteTorneio ? TABS.CAMPEONATO : conviteMesa ? TABS.MESAS : TABS.CARTEIRA
     );
     const [filtroMesas,   setFiltroMesas  ] = useState(FILTRO_MESAS.PUBLICAS);
     const [mesasPublicas, setMesasPublicas] = useState([]);
@@ -173,6 +173,15 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio })
             socket.off('torneios_lista',       onTorneios);
         };
     }, [socket]);
+
+
+    // Auto-entrar se veio por link de convite de mesa (?mesa=ID)
+    useEffect(() => {
+        if (!conviteMesa || !socket) return;
+        const t = setTimeout(() => handleEntrarPublica(conviteMesa), 1500);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [conviteMesa, socket]);
 
 
     // ----------------------------------------------------------------

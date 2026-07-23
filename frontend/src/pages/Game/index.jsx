@@ -11,6 +11,7 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
     const [notificacao,  setNotificacao ] = useState(null);
     const [saldoReal,    setSaldoReal   ] = useState(usuario?.saldo || 0);
     const [notifGanho,   setNotifGanho  ] = useState(null);
+    const [linkCopiado,  setLinkCopiado ] = useState(false);
 
     const timerRef   = useRef(null);
     const ganhoRef   = useRef(null);
@@ -71,6 +72,15 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
     const handleAcao    = useCallback((a, v=0) => socket?.emit('acao', { acao: a, valor: v }), [socket]);
     const handleIniciar = useCallback(()       => socket?.emit('iniciar_rodada'), [socket]);
     const handleSair    = useCallback(()       => { socket?.emit('sair_mesa'); onSair?.(); }, [socket, onSair]);
+
+    const handleCompartilhar = useCallback(() => {
+        if (!mesaRef.current) return;
+        const url = `${window.location.origin}${window.location.pathname}?mesa=${mesaRef.current.id}`;
+        navigator.clipboard.writeText(url).then(() => {
+            setLinkCopiado(true);
+            setTimeout(() => setLinkCopiado(false), 2500);
+        });
+    }, []);
 
     if (!mesa) return (
         <div style={css.loading}>
@@ -177,6 +187,12 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
                         <span style={css.pulseDot} />
                         Aguardando o host iniciar a partida...
                     </div>
+                )}
+
+                {mesa.fase === 'AGUARDANDO' && (
+                    <button onClick={handleCompartilhar} style={css.btnCompartilhar}>
+                        {linkCopiado ? '✓ Link copiado!' : '🔗 Convidar amigos pra mesa'}
+                    </button>
                 )}
 
                 {/* ActionBar */}
@@ -533,6 +549,19 @@ const css = {
         display:'inline-block', width:'7px', height:'7px',
         borderRadius:'50%', background:'#F59E0B',
         animation:'pulse 1.4s ease-in-out infinite', flexShrink:0,
+    },
+    btnCompartilhar: {
+        margin:       '0 12px 8px',
+        padding:      '10px',
+        background:   'rgba(124,58,237,0.15)',
+        border:       '1px solid rgba(124,58,237,0.35)',
+        borderRadius: '10px',
+        color:        '#A78BFA',
+        fontSize:     '13px',
+        fontWeight:   '600',
+        fontFamily:   'inherit',
+        cursor:       'pointer',
+        WebkitTapHighlightColor: 'transparent',
     },
     notif: {
         position:     'fixed',
