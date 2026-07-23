@@ -59,8 +59,12 @@ const io = new Server(server, {
         methods:     ['GET', 'POST'],
         credentials: true,
     },
-    pingTimeout:       60000,
-    pingInterval:      25000,
+    // Ping mais frequente que o padrão (era 25s/60s) — hospedagens
+    // compartilhadas costumam ter timeout de inatividade no proxy mais
+    // curto que isso, derrubando o WebSocket achando que está ocioso.
+    // Pacotes mais frequentes tendem a evitar isso.
+    pingTimeout:       20000,
+    pingInterval:      8000,
     maxHttpBufferSize: 5e6,   // 5 MB — cobre avatares base64 grandes
 });
 
