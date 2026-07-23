@@ -542,7 +542,6 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
                     alignItems: 'center', justifyContent: 'center',
                     gap: '14px', backdropFilter: 'blur(4px)',
                 }}>
-                    <style>{`@keyframes girar { to { transform:rotate(360deg); } }`}</style>
                     <div style={{
                         width: '36px', height: '36px',
                         border: '3px solid rgba(255,255,255,0.10)',

@@ -92,7 +92,6 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
 
     if (!mesa) return (
         <div style={css.loading}>
-            <style>{`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
             <div style={css.spinner} />
             <p style={css.loadingTxt}>Entrando na mesa...</p>
         </div>
@@ -110,25 +109,6 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
 
     return (
         <div style={css.pagina} className="game-pagina">
-            <style>{`
-                @keyframes spin     { to { transform:rotate(360deg); } }
-                @keyframes pulse    { 0%,100%{opacity:1} 50%{opacity:0.35} }
-                @keyframes slideUp  { from{opacity:0;transform:translateX(-50%) translateY(10px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
-                @keyframes winIn    { from{opacity:0;transform:translateY(-16px) scale(0.9)} to{opacity:1;transform:translateY(0) scale(1)} }
-                @keyframes winGlow  { 0%,100%{box-shadow:0 0 30px rgba(245,158,11,0.4)} 50%{box-shadow:0 0 60px rgba(245,158,11,0.8)} }
-
-                /* Sem limite no celular (tela já é estreita); no desktop trava
-                   a largura pra mesa não esticar numa oval achatada gigante. */
-                .game-pagina { max-width: 100vw; }
-                @media (min-width: 900px) {
-                    .game-pagina {
-                        max-width:  920px;
-                        margin:     0 auto;
-                        border-left:  1px solid rgba(255,255,255,0.06);
-                        border-right: 1px solid rgba(255,255,255,0.06);
-                    }
-                }
-            `}</style>
 
             {/* ── Header flutuante ───────────────────── */}
             <div style={css.header}>

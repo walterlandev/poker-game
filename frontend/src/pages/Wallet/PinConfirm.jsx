@@ -103,16 +103,6 @@ export default function PinConfirm({ titulo, descricao, onConfirmar, onCancelar 
     return (
         <div style={estilos.overlay} onClick={onCancelar}>
 
-            <style>{`
-                @keyframes agitar {
-                    0%,100% { transform: translateX(0); }
-                    20%     { transform: translateX(-8px); }
-                    40%     { transform: translateX(8px); }
-                    60%     { transform: translateX(-5px); }
-                    80%     { transform: translateX(5px); }
-                }
-            `}</style>
-
             <div style={estilos.modal} onClick={e => e.stopPropagation()}>
 
                 {/* Ícone */}

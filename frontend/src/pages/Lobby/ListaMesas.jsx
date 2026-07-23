@@ -246,11 +246,6 @@ function InfoItem({ label, valor, corValor = '#F8FAFC' }) {
 function Spinner() {
     return (
         <div style={estilos.spinner}>
-            <style>{`
-                @keyframes girar {
-                    to { transform: rotate(360deg); }
-                }
-            `}</style>
             <div style={{
                 width:        '32px',
                 height:       '32px',
