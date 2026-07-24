@@ -111,6 +111,10 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
     const jogoAtivo      = mesa.fase !== 'AGUARDANDO' && mesa.fase !== 'SHOWDOWN';
     const fichasMesa     = euSou?.saldo || 0;
     const temCartas      = minhasCartas.length === 2;
+    // Status "all-in" de quem fica sem saldo não é limpo entre mãos — sem
+    // cartas na mão, não tem mão ativa esperando resultado de verdade,
+    // mesmo que o status ainda esteja "preso" em all-in.
+    const aguardandoResultado = jogoAtivo && (foldado || emAllIn) && (euSou?.cartas?.length > 0);
     const buyInMesa          = mesa.valorBuyIn || 1000;
     const temSaldoParaRebuy  = (saldoReal + saldoBonus) >= buyInMesa;
 
@@ -141,8 +145,10 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
             {/* ── Painel inferior flutuante ─────────── */}
             <div style={css.painel}>
 
-                {/* Sem fichas na mesa: recompra (se tiver saldo real+bônus) ou sair */}
-                {euSou && fichasMesa <= 0 && (
+                {/* Sem fichas na mesa: recompra (se tiver saldo real+bônus) ou sair.
+                    Não mostra enquanto ainda está esperando o resultado de uma
+                    mão ativa (all-in com cartas na mesa) — só entre mãos. */}
+                {euSou && fichasMesa <= 0 && !aguardandoResultado && (
                     <div style={css.semFichas}>
                         <p style={css.semFichasTexto}>
                             Sem fichas nesta mesa
@@ -227,8 +233,8 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
                     />
                 )}
 
-                {/* Aguardando o showdown enquanto all-in/fold */}
-                {jogoAtivo && euSou && (foldado || emAllIn) && (
+                {/* Aguardando o showdown enquanto all-in/fold — só com mão ativa */}
+                {aguardandoResultado && (
                     <div style={css.aguardando}>
                         <span style={css.pulseDot} />
                         {emAllIn ? 'Você está All-in — aguardando o resultado da mão...' : 'Você desistiu desta mão.'}

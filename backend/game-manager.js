@@ -310,6 +310,18 @@ export class GameManager {
             return j && j.saldo > 0;
         });
 
+        // Quem ficou sem saldo fica de fora da mão — sem isso, o status
+        // ficava preso em 'all-in' da mão anterior pra sempre, mesmo já
+        // não tendo mão nenhuma em andamento (parecia que ele ainda
+        // estava esperando resultado de mão, mesmo entre rodadas).
+        mesa.ordem.forEach(uid => {
+            const j = mesa.jogadores[uid];
+            if (j && j.saldo <= 0 && j.status !== 'sitout') {
+                j.status = 'sitout';
+                j.cartas = [];
+            }
+        });
+
         if (ativos.length < 2) {
             mesa.fase            = 'AGUARDANDO';
             mesa.mensagemVitoria = 'Aguardando jogadores com fichas...';
