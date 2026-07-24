@@ -13,6 +13,9 @@ import express          from 'express';
 import { createServer } from 'http';
 import { Server       } from 'socket.io';
 import cors             from 'cors';
+import fs               from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import dotenv           from 'dotenv';
 import { GameManager        } from './game-manager.js';
 import { TournamentManager  } from './tournament-manager.js';
@@ -24,6 +27,7 @@ import {
     buscarSaldo,
     debitarEntradaMesa,
     creditarSaidaMesa,
+    atualizarAvatar,
 } from './firebase-admin.js';
 
 import { registrarEventosWallet, resetarLimiteDiario, minerarBlocoSeNecessario } from './wallet/wallet-manager.js';
@@ -95,6 +99,15 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Fotos de perfil — servidas como arquivo estático, direto do disco do
+// servidor. Usado no lugar do Firebase Storage (que exige plano pago)
+// já que já pagamos a hospedagem do backend mesmo.
+const __filename    = fileURLToPath(import.meta.url);
+const __dirname      = dirname(__filename);
+const PASTA_AVATARES = join(__dirname, 'public', 'avatares');
+fs.mkdirSync(PASTA_AVATARES, { recursive: true });
+app.use('/avatares', express.static(PASTA_AVATARES));
 
 
 // ================================================================
@@ -208,6 +221,59 @@ io.on('connection', (socket) => {
 
         console.log(`✅ Autenticado: ${dados.nome} (${dados.uid})${socket.data.isAdmin ? ' [admin]' : ''}`);
         socket.emit('autenticado', { sucesso: true, isAdmin: socket.data.isAdmin });
+    });
+
+
+    // ----------------------------------------------------------------
+    // upload_avatar
+    // Recebe a foto em base64, salva como arquivo no próprio servidor
+    // (em vez do Firebase Storage, que exige plano pago) e atualiza o
+    // perfil no Firestore. A URL resultante é pública — outros
+    // jogadores na mesa conseguem carregar a mesma foto.
+    // ----------------------------------------------------------------
+    socket.on('upload_avatar', async ({ imagemBase64 } = {}) => {
+        if (!socket.data.uid) {
+            socket.emit('avatar_erro', { mensagem: 'Autentique-se primeiro.' });
+            return;
+        }
+
+        try {
+            const match = /^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/.exec(imagemBase64 || '');
+            if (!match) {
+                socket.emit('avatar_erro', { mensagem: 'Formato de imagem inválido.' });
+                return;
+            }
+
+            const [, extBruta, dadosBase64] = match;
+            const ext    = extBruta === 'jpeg' ? 'jpg' : extBruta;
+            const buffer = Buffer.from(dadosBase64, 'base64');
+
+            if (buffer.length > 2 * 1024 * 1024) {
+                socket.emit('avatar_erro', { mensagem: 'Imagem muito grande. Máximo 2MB.' });
+                return;
+            }
+
+            const nomeArquivo = `${socket.data.uid}.${ext}`;
+            fs.writeFileSync(join(PASTA_AVATARES, nomeArquivo), buffer);
+
+            // Cache-busting: sem isso, o navegador (e os outros jogadores)
+            // continuariam vendo a foto antiga em cache pelo mesmo nome de arquivo.
+            const avatarUrl = `${process.env.SERVER_URL || ''}/avatares/${nomeArquivo}?v=${Date.now()}`;
+
+            const resultado = await atualizarAvatar(socket.data.uid, avatarUrl);
+            if (!resultado.sucesso) {
+                socket.emit('avatar_erro', { mensagem: resultado.erro });
+                return;
+            }
+
+            socket.data.avatar = avatarUrl;
+            socket.emit('avatar_atualizado', { avatarUrl });
+            console.log(`🖼️  Avatar atualizado: ${socket.data.nome} (${socket.data.uid})`);
+
+        } catch (e) {
+            console.error('upload_avatar erro:', e.message);
+            socket.emit('avatar_erro', { mensagem: 'Erro ao processar imagem.' });
+        }
     });
 
 
