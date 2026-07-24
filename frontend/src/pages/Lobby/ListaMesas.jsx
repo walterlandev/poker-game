@@ -125,7 +125,13 @@ export default function ListaMesas({ mesas = [], carregando, privadas, onEntrar 
 function CardMesa({ mesa, privada, onEntrar }) {
 
     const fase        = infoFase(mesa.fase);
-    const qtdJogadores = Object.keys(mesa.jogadores || {}).length;
+    // GET /mesas manda `jogadores` como CONTAGEM (número), não como objeto
+    // — Object.keys(numero) sempre retorna [] (length 0), então o card
+    // sempre mostrava "0/9" e mesas cheias nunca apareciam como cheias
+    // pros outros jogadores no lobby.
+    const qtdJogadores = typeof mesa.jogadores === 'number'
+        ? mesa.jogadores
+        : Object.keys(mesa.jogadores || {}).length;
     const pctOcupacao  = percentualOcupacao(qtdJogadores);
     const estaCheia    = qtdJogadores >= 9;
     const emJogo       = mesa.fase !== 'AGUARDANDO';
