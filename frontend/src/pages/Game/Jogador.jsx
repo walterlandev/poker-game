@@ -173,8 +173,6 @@ export default function Jogador({
                 </div>
             )}
 
-            </div>
-
             {/* Painel nome + saldo */}
             <div style={{
                 background:     'rgba(8,12,24,0.88)',
@@ -185,7 +183,7 @@ export default function Jogador({
                 flexDirection:  'column',
                 alignItems:     'center',
                 gap:            '1px',
-                minWidth:       Math.round(avatarSz * 1.22) + 'px',
+                minWidth:       compacto ? undefined : Math.round(avatarSz * 1.22) + 'px',
                 backdropFilter: 'blur(6px)',
             }}>
                 <span style={{
@@ -203,6 +201,8 @@ export default function Jogador({
                 <span style={{ fontSize:saldoFont+'px', fontWeight:'600', color:'#38BDF8', lineHeight:1.2 }}>
                     ₿C {fmt(jogador.saldo)}
                 </span>
+            </div>
+
             </div>
 
             {/* Badges D / SB / BB */}
