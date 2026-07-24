@@ -9,7 +9,8 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
     const [mesa,         setMesa        ] = useState(null);
     const [minhasCartas, setMinhasCartas] = useState([]);
     const [notificacao,  setNotificacao ] = useState(null);
-    const [saldoReal,    setSaldoReal   ] = useState(usuario?.saldo || 0);
+    const [saldoReal,    setSaldoReal   ] = useState(usuario?.saldo      || 0);
+    const [saldoBonus,   setSaldoBonus  ] = useState(usuario?.saldoBonus || 0);
     const [notifGanho,   setNotifGanho  ] = useState(null);
     const [linkCopiado,  setLinkCopiado ] = useState(false);
 
@@ -51,7 +52,10 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
             if (timerRef.current) clearTimeout(timerRef.current);
             timerRef.current = setTimeout(() => setNotificacao(null), 4000);
         };
-        const onSaldoAtualizado = ({ saldo }) => setSaldoReal(saldo || 0);
+        const onSaldoAtualizado = ({ saldo, saldoBonus: bonus }) => {
+            setSaldoReal(saldo || 0);
+            if (bonus !== undefined) setSaldoBonus(bonus || 0);
+        };
         const onErro            = ({ mensagem }) => {
             setNotificacao(mensagem);
             if (timerRef.current) clearTimeout(timerRef.current);
@@ -107,6 +111,8 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
     const jogoAtivo      = mesa.fase !== 'AGUARDANDO' && mesa.fase !== 'SHOWDOWN';
     const fichasMesa     = euSou?.saldo || 0;
     const temCartas      = minhasCartas.length === 2;
+    const buyInMesa          = mesa.valorBuyIn || 1000;
+    const temSaldoParaRebuy  = (saldoReal + saldoBonus) >= buyInMesa;
 
     return (
         <div style={css.pagina} className="game-pagina">
@@ -135,26 +141,26 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
             {/* ── Painel inferior flutuante ─────────── */}
             <div style={css.painel}>
 
-                {/* Sem fichas na mesa: oferece recompra com o saldo real */}
+                {/* Sem fichas na mesa: recompra (se tiver saldo real+bônus) ou sair */}
                 {euSou && fichasMesa <= 0 && (
                     <div style={css.semFichas}>
                         <p style={css.semFichasTexto}>
-                            Você ficou sem fichas nesta mesa.
+                            Sem fichas nesta mesa
+                            {!temSaldoParaRebuy && ' — saldo insuficiente pra recomprar'}.
                         </p>
-                        <button
-                            onClick={() => handleRebuy(mesa.valorBuyIn || 1000)}
-                            disabled={saldoReal < (mesa.valorBuyIn || 1000)}
-                            style={{
-                                ...css.btnRebuy,
-                                opacity: saldoReal < (mesa.valorBuyIn || 1000) ? 0.5 : 1,
-                                cursor:  saldoReal < (mesa.valorBuyIn || 1000) ? 'not-allowed' : 'pointer',
-                            }}
-                        >
-                            💰 Comprar mais ₿C {(mesa.valorBuyIn || 1000).toLocaleString('pt-BR')} pra continuar
-                        </button>
-                        {saldoReal < (mesa.valorBuyIn || 1000) && (
-                            <p style={css.semFichasAviso}>Saldo insuficiente pra recomprar.</p>
-                        )}
+                        <div style={css.semFichasAcoes}>
+                            {temSaldoParaRebuy && (
+                                <button
+                                    onClick={() => handleRebuy(buyInMesa)}
+                                    style={css.btnRebuy}
+                                >
+                                    💰 Comprar ₿C {buyInMesa.toLocaleString('pt-BR')}
+                                </button>
+                            )}
+                            <button onClick={handleSair} style={css.btnSairMesa}>
+                                ← Sair da mesa
+                            </button>
+                        </div>
                     </div>
                 )}
 
@@ -575,30 +581,41 @@ const css = {
         display:        'flex',
         flexDirection:  'column',
         alignItems:     'center',
-        gap:            '8px',
-        padding:        '14px 12px',
+        gap:            '6px',
+        padding:        '8px 12px',
     },
     semFichasTexto: {
-        fontSize: '13px',
+        fontSize: '12px',
         color:    'rgba(255,255,255,0.55)',
         margin:   0,
     },
-    semFichasAviso: {
-        fontSize: '11px',
-        color:    '#F87171',
-        margin:   0,
+    semFichasAcoes: {
+        display: 'flex',
+        gap:     '8px',
     },
     btnRebuy: {
-        width:        '100%',
-        padding:      '14px',
+        padding:      '9px 16px',
         background:   'linear-gradient(135deg,#F59E0B,#D97706)',
         border:       'none',
-        borderRadius: '12px',
+        borderRadius: '10px',
         color:        '#fff',
-        fontSize:     '14px',
+        fontSize:     '13px',
         fontWeight:   '700',
         fontFamily:   'inherit',
-        boxShadow:    '0 4px 20px rgba(245,158,11,0.35)',
+        cursor:       'pointer',
+        boxShadow:    '0 2px 12px rgba(245,158,11,0.3)',
+        WebkitTapHighlightColor: 'transparent',
+    },
+    btnSairMesa: {
+        padding:      '9px 16px',
+        background:   'rgba(255,255,255,0.06)',
+        border:       '1px solid rgba(255,255,255,0.15)',
+        borderRadius: '10px',
+        color:        'rgba(255,255,255,0.65)',
+        fontSize:     '13px',
+        fontWeight:   '600',
+        fontFamily:   'inherit',
+        cursor:       'pointer',
         WebkitTapHighlightColor: 'transparent',
     },
     btnCompartilhar: {
