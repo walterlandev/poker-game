@@ -36,8 +36,7 @@ import {
     updateEmail,
 } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
-import { ref as refStorage, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../../services/firebase-config';
+import { db } from '../../services/firebase-config';
 
 // Lista de avatares disponíveis em /public/
 const AVATARES = [
@@ -56,7 +55,7 @@ const NOMES_TEMAS = {
     minimalista: 'Minimalista',
 };
 
-export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
+export default function ModalPerfil({ usuario, socket, onFechar, onAtualizar }) {
 
     const auth = getAuth();
 
@@ -138,6 +137,36 @@ export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
     }
 
     // ----------------------------------------------------------------
+    // Sobe a foto pro próprio servidor (não Firebase Storage — exige
+    // plano pago). Devolve uma URL pública de verdade, que os outros
+    // jogadores na mesa também conseguem carregar.
+    // ----------------------------------------------------------------
+    function uploadAvatarViaServidor(base64) {
+        return new Promise((resolve, reject) => {
+            if (!socket) { reject(new Error('Sem conexão com o servidor.')); return; }
+
+            function onOk({ avatarUrl }) {
+                cleanup();
+                resolve(avatarUrl);
+            }
+            function onErro({ mensagem }) {
+                cleanup();
+                reject(new Error(mensagem || 'Erro ao enviar a foto.'));
+            }
+            function cleanup() {
+                socket.off('avatar_atualizado', onOk);
+                socket.off('avatar_erro',       onErro);
+            }
+
+            socket.once('avatar_atualizado', onOk);
+            socket.once('avatar_erro',       onErro);
+            socket.emit('upload_avatar', { imagemBase64: base64 });
+
+            setTimeout(() => { cleanup(); reject(new Error('Tempo esgotado ao enviar a foto.')); }, 15000);
+        });
+    }
+
+    // ----------------------------------------------------------------
     // Salva as alterações no Firebase Auth + Firestore
     // ----------------------------------------------------------------
     async function handleSalvar() {
@@ -151,16 +180,12 @@ export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
             const user = auth.currentUser;
             if (!user) throw new Error('Usuário não autenticado.');
 
-            // Se escolheu uma foto do dispositivo, sobe pro Firebase Storage
-            // primeiro — assim o avatar final é uma URL de verdade (não
-            // base64), que os outros jogadores na mesa também conseguem ver.
-            // Base64 nunca é enviado pelo socket (arquivo grande demais).
+            // Se escolheu uma foto do dispositivo, sobe pro servidor primeiro
+            // — assim o avatar final é uma URL de verdade (não base64), que
+            // os outros jogadores na mesa também conseguem ver.
             let avatarFinal = avatar;
             if (fotoArquivo) {
-                const caminho    = `avatares/${user.uid}/foto.jpg`;
-                const storageRef = refStorage(storage, caminho);
-                await uploadBytes(storageRef, fotoArquivo, { contentType: fotoArquivo.type });
-                avatarFinal = await getDownloadURL(storageRef);
+                avatarFinal = await uploadAvatarViaServidor(fotoLocal);
             }
 
             // 1. Atualiza nome e avatar no Firebase Auth

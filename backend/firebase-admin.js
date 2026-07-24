@@ -341,3 +341,19 @@ export async function buscarSaldo(uid) {
         return { saldo: 0, saldoBonus: 0, total: 0 };
     }
 }
+
+
+// ================================================================
+// BLOCO 9: ATUALIZAR AVATAR (após upload da foto no servidor)
+// ================================================================
+
+export async function atualizarAvatar(uid, avatarUrl) {
+    if (!db) return { sucesso: false, erro: 'Banco de dados indisponível.' };
+    try {
+        await refJogador(uid).update({ avatar: avatarUrl });
+        return { sucesso: true };
+    } catch (e) {
+        console.error('atualizarAvatar erro:', e.message);
+        return { sucesso: false, erro: 'Erro ao salvar avatar.' };
+    }
+}

@@ -508,6 +508,7 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
             {modalPerfil && (
                 <ModalPerfil
                     usuario={usuario}
+                    socket={socket}
                     onFechar={() => setModalPerfil(false)}
                     onAtualizar={(novoUsuario) => {
                         console.log('Perfil atualizado:', novoUsuario);
