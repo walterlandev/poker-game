@@ -21,6 +21,7 @@ export default function Jogador({
     ehSB           = false,
     ehBB           = false,
     tempoMs        = 45000,
+    expiraEm       = null,   // prazo absoluto do servidor (mesa.turnoExpiraEm)
     avatarSz       = 58,     // escala responsiva vinda do Mesa.jsx
     tema           = 'classico',
     compacto       = false,  // tela pequena: cartas ao lado do avatar em vez de embaixo
@@ -134,7 +135,7 @@ export default function Jogador({
                 </div>
 
                 {/* Anel de tempo */}
-                <Temporizador totalMs={tempoMs} ativo={ehVez} tamanho={avatarSz} />
+                <Temporizador totalMs={tempoMs} expiraEm={expiraEm} ativo={ehVez} tamanho={avatarSz} />
 
                 {/* Badges ALL-IN / FOLD */}
                 {allIn && (

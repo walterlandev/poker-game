@@ -26,6 +26,7 @@
 ================================================================ */
 
 import { useState, useCallback } from 'react';
+import PinConfirm from '../../Wallet/PinConfirm';
 
 
 // ================================================================
@@ -153,13 +154,18 @@ export default function TemasCartas({ saldoAtual, temaAtual, temasComprados = []
     // Estado para evitar duplo clique durante operação em curso
     const [operando, setOperando] = useState(false);
 
+    // Tema aguardando confirmação de PIN antes de efetivar a compra —
+    // mesma exigência de segurança de depósito/saque/envio de ₿C.
+    const [temaPendentePin, setTemaPendentePin] = useState(null);
+
     // Verifica se o jogador tem um tema
     function estaComprado(tema) {
         if (TEMAS_GRATIS.includes(tema.id)) return true;
         return temasComprados.includes(tema.id);
     }
 
-    // ✅ Compra real — aguarda tema:comprado ou tema:erro do backend
+    // Abre a confirmação de PIN antes de comprar — a compra de verdade só
+    // acontece em confirmarCompraComPin, depois do PIN ser validado.
     const handleComprar = useCallback((tema) => {
         if (!socket || operando) return;
 
@@ -168,8 +174,17 @@ export default function TemasCartas({ saldoAtual, temaAtual, temasComprados = []
             return;
         }
 
+        setTemaPendentePin(tema);
+    }, [socket, operando, saldoAtual, onFeedback]);
+
+    // ✅ Compra real — aguarda tema:comprado ou tema:erro do backend
+    const confirmarCompraComPin = useCallback((pin) => {
+        const tema = temaPendentePin;
+        if (!socket || !tema) return;
+
+        setTemaPendentePin(null);
         setOperando(true);
-        socket.emit('comprar_tema', { temaId: tema.id });
+        socket.emit('comprar_tema', { temaId: tema.id, pin });
 
         const onComprado = () => {
             setOperando(false);
@@ -194,7 +209,7 @@ export default function TemasCartas({ saldoAtual, temaAtual, temasComprados = []
             setOperando(false);
         }, 8000);
 
-    }, [socket, operando, saldoAtual, onFeedback]);
+    }, [socket, temaPendentePin, onFeedback]);
 
     // ✅ Ativação real — aguarda tema:ativado ou tema:erro do backend
     const handleAtivar = useCallback((tema) => {
@@ -272,6 +287,15 @@ export default function TemasCartas({ saldoAtual, temaAtual, temasComprados = []
                     ₿C {fmt(saldoAtual)}
                 </span>
             </p>
+
+            {temaPendentePin && (
+                <PinConfirm
+                    titulo="Confirmar compra"
+                    descricao={`Comprar o tema "${temaPendentePin.nome}" por ₿C ${fmt(temaPendentePin.preco)}`}
+                    onConfirmar={confirmarCompraComPin}
+                    onCancelar={() => setTemaPendentePin(null)}
+                />
+            )}
 
         </div>
     );

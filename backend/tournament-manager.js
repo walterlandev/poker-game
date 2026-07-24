@@ -240,6 +240,30 @@ export class TournamentManager {
 
 
     // ================================================================
+    // ABANDONO DE MESA (chamado pelo server.js no sair_mesa/disconnect)
+    //
+    // Sair ou cair a conexão no meio de uma mesa de torneio é tratado como
+    // desistência (forfeit) — as fichas na mesa não valem dinheiro fora do
+    // torneio, só o campeão recebe prêmio real ao final (winner-take-all,
+    // ver _avancarRodada). Aqui só marcamos a entrada dele no torneio como
+    // eliminada, pra não ficar uma entrada "fantasma" presa em 'jogando'
+    // pra sempre — quem continua jogando na mesa resolve o resultado dela
+    // normalmente (via notificarVencedorMesa, pelo showdown ou W.O.).
+    // ================================================================
+
+    abandonarMesa(torneioId, uid) {
+        const torneio = this.torneios.get(torneioId);
+        if (!torneio) return;
+
+        const j = torneio.jogadores[uid];
+        if (!j || j.status !== 'jogando') return;
+
+        j.status = 'eliminado';
+        this.emitirEstadoTorneio(torneioId);
+    }
+
+
+    // ================================================================
     // VERIFICAR SE A RODADA TERMINOU
     // ================================================================
 
@@ -357,6 +381,13 @@ export class TournamentManager {
     checarRebuy(torneioId, uid) {
         const torneio = this.torneios.get(torneioId);
         if (!torneio) return { sucesso: false, erro: 'Torneio não encontrado.' };
+
+        // Sem isso, um clique tardio de um cliente desatualizado (ex: torneio
+        // já terminou e o prêmio já foi pago ao campeão) ainda passava por
+        // aqui, debitando um buy-in real sem nenhum retorno possível.
+        if (torneio.status !== 'em_andamento') {
+            return { sucesso: false, erro: 'Torneio não está em andamento.' };
+        }
 
         const j = torneio.jogadores[uid];
         if (!j) return { sucesso: false, erro: 'Você não está neste torneio.' };

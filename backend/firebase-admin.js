@@ -139,9 +139,18 @@ const ehBot = (uid) => !uid || uid.startsWith('bot_');
 // ================================================================
 
 export async function debitarEntradaMesa(uid, valorBuyIn) {
+    // Nunca confiar em valor vindo do cliente sem validar sinal/tipo — um
+    // buyIn negativo ou não-numérico faria o "debitarReal" abaixo virar
+    // negativo, e increment(-debitarReal) creditaria ₿C em vez de debitar
+    // (exploit real de "imprimir" dinheiro — já aconteceu antes, ver CLAUDE.md).
+    valorBuyIn = Math.floor(Number(valorBuyIn));
+    if (!Number.isFinite(valorBuyIn) || valorBuyIn <= 0) {
+        return { sucesso: false, erro: 'Valor de buy-in inválido.' };
+    }
+
     // Bots e modo offline: libera sem debitar
-    if (ehBot(uid)) return { sucesso: true, fichasDebitadas: valorBuyIn };
-    if (!db)        return { sucesso: true, fichasDebitadas: valorBuyIn };
+    if (ehBot(uid)) return { sucesso: true, fichasDebitadas: valorBuyIn, debitarReal: 0, debitarBonus: 0 };
+    if (!db)        return { sucesso: true, fichasDebitadas: valorBuyIn, debitarReal: valorBuyIn, debitarBonus: 0 };
 
     try {
         const resultado = await db.runTransaction(async (tx) => {
@@ -171,7 +180,7 @@ export async function debitarEntradaMesa(uid, valorBuyIn) {
                 saldoBonus: admin.firestore.FieldValue.increment(-debitarBonus),
             });
 
-            return { sucesso: true, fichasDebitadas: valorBuyIn };
+            return { sucesso: true, fichasDebitadas: valorBuyIn, debitarReal, debitarBonus };
         });
 
         if (resultado.sucesso) {
@@ -200,16 +209,25 @@ export async function debitarEntradaMesa(uid, valorBuyIn) {
 // game-manager a cada showdown.
 // ================================================================
 
-export async function creditarSaidaMesa(uid, fichasRestantes) {
+// origemBonus: quanto do buy-in/rebuy que formou essa pilha de fichas veio
+// do saldo BÔNUS — nunca pode virar mais do que isso de volta em saldo
+// bônus; o resto (o que realmente veio de saldo real, mais qualquer ganho
+// da mesa) volta como saldo real. Sem isso, sentar numa mesa com bônus e
+// sair na sequência "lavava" o bônus (não sacável) em saldo real sacável.
+export async function creditarSaidaMesa(uid, fichasRestantes, origemBonus = 0) {
     if (ehBot(uid))           return;
     if (!db)                  return;
     if (fichasRestantes <= 0) return;
 
+    const bonusDevolvido = Math.min(Math.max(Math.floor(Number(origemBonus)) || 0, 0), fichasRestantes);
+    const realDevolvido  = fichasRestantes - bonusDevolvido;
+
     try {
         await refJogador(uid).update({
-            saldo: admin.firestore.FieldValue.increment(fichasRestantes),
+            saldo:      admin.firestore.FieldValue.increment(realDevolvido),
+            saldoBonus: admin.firestore.FieldValue.increment(bonusDevolvido),
         });
-        console.log(`↩️  Saída mesa: ₿C ${fichasRestantes} devolvidos a ${uid}`);
+        console.log(`↩️  Saída mesa: ₿C ${realDevolvido} (real) + ₿C ${bonusDevolvido} (bônus) devolvidos a ${uid}`);
     } catch (e) {
         console.error('creditarSaidaMesa erro:', e.message);
     }

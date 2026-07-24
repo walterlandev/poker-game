@@ -5,34 +5,36 @@
    Conta regressivamente o tempo disponível para agir.
 
    PROPS:
-     totalMs → tempo total em ms (90000=humano, 30000=bot)
-     ativo   → boolean: true quando é a vez deste jogador
-     tamanho → tamanho do SVG em pixels (padrão 50)
+     totalMs  → tempo total em ms (90000=humano, 30000=bot) — só usado como
+                fallback caso expiraEm não esteja disponível
+     expiraEm → timestamp absoluto (Date.now() + ms) vindo do servidor
+                (mesa.turnoExpiraEm) — fonte de verdade da contagem. Contar
+                a partir de um prazo absoluto (em vez de "totalMs a partir
+                do momento em que este componente montou") evita que um
+                refresh de página ou uma reconexão no meio do turno reinicie
+                o anel do zero, dessincronizado do timeout real do servidor.
+     ativo    → boolean: true quando é a vez deste jogador
+     tamanho  → tamanho do SVG em pixels (padrão 50)
 ================================================================ */
 
 import { useState, useEffect, useRef } from 'react';
 
-export default function Temporizador({ totalMs = 90000, ativo = false, tamanho = 50 }) {
+export default function Temporizador({ totalMs = 90000, expiraEm = null, ativo = false, tamanho = 50 }) {
 
     const [restante, setRestante] = useState(totalMs);
     const intervaloRef            = useRef(null);
-    const inicioRef               = useRef(null);
 
     useEffect(() => {
         // Limpa timer anterior
         if (intervaloRef.current) clearInterval(intervaloRef.current);
 
-        if (!ativo) {
+        if (!ativo || !expiraEm) {
             const reset = setTimeout(() => setRestante(totalMs), 0);
             return () => clearTimeout(reset);
         }
 
-        // Inicia contagem
-        inicioRef.current = Date.now();
-
         const tick = () => {
-            const decorrido = Date.now() - inicioRef.current;
-            const novoRestante = Math.max(0, totalMs - decorrido);
+            const novoRestante = Math.max(0, expiraEm - Date.now());
             setRestante(novoRestante);
 
             if (novoRestante <= 0) {
@@ -47,7 +49,7 @@ export default function Temporizador({ totalMs = 90000, ativo = false, tamanho =
             clearTimeout(inicial);
             if (intervaloRef.current) clearInterval(intervaloRef.current);
         };
-    }, [ativo, totalMs]);
+    }, [ativo, expiraEm, totalMs]);
 
     if (!ativo) return null;
 

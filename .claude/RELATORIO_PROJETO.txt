@@ -1,0 +1,474 @@
+================================================================================
+RELATÓRIO DO PROJETO — POKER GAME (₿C BITCHAGER)
+Atualizado em: 24/07/2026
+================================================================================
+
+Este documento existe pra você acompanhar, a qualquer momento, três coisas:
+  1. Como o jogo FUNCIONA hoje e como cada parte DEVERIA funcionar
+  2. O que já foi corrigido/construído (histórico desta fase de trabalho)
+  3. O que ainda falta, está pendente, ou é um risco conhecido
+
+Sempre que eu mexer em algo novo, esse arquivo deve ser atualizado. Se algo
+aqui parecer desatualizado, pergunte antes de confiar 100% nele — o código
+é sempre a fonte da verdade, isso aqui é um mapa de apoio.
+
+
+================================================================================
+1. VISÃO GERAL DA ARQUITETURA
+================================================================================
+
+O QUE É
+  Um poker Texas Hold'em online multiplayer em tempo real, com uma moeda
+  interna (₿C — Bitchager) que pode ser comprada com dinheiro real (PIX via
+  Mercado Pago) e sacada de volta pra PIX (hoje de forma manual/assistida).
+
+PEÇAS DO QUEBRA-CABEÇA (onde cada coisa mora)
+
+  FRONTEND
+    - React 19 + Vite, hospedado no Vercel
+    - URL: https://poker-game-tawny-rho.vercel.app
+    - Fala com o backend via Socket.io (tempo real) + algumas rotas REST
+      (GET /mesas, GET /ranking, GET /jogador/:uid)
+
+  BACKEND
+    - Node.js + Express + Socket.io, hospedado na Hostinger (hospedagem
+      compartilhada, "Implante web app" — puxa direto do GitHub)
+    - URL: https://brown-wolverine-631802.hostingersite.com
+    - IMPORTANTE: todo estado de jogo (mesas, torneios) fica só em MEMÓRIA
+      (um Map do JavaScript). Não está salvo em nenhum banco de dados.
+      >>> Isso significa que TODA VEZ que o backend reinicia (o que
+      >>> acontece a cada deploy novo), TODAS as mesas e torneios em
+      >>> andamento são perdidos. Ver seção 4 (pendências) pra mais detalhes.
+
+  BANCO DE DADOS / LOGIN
+    - Firebase Auth (login por Google ou email/senha)
+    - Firestore (banco de dados): perfil do jogador, saldo, transações,
+      blockchain interna, depósitos/saques pendentes
+    - Projeto Firebase: poker-texas-hold-1ec8d
+
+  PAGAMENTOS
+    - Mercado Pago, credenciais de PRODUÇÃO (não é mais teste)
+    - Depósito: automático, via PIX, com webhook de confirmação
+    - Saque: manual — fica pendente até o admin (você) confirmar que pagou
+      o PIX pelo app do banco (a API do Mercado Pago não oferece, hoje,
+      um jeito de mandar PIX pra uma chave qualquer automaticamente)
+
+  REPOSITÓRIO
+    - GitHub: github.com/walterlandev/poker-game (era wassites, a conta
+      mudou de nome/dono em algum momento)
+    - git push na branch main = deploy automático nos dois lados
+      (Vercel pro frontend, Hostinger pro backend)
+
+
+================================================================================
+2. COMO CADA PARTE DEVERIA FUNCIONAR
+================================================================================
+
+--------------------------------------------------------------------------
+2.1 CADASTRO E LOGIN
+--------------------------------------------------------------------------
+  - Duas formas de entrar: "Continuar com Google" ou email/senha
+  - Cadastro novo: cria o perfil no Firestore com saldo ZERO (saldo real e
+    bônus) — o bônus de boas-vindas só é creditado depois, quando o
+    jogador resgata ele manualmente na Carteira (não é automático)
+  - Depois do cadastro, é OBRIGATÓRIO criar um PIN de segurança (4+
+    dígitos) antes de poder jogar — sem PIN, não dá pra depositar, sacar,
+    comprar na loja nem enviar ₿C pra outro jogador
+  - Jogadores que já tinham conta de antes de o PIN existir também são
+    obrigados a criar o PIN na primeira vez que tentam usar a carteira
+
+--------------------------------------------------------------------------
+2.2 LOBBY (tela principal, depois de logar)
+--------------------------------------------------------------------------
+  Abas: Carteira | Mesas | Torneio | Ranking | Loja | Admin (só se for admin)
+
+  - CARTEIRA: saldo (real + bônus), depositar, sacar, enviar ₿C, extrato
+  - MESAS: lista de mesas públicas e privadas abertas (só aparecem mesas
+    que ainda não começaram a jogar e não estão cheias — 9 jogadores é o
+    máximo). Atualiza sozinho em tempo real quando uma mesa é criada,
+    começa a jogar, ou é fechada (não precisa ficar recarregando a página)
+  - TORNEIO: torneios abertos, criar torneio, entrar via convite
+  - RANKING: top jogadores por pontuação
+  - LOJA: comprar ₿C com dinheiro real, comprar temas/baralhos diferentes
+  - ADMIN: só visível/funcional pra quem tem isAdmin=true no Firestore
+    (checado no SERVIDOR, nunca só escondido na tela)
+
+--------------------------------------------------------------------------
+2.3 CRIAR / ENTRAR EM MESA
+--------------------------------------------------------------------------
+  - Criar mesa: escolhe nome, valor de entrada (buy-in), blinds, quantos
+    bots, se é privada (com senha) ou não
+  - Buy-in é debitado do saldo real do jogador (saldo + bônus) na hora
+    de criar ou entrar na mesa
+  - Mesa PRIVADA exige a senha certa pra qualquer um que ainda não esteja
+    sentado — sem a senha certa, não entra
+  - Mesa aparece na lista pública (aba Mesas) até ela ficar CHEIA (9
+    jogadores) ou o jogo COMEÇAR — a partir daí ela some da lista
+    automaticamente
+  - Convite por link: dentro da mesa (enquanto ainda está "Aguardando"),
+    tem um botão "Convidar amigos pra mesa" que copia um link
+    (?mesa=CÓDIGO) — quem abre esse link entra direto na mesa
+    automaticamente (mesmo esquema já existia pra torneio)
+
+--------------------------------------------------------------------------
+2.4 O JOGO EM SI (motor de poker)
+--------------------------------------------------------------------------
+  - Texas Hold'em padrão: 2 cartas na mão, 5 cartas comunitárias
+    (Flop 3 + Turn 1 + River 1), rodadas de aposta em cada fase
+  - Dealer (botão) roda a cada mão. Heads-up (só 2 jogadores): dealer é
+    o Small Blind e age primeiro no pré-flop, mas por último nas fases
+    seguintes — regra padrão de poker
+  - Fold / Check / Call / Raise / All-in — cada botão só deveria estar
+    disponível/clicável quando a ação é realmente possível (ex: não dá
+    pra fazer Check se tem aposta na mesa; não dá pra fazer Raise se o
+    saldo não cobre nem o aumento mínimo)
+  - All-in incompleto: se o jogador não tem saldo pra igualar a aposta,
+    ele entra "all-in" só com o que tem, e isso NÃO reabre a rodada de
+    apostas pros outros (regra padrão)
+  - Side pots (potes divididos): quando alguém vai all-in com menos saldo
+    que os outros, o pote se divide em "pote principal" (todo mundo
+    disputa) e "pote lateral" (só quem apostou mais disputa). O dinheiro
+    de quem DESISTIU (fold) no meio do caminho continua contando pro
+    valor do pote — só a ELEGIBILIDADE de ganhar é restrita a quem não
+    desistiu.
+  - Showdown: mostra as cartas de quem chegou até o fim, calcula a mão
+    mais forte, distribui o(s) pote(s), mostra o resultado na tela por
+    alguns segundos antes de começar a próxima mão
+  - Sair da mesa no meio de uma mão em andamento: conta como desistência
+    (fold) automática — se só sobrar 1 jogador ativo, ele ganha na hora
+  - Fichas que sobraram na mesa voltam pro saldo real do jogador quando
+    ele sai da mesa
+  - Recompra (rebuy): se o jogador zerar as fichas NA MESA (mas ainda tem
+    saldo real ou bônus fora da mesa), aparece um botão pra comprar mais
+    fichas (mesmo valor do buy-in original) e continuar jogando — ou um
+    botão pra simplesmente sair da mesa, se não quiser/não puder recompor
+  - Jogador sem fichas fica sentado observando (não participa da mão)
+    até recomprar ou sair — nunca é dado como perdedor forçado
+  - Timeout: 45s pra jogador humano agir, 10s pra bot. Depois de 3 faltas
+    seguidas, o jogador é removido automaticamente da mesa (e o que
+    sobrou de fichas dele volta pro saldo real)
+
+--------------------------------------------------------------------------
+2.5 BOTS
+--------------------------------------------------------------------------
+  - Preenchem vagas na mesa quando o host escolhe adicionar bots
+  - Têm uma IA baseada na força da mão + agressividade aleatória por bot
+  - Fazem rebuy automático quando zeram (não ficam presos esperando)
+
+--------------------------------------------------------------------------
+2.6 TORNEIOS
+--------------------------------------------------------------------------
+  - Buy-in fixo, fichas iniciais fixas, várias mesas em paralelo que vão
+    se fundindo conforme jogadores são eliminados
+  - Rebuy period configurável no início do torneio
+  - Campeão leva o prêmio total acumulado (buy-ins de todos + rebuys) —
+    creditado automaticamente no saldo real dele quando o torneio acaba
+  - Convite por link (?torneio=CÓDIGO), igual mesa comum
+
+--------------------------------------------------------------------------
+2.7 CARTEIRA (saldo real x bônus)
+--------------------------------------------------------------------------
+  REGRA DE OURO: saldo REAL pode ser sacado; saldo BÔNUS não pode nunca
+  ser sacado (só jogado). Os dois juntos contam pra entrar em mesa/torneio.
+
+  - DEPOSITAR: escolhe valor em R$, gera um PIX real (QR Code + copia e
+    cola) via Mercado Pago, fica PENDENTE até o Mercado Pago confirmar o
+    pagamento (webhook automático credita o ₿C na hora que confirma)
+  - SACAR: exige ter PIN configurado, chave PIX de destino, valor mínimo
+    de ₿C 5.000, taxa de 3%, limite diário. Fica PENDENTE até o ADMIN
+    confirmar manualmente que pagou o PIX pelo próprio banco (ver seção
+    4 — a API do Mercado Pago não manda PIX pra qualquer chave sozinha)
+  - ENVIAR ₿C: manda saldo pra outro jogador (busca por nome/ID), com
+    taxa. Servidor sempre recalcula a taxa e o total — nunca confia no
+    que o cliente manda
+  - BÔNUS DE BOAS-VINDAS: resgatado manualmente uma vez só, vira saldo
+    BÔNUS (não saldo real)
+  - EXTRATO: histórico de tudo (depósito, saque, envio, recebido, prêmio,
+    compra, bônus), com filtro por tipo e período, mostra o status de
+    cada transação (pendente/confirmada)
+
+--------------------------------------------------------------------------
+2.8 BLOCKCHAIN INTERNA (ledger auditável)
+--------------------------------------------------------------------------
+  - NÃO é uma criptomoeda de verdade nem negociável fora do jogo — é um
+    livro-razão interno, tipo blockchain de verdade (blocos encadeados,
+    prova de trabalho, hash), só pra ter um registro auditável e à prova
+    de adulteração de todas as movimentações de ₿C
+  - Toda transação de saldo real (depósito, saque, envio) entra nesse
+    ledger também, em paralelo ao Firestore (que é a fonte real do saldo)
+  - Minerado automaticamente a cada 20s se tiver transação pendente
+  - Persistido no Firestore — sobrevive a reinícios do servidor
+  - Jogador pode conferir o próprio histórico e validar a integridade da
+    cadeia pela tela da Carteira
+
+--------------------------------------------------------------------------
+2.9 LOJA (temas/baralhos)
+--------------------------------------------------------------------------
+  - Compra temas de carta diferentes com ₿C (visual: cores, baralho
+    "premium" com bordas/detalhes especiais)
+  - O tema ativo do jogador aparece PRA TODO MUNDO na mesa (não só pra
+    ele) — cada jogador vê o baralho de cada adversário com o tema que
+    ELE escolheu, não o seu próprio
+
+--------------------------------------------------------------------------
+2.10 PERFIL (foto e dados)
+--------------------------------------------------------------------------
+  - Foto de perfil: escolhe entre avatares prontos OU sobe uma foto do
+    celular/computador — a foto enviada fica visível pros outros
+    jogadores na mesa (sobe pro próprio servidor, não pro Firebase
+    Storage, que exigiria plano pago)
+  - Nome, telefone, email editáveis
+
+--------------------------------------------------------------------------
+2.11 PAINEL ADMIN
+--------------------------------------------------------------------------
+  - Só acessível por quem tem isAdmin=true no Firestore (checado sempre
+    no servidor)
+  - Usuários: lista todo mundo, saldo real/bônus, se tem PIN, data de
+    criação da conta
+  - Depósitos pendentes: mostra os que ainda não foram confirmados
+  - Saques pendentes: mostra valor, chave PIX, NOME do titular da conta
+    (pra conferir se bate com quem é dono da chave PIX antes de mandar o
+    dinheiro), botão de copiar a chave, botão "já paguei — confirmar"
+
+
+================================================================================
+3. O QUE JÁ FOI FEITO NESTA FASE DE TRABALHO
+================================================================================
+
+INFRAESTRUTURA / DEPLOY
+  [x] Backend migrado do Railway (que parou de existir) pra Hostinger
+  [x] Removido .env do controle de versão (estava commitado num repo
+      público no GitHub, vazando credenciais)
+  [x] Configuradas as variáveis de ambiente reais na Hostinger
+  [x] Corrigido erro fatal de compatibilidade (ERR_REQUIRE_ASYNC_MODULE)
+      — código usava "await" solto no topo de arquivo, que a Hostinger
+      não suporta (carrega o app via require() clássico do Node)
+  [x] Corrigido Firebase Admin não inicializando em produção
+  [x] Reduzido intervalo de ping do Socket.io pra evitar timeout de
+      proxy da hospedagem compartilhada
+  [x] Integrado Mercado Pago de produção (token real, não mais teste)
+
+MOTOR DO JOGO
+  [x] Sair da mesa no meio de uma mão: tratado como desistência corretamente
+  [x] Prêmio de torneio nunca era creditado ao campeão — corrigido
+  [x] CRÍTICO: side pots perdiam o dinheiro de quem tinha desistido —
+      corrigido e testado
+  [x] Status "all-in" de jogador sem saldo ficava preso entre mãos,
+      causando telas com informação sobreposta/confusa — corrigido
+  [x] Jogador que caía a conexão (WiFi ruim, etc.) virava "fantasma" —
+      parava de receber atualização e não conseguia mais agir — corrigido
+      com reautenticação automática na reconexão
+  [x] CRÍTICO/SEGURANÇA: senha de mesa privada nunca era guardada nem
+      checada no servidor — qualquer um entrava sem saber ela — corrigido
+  [x] Lobby não avisava em tempo real sobre mesas novas/mesas que
+      começaram a jogar — só descobria a cada 10s de polling — corrigido
+  [x] Botão Raise ficava clicável mesmo sem saldo suficiente pra um
+      aumento válido — corrigido
+  [x] Barra de ação continuava aparecendo mesmo com o jogador já
+      all-in ou desistido na mão — corrigido
+  [x] Recompra (rebuy): recurso criado do zero (backend já tinha o
+      evento, mas não tinha botão em mesa comum, só em torneio)
+
+CARTEIRA / SEGURANÇA FINANCEIRA
+  [x] CRÍTICO: exploit onde o cliente controlava o valor debitado no
+      envio de ₿C, permitindo "imprimir" dinheiro — corrigido, servidor
+      recalcula tudo sempre
+  [x] Condições de corrida em saque e resgate de bônus (dois cliques
+      rápidos duplicando a ação) — corrigido com transação atômica
+  [x] PIN: força bruta agora é bloqueada de verdade no servidor
+  [x] PIN: jogadores antigos (de antes do PIN existir) estavam travados
+      sem conseguir depositar/sacar — corrigido
+  [x] Faltava checagem de PIN antes de abrir a tela de PIN na Loja e no
+      envio de ₿C (só a Carteira tinha essa checagem) — corrigido
+  [x] Depósito e saque sem nenhum aviso de erro visível — corrigido
+  [x] Bônus aparecia com sinal/cor errada no extrato — corrigido
+  [x] "Taxas" no resumo do extrato sempre mostrava R$0 — corrigido
+  [x] Saque reconstruído do zero: agora coleta a chave PIX, calcula tudo
+      no servidor, fica PENDENTE até confirmação manual do admin
+  [x] Cadastro dava ₿C 2.000 de bônus fictício sem lastro nenhum —
+      corrigido pra não dar mais saldo de graça sem resgate manual
+
+BLOCKCHAIN INTERNA
+  [x] Construída em cima de código que já existia mas estava morto/não
+      conectado (genesis block, prova de trabalho, merkle root)
+  [x] Bug de detecção de adulteração corrigido (recalculava hash errado)
+  [x] Persistência no Firestore implementada
+
+PAINEL ADMIN
+  [x] Criado do zero (não existia)
+  [x] Mostra nome do titular da conta + botão de copiar chave PIX no saque
+
+FRONTEND / VISUAL
+  [x] Temas de cartas comprados não estavam sendo aplicados na mesa
+  [x] Fichas de poker com visual próprio (em vez de texto simples)
+  [x] Layout responsivo: foto do jogador ao lado das cartas em tela
+      pequena, cartas um pouco maiores, nome/saldo alinhados
+  [x] Foto do jogador do topo cortada pelo cabeçalho em mesas grandes
+      — corrigido
+  [x] Cartas comunitárias ficavam cobertas pela ficha de aposta
+      flutuante em mesas pequenas — corrigido (z-index)
+  [x] Avatar enviado pelo jogador não aparecia pros outros — corrigido,
+      sobe pro próprio servidor (Firebase Storage exigiria plano pago)
+  [x] Investigado extensivamente um bug intermitente de tela preta
+      (erro do React "insertBefore") — mitigado movendo tags <style>
+      condicionais pro CSS global (ver pendências, seção 4)
+
+
+================================================================================
+3.1 SESSÃO 24/07/2026 — AUDITORIA GERAL + CORREÇÕES
+================================================================================
+  Pedido do usuário: analisar o relatório e o jogo inteiro, achar o que
+  estava errado e corrigir tudo, deixando 100% funcional conforme as
+  regras do poker. Auditoria feita em paralelo (motor, torneio, carteira,
+  server/admin/bots, frontend) + revisão manual profunda do motor.
+
+  FINANCEIRO / SEGURANÇA (crítico)
+  [x] Buy-in negativo/inválido permitia creditar ₿C em vez de debitar
+      (criar_mesa, entrar_mesa, criar_torneio, entrar_torneio, rebuy) —
+      debitarEntradaMesa agora valida e normaliza o valor
+  [x] CRÍTICO: bônus (não sacável) virava saldo real sacável ao sentar
+      numa mesa e sair de novo, e também ao enviar ₿C pra outra conta —
+      agora rastreamos "origemBonus" por jogador na mesa e
+      creditarSaidaMesa/wallet:enviar nunca devolvem mais bônus do que
+      realmente entrou como bônus
+  [x] Taxa de depósito vinha do cliente e nunca era recalculada no
+      servidor (TAXA_DEPOSITO existia mas não era usada) — corrigido
+  [x] Faltava checagem de PIN na compra de tema na Loja — corrigido
+      (mesmo padrão de PinConfirm já usado em depósito/saque/envio)
+  [x] Corrida no crédito de depósito via webhook (reenvio do Mercado
+      Pago podia duplicar o crédito) — idempotência + crédito agora
+      atômicos na mesma transação Firestore
+  [x] Webhook do Mercado Pago aceitava requisição sem checar assinatura
+      se MP_WEBHOOK_SECRET estivesse vazio — agora rejeita em produção
+      nesse caso (só não bloqueia em modo dev, sem token real)
+
+  TORNEIO (crítico)
+  [x] CRÍTICO: mesa de torneio encerrava a rodada inteira na primeira
+      mão em que todos exceto um desistissem (W.O.), mesmo com todo
+      mundo ainda de fichas cheias — na prática isso quebrava qualquer
+      torneio, já que a maioria das mãos termina por fold, não showdown
+  [x] CRÍTICO: sair/desconectar de mesa de torneio creditava o stack
+      da mesa como saldo real na hora — furava o winner-take-all. Agora
+      é tratado como forfeit (fichas de torneio não são dinheiro fora
+      dele) e o jogador é marcado eliminado no bracket
+  [x] Rebuy podia ser cobrado com o torneio já finalizado (cliente
+      desatualizado) — checarRebuy agora exige torneio 'em_andamento'
+
+  MOTOR DO JOGO (regras do poker)
+  [x] CRÍTICO: ordem de turno quebrava quando um jogador saía da mesa
+      (ou era removido por inatividade) no meio de uma mão com 3+
+      jogadores — podia pular quem ainda precisava agir. Descoberto e
+      confirmado com um script Node (socket.io-client) simulando a
+      partida real
+  [x] CRÍTICO: consequência do bug acima — se quem saísse fosse
+      justamente a referência de "volta completa" da rodada de apostas,
+      a mão travava num loop infinito de check, nunca fechava a rodada
+  [x] Botão do dealer "resetava" pro início da lista de jogadores
+      quando o dealer anterior zerava fichas ou saía da mesa, em vez de
+      passar pro próximo jogador realmente ativo (afeta justiça do
+      rodízio de blinds)
+  [x] Fichas de quem saía da mesa no meio de uma mão com side pot em
+      aberto podiam ser somadas ao pote errado (a fração paga por ele
+      antes de sair precisa entrar na faixa certa de side pot)
+  [x] Rebuy automático de bot rodava tarde demais — bot recompunha o
+      saldo mas ficava de fora justo da mão em que devia voltar
+  [x] Rebuy não validava que o valor era exatamente o buy-in da mesa
+  [x] GET /mesas não filtrava mesas já cheias (9/9) — apareciam no lobby
+      mesmo sem vaga
+  [x] adicionarBot não avisava o lobby em tempo real (mesas_atualizadas)
+
+  FRONTEND
+  [x] <style> solto dentro de ActionBar.jsx e HandStrength.jsx — as
+      duas telas mais visitadas do jogo (montam/desmontam a cada
+      fold/all-in/mão nova) — regressão exata do padrão que já causou
+      o bug de tela preta. Movido pro CSS global em main.jsx
+  [x] Timer de ação (Temporizador.jsx) contava localmente a partir do
+      momento em que o componente montava, dessincronizado do timeout
+      real do servidor (refresh de página no meio do turno bugava a
+      contagem) — servidor agora manda um prazo absoluto
+      (mesa.turnoExpiraEm) e o frontend conta a partir dele
+  [x] Vazamento de listener de socket em ModalCriarMesa.jsx (sem
+      cleanup no timeout) — risco de criar mesa em duplicidade com
+      duplo débito de buy-in
+  [x] Botão Call mostrava o custo cheio mesmo quando o saldo não
+      cobria (deveria mostrar "All-in ₿C X", já que é isso que o
+      servidor realmente processa)
+
+  COMO FOI TESTADO
+  Script Node com socket.io-client rodado contra o servidor LOCAL (modo
+  offline, sem Firebase) simulando: rotação de dealer em várias mãos,
+  heads-up, jogador saindo no meio de uma mão com 3 jogadores, e um
+  torneio com fold até o fim de uma mão — todos os cenários confirmaram
+  o bug ANTES da correção e o comportamento correto DEPOIS. Build de
+  produção do frontend rodado sem erros.
+
+
+================================================================================
+4. PENDÊNCIAS E RISCOS CONHECIDOS
+================================================================================
+
+RISCO ALTO — Estado do jogo só em memória
+  Mesas e torneios ativos vivem só na memória do processo Node. Toda vez
+  que o backend é reiniciado (todo deploy novo faz isso), esse estado é
+  perdido — jogos em andamento simplesmente desaparecem, mesmo que os
+  jogadores continuem "vendo" a tela antiga até recarregar.
+  → Solução de verdade: persistir mesas ativas em algum lugar durável
+    (Firestore ou Redis). Isso é um trabalho de verdade, não um ajuste
+    rápido — envolve reestruturar bastante o game-manager.js.
+  → Enquanto isso: evitar reiniciar o servidor durante partidas reais,
+    ou avisar os jogadores antes de um deploy.
+
+SAQUE AINDA É MANUAL
+  Não existe hoje uma forma automática de mandar PIX pra uma chave
+  qualquer pela API do Mercado Pago (o produto deles não oferece isso
+  do jeito que a gente precisa). Todo saque passa por confirmação manual
+  sua no painel Admin. Se o volume de saques crescer, isso vira gargalo.
+
+TELA PRETA INTERMITENTE (erro "insertBefore" do React)
+  Foi investigado a fundo (inclusive com depuração ao vivo no navegador,
+  decodificação de sourcemap, e testes automatizados com Playwright) mas
+  a causa exata NÃO foi 100% confirmada — foi mitigada removendo um
+  padrão de código (tags <style> que entravam/saíam do DOM junto com
+  modais e spinners) que parecia coincidir com o erro. Pode ainda
+  acontecer em algum caso não coberto. Se voltar a acontecer, vale
+  reconectar o depurador ao vivo em vez de tentar adivinhar de novo.
+
+CÓDIGO MORTO AINDA EXISTE
+  wallet.js (sistema de carteira com chaves ECDSA) e partes de
+  transactions.js não são mais usados de verdade — foram auditados mas
+  não removidos ainda, por falta de decisão sua sobre manter ou apagar.
+
+WEBHOOK DO MERCADO PAGO
+  MP_WEBHOOK_SECRET precisa continuar configurado na Hostinger — desde
+  24/07/2026 o servidor REJEITA o webhook em produção se essa variável
+  estiver vazia (antes pulava a validação silenciosamente). Só confirme
+  que a env var está mesmo setada lá se depósitos pararem de confirmar.
+
+TORNEIO NÃO TEM MERGE DE MESAS DE VERDADE
+  Descoberto na auditoria de 24/07/2026: cada rodada do torneio cria
+  mesas novas (uma por grupo de jogadores) que jogam até sobrar 1
+  vencedor CADA UMA, e só então a próxima rodada é montada com os
+  sobreviventes — resetando o stack de todos pro valor inicial de novo.
+  Não existe "fundir mesas conforme jogadores vão sendo eliminados"
+  como o documento da seção 2.6 descreve — é mais parecido com um
+  formato de bracket (Sit & Go em série) do que um MTT clássico com
+  merge dinâmico. Funciona e é justo, só não é literalmente o que está
+  descrito. Construir merge de mesas de verdade é trabalho arquitetural
+  grande (mexer a fundo no game-manager.js e tournament-manager.js),
+  não um ajuste rápido — fica pra quando for priorizado.
+
+MESA VERTICAL
+  Foi cogitada a ideia de girar a mesa de horizontal pra vertical (layout
+  retrato) pra aproveitar melhor telas de celular, mantendo as cartas
+  comunitárias sempre na orientação horizontal. Discutido mas NÃO
+  implementado ainda — fica pra quando for priorizado.
+
+BOTÃO DE ATUALIZAR MANUAL NO LOBBY
+  Chegou a ser oferecido como reforço (além do tempo real que já
+  funciona), mas não foi decidido/construído ainda.
+
+
+================================================================================
+FIM DO RELATÓRIO — mantenha este arquivo atualizado conforme o projeto avança
+================================================================================

@@ -159,6 +159,7 @@ export class GameManager {
             ultimaAcaoDescritiva: 'Mesa criada. Aguardando jogadores.',
             ordem:                [usuario.uid],
             senha:                config.senha ? String(config.senha) : null,
+            contribuicoesEncerradas: [],
             jogadores: {
                 [usuario.uid]: this._criarJogador(usuario, config.buyIn || 1000, 'humano'),
             },
@@ -208,6 +209,67 @@ export class GameManager {
                         && mesa.fase !== 'SHOWDOWN';
         const eraSuaVez = mesa.turno === uid;
 
+        // Saída no meio de uma mão em andamento: trata como desistência.
+        // IMPORTANTE: tudo que depende da posição do jogador na ordem (quem
+        // ganha por W.O., quem age em seguida) precisa ser resolvido AQUI,
+        // ANTES de remover o jogador de mesa.ordem/mesa.jogadores — depois
+        // de removido, _encontrarProximo perde a referência do assento
+        // esvaziado e reiniciava a busca (errado) do início da lista,
+        // podendo pular jogadores que ainda precisavam agir na rodada.
+        let proximoUid          = null;
+        let vencedorPorAbandono = null;
+
+        if (maoAtiva) {
+            // O dinheiro que ele já apostou nesta mão continua contando pro
+            // pote (side pots) — só a elegibilidade de ganhar se perde,
+            // igual um fold comum. Sem guardar isso antes de apagar o
+            // jogador, essa contribuição "sumia" do cálculo do pote.
+            if (jogador.apostaTotal > 0) {
+                mesa.contribuicoesEncerradas = mesa.contribuicoesEncerradas || [];
+                mesa.contribuicoesEncerradas.push({ apostaTotal: jogador.apostaTotal });
+            }
+
+            jogador.status = 'fold';
+            jogador.cartas = [];
+
+            const aindaAtivos = mesa.ordem.filter(id => {
+                if (id === uid) return false;
+                const j = mesa.jogadores[id];
+                return j && j.cartas?.length > 0 && j.status !== 'fold' && j.status !== 'sitout';
+            });
+
+            if (aindaAtivos.length === 1) {
+                vencedorPorAbandono = aindaAtivos[0];
+            } else {
+                // IMPORTANTE: calcula proximoUid usando a referência de
+                // "volta completa" (mesa.primeiroJogador) ORIGINAL, ainda
+                // intacta — antes de qualquer reatribuição abaixo. Trocar
+                // primeiroJogador antes dessa chamada faria _encontrarProximo
+                // comparar contra o valor NOVO, o que (quando o novo valor
+                // coincide com o próprio proximoUid) faz ele bater a
+                // condição "voltou ao agressor" na primeira volta e devolver
+                // null, avançando a fase sem ninguém ter agido de verdade.
+                if (eraSuaVez) {
+                    // mesa.turno ainda é `uid` aqui, e ele ainda está em
+                    // mesa.ordem (com status 'fold') — _encontrarProximo acha
+                    // a posição certa e pula o assento dele naturalmente.
+                    proximoUid = this._encontrarProximo(mesaId);
+                }
+
+                // Se quem saiu era a referência de "volta completa" da rodada
+                // de apostas, ela precisa ser reatribuída ANTES de remover
+                // ele de mesa.ordem — senão esse uid nunca mais é encontrado
+                // por _encontrarProximo (sumiu da ordem), a comparação
+                // "uid === aggressor" nunca mais bate, e a rodada de apostas
+                // trava num loop de check infinito (nunca fecha sozinha).
+                if (mesa.primeiroJogador === uid) {
+                    mesa.primeiroJogador = eraSuaVez
+                        ? proximoUid
+                        : this._proximoAtivoNaOrdemApos(mesa, uid);
+                }
+            }
+        }
+
         mesa.ordem = mesa.ordem.filter(id => id !== uid);
         delete mesa.jogadores[uid];
 
@@ -221,32 +283,52 @@ export class GameManager {
 
         if (mesa.host === uid) mesa.host = humanos[0].uid;
 
-        // Saída no meio de uma mão em andamento: trata como desistência.
-        // Sem isso, a mesa pode travar pra sempre (turno apontando pra
-        // alguém que não existe mais) ou o vencedor por W.O. nunca ser
-        // detectado enquanto os outros esperam a vez de quem já saiu.
-        if (maoAtiva) {
-            const aindaAtivos = mesa.ordem.filter(id => {
-                const j = mesa.jogadores[id];
-                return j && j.cartas?.length > 0 && j.status !== 'fold' && j.status !== 'sitout';
-            });
+        if (vencedorPorAbandono) {
+            this._limparTimers(mesaId);
+            this._finalizarMao(mesaId, vencedorPorAbandono, true);
+            return;
+        }
 
-            if (aindaAtivos.length === 1) {
-                this._limparTimers(mesaId);
-                this._finalizarMao(mesaId, aindaAtivos[0], true);
-                return;
+        if (maoAtiva && eraSuaVez) {
+            this._limparTimers(mesaId);
+            if (proximoUid) {
+                mesa.turno = proximoUid;
+                this._gerenciarTurno(mesaId);
+                this.emitirEstado(mesaId);
+            } else {
+                this._avancarFase(mesaId);
             }
-
-            if (eraSuaVez) {
-                this._limparTimers(mesaId);
-                this._avancarJogo(mesaId);
-                this.io.emit('mesas_atualizadas');
-                return;
-            }
+            this.io.emit('mesas_atualizadas');
+            return;
         }
 
         this.emitirEstado(mesaId);
         this.io.emit('mesas_atualizadas');
+    }
+
+    /**
+     * Próximo jogador ainda ativo na mão (não fold/sitout), caminhando a
+     * partir do assento de `uidReferencia` em mesa.ordem (assento que ainda
+     * existe nesse momento — chamar ANTES de remover o jogador da ordem).
+     * Usado pra reatribuir mesa.primeiroJogador quando quem sai da mesa era
+     * a própria referência de "volta completa" da rodada de apostas.
+     */
+    _proximoAtivoNaOrdemApos(mesa, uidReferencia) {
+        const ordem = mesa.ordem;
+        const total = ordem.length;
+        let   idx   = ordem.indexOf(uidReferencia);
+        if (idx === -1) idx = 0;
+
+        for (let i = 0; i < total; i++) {
+            idx = (idx + 1) % total;
+            const candidato = ordem[idx];
+            if (candidato === uidReferencia) continue;
+            const j = mesa.jogadores[candidato];
+            if (j && j.cartas?.length > 0 && j.status !== 'fold' && j.status !== 'sitout') {
+                return candidato;
+            }
+        }
+        return null;
     }
 
     adicionarBot(mesaId, rankPontosJogador = 0) {
@@ -273,6 +355,10 @@ export class GameManager {
         };
 
         this.emitirEstado(mesaId);
+        // Sem isso, o contador de vagas no lobby dos outros clientes
+        // (aba Mesas) ficava desatualizado até algum outro evento disparar
+        // — alguém podia tentar entrar numa mesa que só "parecia" ter vaga.
+        this.io.emit('mesas_atualizadas');
     }
 
     _criarJogador(usuario, buyIn, tipo) {
@@ -288,6 +374,11 @@ export class GameManager {
             apostaTotal:    0,   // acumulado durante TODA a mão (para side pots)
             faltasSeguidas: 0,
             tipo,
+            // Quanto do saldo atual na mesa veio de saldo BÔNUS (não sacável).
+            // Rastreado pra creditarSaidaMesa nunca devolver mais bônus do que
+            // realmente entrou nessa pilha de fichas — sem isso, sentar numa
+            // mesa e sair de novo "lavava" bônus em saldo real sacável.
+            origemBonus:    usuario.origemBonus || 0,
         };
     }
 
@@ -304,6 +395,18 @@ export class GameManager {
         // (visível na lista pública) e está prestes a começar a jogar —
         // evita ficar avisando à toa a cada nova mão de um jogo já em curso.
         const eraAguardando = mesa.fase === 'AGUARDANDO';
+
+        // Bots zerados de saldo recebem rebuy automático ANTES de calcular
+        // quem está ativo nesta mão — se isso rodasse depois (como antes),
+        // o bot recompunha o saldo mas ficava de fora justo da mão em que
+        // devia voltar a jogar, só entrando de fato na mão seguinte.
+        Object.values(mesa.jogadores).forEach(j => {
+            if (j.tipo === 'cpu' && j.saldo <= 0) {
+                j.saldo        = mesa.valorBuyIn;
+                j.status       = 'ativo';
+                j.apostaTotal  = 0;
+            }
+        });
 
         const ativos = mesa.ordem.filter(uid => {
             const j = mesa.jogadores[uid];
@@ -340,19 +443,18 @@ export class GameManager {
             j.cartas        = [baralho.pop(), baralho.pop()];
         });
 
-        // Bots zerados de saldo recebem rebuy automático
-        Object.values(mesa.jogadores).forEach(j => {
-            if (j.tipo === 'cpu' && j.saldo <= 0) {
-                j.saldo        = mesa.valorBuyIn;
-                j.status       = 'ativo';
-                j.apostaTotal  = 0;
-            }
-        });
+        // Dinheiro de quem saiu da mesa no meio da mão anterior (contado no
+        // pote, mas sem dono elegível) — não deve vazar para esta mão nova.
+        mesa.contribuicoesEncerradas = [];
 
-        // Avança o dealer
-        const idxDealerAtual = ativos.indexOf(mesa.dealer);
-        const idxNovoDealer  = (idxDealerAtual + 1) % ativos.length;
-        mesa.dealer          = ativos[idxNovoDealer];
+        // Avança o dealer (respeita o assento físico do dealer anterior —
+        // mesa.ordem, não a lista já filtrada de quem tem fichas agora —
+        // pra passar o botão pro próximo jogador ativo de verdade mesmo
+        // quando o antigo dealer zerou o saldo ou saiu da mesa. Antes,
+        // indexOf(mesa.dealer) em `ativos` dava -1 nesses casos e o botão
+        // simplesmente voltava pro início da lista, o que não é justo.
+        mesa.dealer = this._proximoDealer(mesa, ativos);
+        const idxNovoDealer = ativos.indexOf(mesa.dealer);
 
         // Posições de SB, BB e primeiro a agir
         let sbIdx, bbIdx, primeiroIdx;
@@ -388,9 +490,34 @@ export class GameManager {
         mesa.mensagemVitoria      = null;
         mesa.ultimaAcaoDescritiva = 'Nova rodada iniciada. Blinds apostados.';
 
+        // _gerenciarTurno primeiro: ele grava mesa.turnoExpiraEm (prazo real
+        // do relógio) antes do estado ser transmitido, senão o primeiro
+        // estado_mesa da mão sairia sem o prazo atualizado.
+        this._gerenciarTurno(mesaId);
         this.emitirEstado(mesaId);
         if (eraAguardando) this.io.emit('mesas_atualizadas');
-        this._gerenciarTurno(mesaId);
+    }
+
+    /**
+     * Acha o próximo dealer a partir do assento físico do dealer anterior
+     * (mesa.ordem, que preserva a posição de todo mundo, mesmo quem está
+     * sem saldo nesta mão), pulando pra frente até achar alguém que está
+     * em `ativos`. Primeira mão (mesa.dealer === null) → primeiro ativo.
+     */
+    _proximoDealer(mesa, ativos) {
+        if (!ativos.length) return null;
+        if (mesa.dealer === null) return ativos[0];
+
+        const ordem = mesa.ordem;
+        const total = ordem.length;
+        let   idx   = ordem.indexOf(mesa.dealer);   // -1 se saiu de vez da mesa
+
+        for (let i = 0; i < total; i++) {
+            idx = (idx + 1) % total;
+            const candidato = ordem[idx];
+            if (ativos.includes(candidato)) return candidato;
+        }
+        return ativos[0];
     }
 
     _aplicarBlind(mesa, uid, valor) {
@@ -417,6 +544,15 @@ export class GameManager {
         const uid   = mesa.turno;
         const ehBot = uid.startsWith('bot_');
         const tempo = ehBot ? CONFIG.TEMPO_BOT : CONFIG.TEMPO_HUMANO;
+
+        // Prazo absoluto (não uma duração) salvo no próprio estado da mesa —
+        // o frontend usa isso pra contar o relógio a partir do deadline real
+        // do servidor, não de uma contagem local própria. Sem isso, um
+        // refresh de página ou latência no recebimento do evento de socket
+        // fazia o timer visual reiniciar do zero, dessincronizado do timeout
+        // real do servidor (podia até dar fold automático com o anel ainda
+        // mostrando vários segundos restantes).
+        mesa.turnoExpiraEm = Date.now() + tempo;
 
         this.io.to(mesaId).emit('iniciar_relogio', { uid, ms: tempo });
 
@@ -464,10 +600,12 @@ export class GameManager {
             this.io.to(mesaId).emit('notificacao', {
                 mensagem: `${jogador.nome} foi removido por inatividade.`,
             });
-            jogador.status = 'fold';
-            jogador.cartas = [];
+            // sairMesa já trata a saída no meio de uma mão como desistência
+            // (fold) e resolve corretamente quem age em seguida — setar
+            // status/cartas aqui antes ANTES de chamar sairMesa fazia
+            // maoAtiva dar falso lá dentro (cartas já vazias), pulando essa
+            // resolução e deixando o turno preso num uid que acabou de sair.
             this.sairMesa(mesaId, uid);
-            this._avancarJogo(mesaId);
             return;
         }
 
@@ -667,8 +805,8 @@ export class GameManager {
 
         if (proximo) {
             mesa.turno = proximo;
-            this.emitirEstado(mesaId);
             this._gerenciarTurno(mesaId);
+            this.emitirEstado(mesaId);
         } else {
             this._avancarFase(mesaId);
         }
@@ -782,8 +920,8 @@ export class GameManager {
         mesa.turno           = primeiro;
         mesa.primeiroJogador = primeiro;
 
-        this.emitirEstado(mesaId);
         this._gerenciarTurno(mesaId);
+        this.emitirEstado(mesaId);
     }
 
     /**
@@ -976,9 +1114,19 @@ export class GameManager {
         // "perdendo" fichas de quem tinha dado fold.
         const todosUids = Object.keys(mesa.jogadores);
 
+        // Jogadores que SAÍRAM da mesa no meio desta mão (não só deram fold,
+        // saíram de vez) não aparecem mais em mesa.jogadores — a contribuição
+        // deles ficou guardada aqui pra não sumir do side pot certo (ver
+        // sairMesa). Nunca são elegíveis, só engordam o pote na faixa certa.
+        const fantasmas = mesa.contribuicoesEncerradas || [];
+
         for (const cap of caps) {
-            const valorDoPote = todosUids.reduce((soma, uid) => {
+            let valorDoPote = todosUids.reduce((soma, uid) => {
                 const total = mesa.jogadores[uid].apostaTotal || 0;
+                return soma + Math.min(Math.max(total - capAnter, 0), cap - capAnter);
+            }, 0);
+            valorDoPote += fantasmas.reduce((soma, f) => {
+                const total = f.apostaTotal || 0;
                 return soma + Math.min(Math.max(total - capAnter, 0), cap - capAnter);
             }, 0);
 
@@ -1049,9 +1197,20 @@ export class GameManager {
 
         this.emitirEstado(mesaId);
 
-        // Notifica torneio se aplicável
+        // Notifica torneio se aplicável — só quando restar de fato 1 único
+        // jogador COM FICHAS na mesa (igual _calcularVencedor faz no showdown).
+        // Sem essa checagem, a mesa de torneio era encerrada na primeira mão
+        // em que todos exceto um desistissem (o caso mais comum no poker),
+        // mesmo que os "eliminados" ainda estivessem com a pilha cheia.
         if (mesa.torneioId && this.tournamentManager) {
-            this.tournamentManager.notificarVencedorMesa(mesa.torneioId, mesaId, vencedorUid);
+            const comFichas = Object.entries(mesa.jogadores)
+                .filter(([, j]) => j.saldo > 0)
+                .map(([uid]) => uid);
+            if (comFichas.length === 1) {
+                this.tournamentManager.notificarVencedorMesa(mesa.torneioId, mesaId, comFichas[0]);
+            } else {
+                this._agendarProximaRodada(mesaId);
+            }
         } else {
             this._agendarProximaRodada(mesaId);
         }
@@ -1121,12 +1280,18 @@ export class GameManager {
     // REBUY
     // ================================================================
 
-    fazerRebuy(mesaId, uid, valor) {
+    fazerRebuy(mesaId, uid, valor, origemBonus = 0) {
         const mesa = mesas.get(mesaId);
         if (!mesa) return { sucesso: false, erro: 'Mesa não encontrada.' };
 
         const jogador = mesa.jogadores[uid];
         if (!jogador) return { sucesso: false, erro: 'Jogador não encontrado.' };
+
+        // Rebuy sempre no mesmo valor do buy-in original da mesa — evita
+        // stacks fora do combinado na mesa (regra documentada do projeto).
+        if (valor !== mesa.valorBuyIn) {
+            return { sucesso: false, erro: `Rebuy precisa ser exatamente ₿C ${mesa.valorBuyIn}.` };
+        }
 
         const maoAtiva = jogador.cartas && jogador.cartas.length > 0
                       && mesa.fase !== 'SHOWDOWN'
@@ -1136,7 +1301,8 @@ export class GameManager {
             return { sucesso: false, erro: 'Não pode fazer rebuy durante uma mão ativa.' };
         }
 
-        jogador.saldo += valor;
+        jogador.saldo      += valor;
+        jogador.origemBonus = (jogador.origemBonus || 0) + (origemBonus || 0);
         if (jogador.status === 'eliminado') jogador.status = 'ativo';
 
         this.emitirEstado(mesaId);
@@ -1183,6 +1349,7 @@ export class GameManager {
             jogadores:            {},
             torneioId,              // ← liga ao torneio
             senha:                null,
+            contribuicoesEncerradas: [],
         };
 
         jogadores.forEach(j => {

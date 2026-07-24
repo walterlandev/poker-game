@@ -59,7 +59,7 @@ async function getPerfil(uid) {
 // 3 tentativas" só de UI, que resetava a cada remontagem do modal e não
 // protegia nada de verdade. Aqui os contadores ficam no Firestore, então
 // nenhuma tentativa de burlar o cliente escapa do limite.
-async function verificarPin(uid, pin) {
+export async function verificarPin(uid, pin) {
     const ref  = refJogador(uid);
     const snap = await ref.get();
     if (!snap.exists) return { ok: false, erro: 'Jogador não encontrado.' };
@@ -145,23 +145,27 @@ function formatarTxParaFrontend(tx, meuUid) {
 
 export async function creditarDeposito(intencaoId, io) {
     try {
-        const db       = admin.firestore();
-        const intencao = await db.collection('depositos_pendentes').doc(intencaoId).get();
+        const db          = admin.firestore();
+        const intencaoRef = db.collection('depositos_pendentes').doc(intencaoId);
 
-        if (!intencao.exists) {
+        // Checa e busca a intenção FORA da transação (leitura simples), mas
+        // o passo que importa — checar idempotência e já marcar CONFIRMADO —
+        // roda dentro da transação abaixo, atomicamente com o crédito do
+        // saldo. O Mercado Pago pode reenviar o mesmo webhook; um simples
+        // .get() seguido de .commit() (como era antes) deixava uma janela
+        // onde duas chamadas concorrentes liam status !== 'CONFIRMADO' antes
+        // de qualquer uma escrever, e creditavam o depósito em dobro.
+        const preCheck = await intencaoRef.get();
+        if (!preCheck.exists) {
             console.error('Intenção de depósito não encontrada:', intencaoId);
             return;
         }
-
-        const data = intencao.data();
-
-        // Idempotência — não processa duas vezes
-        if (data.status === 'CONFIRMADO') {
+        if (preCheck.data().status === 'CONFIRMADO') {
             console.warn('Depósito já processado:', intencaoId);
             return;
         }
 
-        const { uid, bcCreditar, valorBRL, taxaBRL, totalBRL, socketId } = data;
+        const { uid, bcCreditar, valorBRL, taxaBRL, totalBRL, socketId } = preCheck.data();
 
         const perfil   = await getPerfil(uid);
         const ultimaTx = await getUltimaTransacao(uid);
@@ -181,20 +185,30 @@ export async function creditarDeposito(intencaoId, io) {
 
         const txConfirmada = confirmarTransacao(resultado.transacao);
 
-        // Atualiza saldo + status em batch atômico
-        const batch = db.batch();
-        batch.update(db.collection('jogadores').doc(uid), {
-            saldo: admin.firestore.FieldValue.increment(bcCreditar),
+        const jaCreditado = await db.runTransaction(async (tx) => {
+            const intencao = await tx.get(intencaoRef);
+            if (!intencao.exists || intencao.data().status === 'CONFIRMADO') {
+                return true;   // outra chamada concorrente já processou
+            }
+
+            tx.update(db.collection('jogadores').doc(uid), {
+                saldo: admin.firestore.FieldValue.increment(bcCreditar),
+            });
+            tx.update(intencaoRef, {
+                status:       'CONFIRMADO',
+                confirmadoEm: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            tx.set(
+                db.collection('jogadores').doc(uid).collection('transacoes').doc(txConfirmada.id),
+                txConfirmada
+            );
+            return false;
         });
-        batch.update(db.collection('depositos_pendentes').doc(intencaoId), {
-            status:       'CONFIRMADO',
-            confirmadoEm: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        batch.set(
-            db.collection('jogadores').doc(uid).collection('transacoes').doc(txConfirmada.id),
-            txConfirmada
-        );
-        await batch.commit();
+
+        if (jaCreditado) {
+            console.warn('Depósito já processado (corrida detectada na transação):', intencaoId);
+            return;
+        }
 
         // Registra na blockchain interna (mesmo motivo do salvarEEmitirTx —
         // ledger auditável em paralelo, não é a fonte do saldo real)
@@ -376,7 +390,7 @@ export function registrarEventosWallet(socket, io) {
     // Em PRODUÇÃO: cria intenção pendente → aguarda webhook do MP
     // Em DEV:      confirma automaticamente após 3 segundos
     // ----------------------------------------------------------------
-    socket.on('wallet:depositar', async ({ valorBRL, taxaBRL, bcEsperado, pin }) => {
+    socket.on('wallet:depositar', async ({ valorBRL, pin }) => {
         const jogadorUid = uid();
         if (!jogadorUid) return;
 
@@ -397,7 +411,13 @@ export function registrarEventosWallet(socket, io) {
                 return;
             }
 
-            const totalBRL   = parseFloat((valorBRL + (taxaBRL || 0)).toFixed(2));
+            // Taxa SEMPRE recalculada aqui a partir de TAXA_DEPOSITO — nunca
+            // aceitar taxaBRL vindo do cliente. Antes disso, o cliente podia
+            // mandar taxaBRL zero (ou negativo) e pagar bem menos que
+            // valorBRL via PIX recebendo o mesmo ₿C, já que TAXA_DEPOSITO
+            // estava declarada mas nunca era realmente usada pra cobrar nada.
+            const taxaBRL    = parseFloat((valorBRL * TAXA_DEPOSITO).toFixed(2));
+            const totalBRL   = parseFloat((valorBRL + taxaBRL).toFixed(2));
             const bcCreditar = Math.floor(valorBRL * COTACAO_BC_POR_REAL);
 
             // Salva intenção no Firestore
@@ -700,8 +720,17 @@ export function registrarEventosWallet(socket, io) {
                     saldo:      admin.firestore.FieldValue.increment(-debitarReal),
                     saldoBonus: admin.firestore.FieldValue.increment(-debitarBonus),
                 });
+
+                // O destinatário recebe na MESMA proporção real/bônus que o
+                // remetente pagou — sem isso, enviar ₿C que veio de saldo
+                // BÔNUS (não sacável) creditava tudo como saldo real sacável
+                // pro destinatário, "lavando" bônus através do envio (inclusive
+                // pra uma segunda conta própria).
+                const bonusParaDestino = Math.min(debitarBonus, valor);
+                const realParaDestino  = valor - bonusParaDestino;
                 tx.update(refJogador(destinatarioUid), {
-                    saldo: admin.firestore.FieldValue.increment(valor),
+                    saldo:      admin.firestore.FieldValue.increment(realParaDestino),
+                    saldoBonus: admin.firestore.FieldValue.increment(bonusParaDestino),
                 });
 
                 return { sucesso: true, remetenteNome: remetente.nome };

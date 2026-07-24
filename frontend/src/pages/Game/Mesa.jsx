@@ -154,6 +154,7 @@ export default function Mesa({ mesa, meuUid, minhasCartas = [], meuAvatar = '', 
                                     ehSB={mesa.sbId === uid}
                                     ehBB={mesa.bbId === uid}
                                     tempoMs={tempoDoJogador(uid)}
+                                    expiraEm={mesa.turno === uid ? mesa.turnoExpiraEm : null}
                                     avatarSz={avatarSz}
                                     tema={tema}
                                     compacto={layoutCompacto}

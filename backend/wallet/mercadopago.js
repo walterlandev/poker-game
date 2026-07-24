@@ -41,6 +41,13 @@ const MP_WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET;
 const CLIENT_URL        = process.env.CLIENT_URL || 'http://localhost:5173';
 const MP_API_BASE       = 'https://api.mercadopago.com';
 
+// Em produção (token real configurado) o segredo do webhook é obrigatório —
+// sem ele, a validação de assinatura era pulada SILENCIOSAMENTE, permitindo
+// que qualquer um chamasse o endpoint do webhook fingindo ser o Mercado
+// Pago e mandasse creditar depósitos à vontade. Em modo dev (sem token
+// real) não há dinheiro de verdade envolvido, então não bloqueia.
+const MODO_DEV = !MP_ACCESS_TOKEN;
+
 
 // ================================================================
 // BLOCO 2: CRIAR PAGAMENTO PIX
@@ -241,6 +248,10 @@ export function processarWebhookMP(io) {
             if (!pagamentoId) return;
 
             // Valida assinatura do webhook (segurança)
+            if (!MODO_DEV && !MP_WEBHOOK_SECRET) {
+                console.error('🚨 MP_WEBHOOK_SECRET ausente em produção — webhook rejeitado por segurança.');
+                return;
+            }
             if (MP_WEBHOOK_SECRET) {
                 const assinaturaHeader = req.headers['x-signature'];
                 const assinaturaValida = validarAssinaturaWebhook(

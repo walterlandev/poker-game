@@ -125,7 +125,7 @@ app.get('/health', (req, res) => {
 
 app.get('/mesas', (req, res) => {
     const mesas = gameManager.getMesasAtivas()
-        .filter(m => m.fase === 'AGUARDANDO')
+        .filter(m => m.fase === 'AGUARDANDO' && Object.keys(m.jogadores).length < 9)
         .map(m => ({
             id:           m.id,
             nome:         m.nome,
@@ -286,29 +286,41 @@ io.on('connection', (socket) => {
             return;
         }
 
-        const usuario = {
-            uid:        socket.data.uid,
-            nome:       socket.data.nome,
-            avatar:     socket.data.avatar,
-            tema:       socket.data.tema,
-            rankPontos: config.rankPontos || 0,
-        };
-
         const buyIn = config.buyIn || 1000;
 
         // ── DÉBITO DO BUY-IN ──────────────────────────────────────
-        const debito = await debitarEntradaMesa(usuario.uid, buyIn);
+        // debitarEntradaMesa valida e normaliza o valor (nunca confiar
+        // num buyIn negativo/inválido vindo do cliente) — usamos o valor
+        // que ele realmente processou (fichasDebitadas), não o bruto do
+        // config, pra mesa.valorBuyIn bater exatamente com o que foi
+        // debitado e com o que outros jogadores vão pagar pra entrar.
+        const debito = await debitarEntradaMesa(socket.data.uid, buyIn);
         if (!debito.sucesso) {
             socket.emit('erro', { mensagem: debito.erro });
             return;
         }
         // ─────────────────────────────────────────────────────────
 
-        const resultado = gameManager.criarMesa(config, usuario);
+        const usuario = {
+            uid:         socket.data.uid,
+            nome:        socket.data.nome,
+            avatar:      socket.data.avatar,
+            tema:        socket.data.tema,
+            rankPontos:  config.rankPontos || 0,
+            // Quanto do buy-in veio de saldo BÔNUS — rastreado pra nunca
+            // devolver mais bônus do que entrou de fato quando ele sair.
+            origemBonus: debito.debitarBonus || 0,
+        };
+
+        const resultado = gameManager.criarMesa(
+            { ...config, buyIn: debito.fichasDebitadas },
+            usuario,
+        );
 
         if (!resultado.sucesso) {
-            // Se a mesa falhou depois do débito, devolve o buyIn
-            await creditarSaidaMesa(usuario.uid, buyIn);
+            // Se a mesa falhou depois do débito, devolve o buyIn (com a
+            // mesma origem real/bônus que foi debitada)
+            await creditarSaidaMesa(socket.data.uid, debito.fichasDebitadas, debito.debitarBonus);
             socket.emit('erro', { mensagem: resultado.erro });
             return;
         }
@@ -357,6 +369,7 @@ io.on('connection', (socket) => {
 
         // Se jogador já está na mesa (reconexão), não debita novamente
         const jaEstaNaMesa = !!mesa.jogadores[socket.data.uid];
+        let origemBonus = 0;
 
         if (!jaEstaNaMesa) {
             // ── DÉBITO DO BUY-IN ──────────────────────────────────
@@ -365,21 +378,23 @@ io.on('connection', (socket) => {
                 socket.emit('erro', { mensagem: debito.erro });
                 return;
             }
+            origemBonus = debito.debitarBonus || 0;
             // ──────────────────────────────────────────────────────
         }
 
         const usuario = {
-            uid:    socket.data.uid,
-            nome:   socket.data.nome,
-            avatar: socket.data.avatar,
-            tema:   socket.data.tema,
+            uid:         socket.data.uid,
+            nome:        socket.data.nome,
+            avatar:      socket.data.avatar,
+            tema:        socket.data.tema,
+            origemBonus,
         };
 
         const resultado = gameManager.entrarMesa(dados.mesaId, usuario, socket, dados.senha);
 
         if (!resultado.sucesso) {
-            // Devolve buyIn se não conseguiu entrar
-            if (!jaEstaNaMesa) await creditarSaidaMesa(usuario.uid, mesa.valorBuyIn);
+            // Devolve buyIn se não conseguiu entrar (mesma origem real/bônus)
+            if (!jaEstaNaMesa) await creditarSaidaMesa(usuario.uid, mesa.valorBuyIn, origemBonus);
             socket.emit('erro', { mensagem: resultado.erro });
             return;
         }
@@ -481,10 +496,10 @@ io.on('connection', (socket) => {
         }
         // ─────────────────────────────────────────────────────────
 
-        const resultado = gameManager.fazerRebuy(mesaId, uid, valor);
+        const resultado = gameManager.fazerRebuy(mesaId, uid, valor, debito.debitarBonus || 0);
         if (!resultado.sucesso) {
-            // Devolve o débito se o rebuy falhou (ex: mão ativa)
-            await creditarSaidaMesa(uid, valor);
+            // Devolve o débito se o rebuy falhou (ex: mão ativa, valor errado)
+            await creditarSaidaMesa(uid, valor, debito.debitarBonus || 0);
             socket.emit('erro', { mensagem: resultado.erro });
         } else {
             socket.emit('rebuy_ok', { valor });
@@ -585,9 +600,12 @@ io.on('connection', (socket) => {
             tema:   socket.data.tema,
         };
 
-        const resultado = tournamentManager.criarTorneio(config, host);
+        const resultado = tournamentManager.criarTorneio(
+            { ...config, buyIn: debito.fichasDebitadas },
+            host,
+        );
         if (!resultado.sucesso) {
-            await creditarSaidaMesa(socket.data.uid, buyIn);
+            await creditarSaidaMesa(socket.data.uid, debito.fichasDebitadas, debito.debitarBonus);
             socket.emit('erro', { mensagem: resultado.erro });
             return;
         }
@@ -626,9 +644,10 @@ io.on('connection', (socket) => {
         }
 
         const jaEstaNaTorneio = !!torneio.jogadores[socket.data.uid];
+        let debito = null;
 
         if (!jaEstaNaTorneio) {
-            const debito = await debitarEntradaMesa(socket.data.uid, torneio.buyIn);
+            debito = await debitarEntradaMesa(socket.data.uid, torneio.buyIn);
             if (!debito.sucesso) {
                 socket.emit('erro', { mensagem: debito.erro });
                 return;
@@ -644,7 +663,7 @@ io.on('connection', (socket) => {
 
         const resultado = tournamentManager.entrarTorneio(torneioId, usuario);
         if (!resultado.sucesso) {
-            if (!jaEstaNaTorneio) await creditarSaidaMesa(socket.data.uid, torneio.buyIn);
+            if (!jaEstaNaTorneio) await creditarSaidaMesa(socket.data.uid, debito.fichasDebitadas, debito.debitarBonus);
             socket.emit('erro', { mensagem: resultado.erro });
             return;
         }
@@ -728,7 +747,7 @@ io.on('connection', (socket) => {
 
         const resultado = tournamentManager.processarRebuy(torneioId, socket.data.uid);
         if (!resultado.sucesso) {
-            await creditarSaidaMesa(socket.data.uid, torneio.buyIn);
+            await creditarSaidaMesa(socket.data.uid, debito.fichasDebitadas, debito.debitarBonus);
             socket.emit('erro', { mensagem: resultado.erro });
             return;
         }
@@ -753,15 +772,25 @@ io.on('connection', (socket) => {
  *
  * IMPORTANTE: só credita se o jogador realmente está saindo.
  * Reconexões são tratadas no evento disconnect com delay de 5s.
+ *
+ * MESA DE TORNEIO: fichas de torneio NÃO são dinheiro — só o campeão
+ * recebe prêmio real, e só ao fim do torneio (winner-take-all, ver
+ * tournament-manager.js). Sair/desconectar de uma mesa de torneio no meio
+ * do jogo tinha que ser tratado como desistência (forfeit), sem creditar
+ * nada — antes disso, sair era um jeito de "sacar" o stack acumulado como
+ * saldo real na hora, furando o winner-take-all e deixando uma entrada
+ * fantasma presa em torneio.jogadores[uid].
  */
 async function processarSaidaMesa(socket, motivo = 'saída') {
     const mesaId = socket.data.mesaId || socketMesa.get(socket.id);
     const uid    = socket.data.uid;
     if (!mesaId || !uid) return;
 
-    // Captura fichas ANTES de remover da mesa
+    // Captura fichas e origem (real/bônus) ANTES de remover da mesa
     const mesa            = gameManager.getMesa(mesaId);
-    const fichasRestantes = mesa?.jogadores?.[uid]?.saldo || 0;
+    const fichasRestantes = mesa?.jogadores?.[uid]?.saldo       || 0;
+    const origemBonus     = mesa?.jogadores?.[uid]?.origemBonus || 0;
+    const torneioId       = mesa?.torneioId || null;
 
     // Remove da mesa (em memória)
     socket.leave(mesaId);
@@ -769,10 +798,18 @@ async function processarSaidaMesa(socket, motivo = 'saída') {
     socket.data.mesaId = null;
     gameManager.sairMesa(mesaId, uid);
 
-    // Credita fichas restantes no Firestore como saldo real
-    // Isso inclui: buyIn original + fichas ganhas nas rodadas - fichas perdidas
+    if (torneioId) {
+        tournamentManager.abandonarMesa(torneioId, uid);
+        console.log(`🚪 ${socket.data.nome} abandonou mesa de torneio (${motivo}): ₿C ${fichasRestantes} de fichas forfeited.`);
+        return;
+    }
+
+    // Credita fichas restantes no Firestore — real e bônus na mesma
+    // proporção em que entraram (nunca mais bônus do que o que foi
+    // debitado como bônus, senão "lavaria" bônus em saldo real sacável).
+    // Isso inclui: buyIn original + fichas ganhas nas rodadas - perdidas.
     if (fichasRestantes > 0) {
-        await creditarSaidaMesa(uid, fichasRestantes);
+        await creditarSaidaMesa(uid, fichasRestantes, origemBonus);
         // Emite saldo atualizado para o frontend
         await emitirSaldoAtualizado(socket, uid);
     }

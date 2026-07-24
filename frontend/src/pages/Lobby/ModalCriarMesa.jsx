@@ -162,17 +162,32 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
         // Emite o evento para o servidor via Socket.io
         socket.emit('criar_mesa', config);
 
-        // Escuta a resposta do servidor
-        socket.once('mesa_criada', ({ mesaId }) => {
+        // Handlers nomeados pra poder dar socket.off explicitamente — com
+        // socket.once "solto" (sem cleanup no timeout), se o servidor
+        // respondesse depois dos 10s, ou se o usuário tentasse de novo
+        // após o timeout, os listeners se acumulavam: uma resposta atrasada
+        // de uma tentativa já "desistida" podia chamar onMesaCriada com um
+        // mesaId inesperado, ou (pior) duas tentativas processadas pelo
+        // servidor criavam duas mesas com dois débitos de buy-in.
+        function cleanup() {
+            socket.off('mesa_criada', onMesaCriadaHandler);
+            socket.off('erro',        onErroHandler);
+        }
+
+        function onMesaCriadaHandler({ mesaId }) {
+            cleanup();
             setEnviando(false);
             onMesaCriada(mesaId);
-        });
+        }
 
-        // Escuta possível erro do servidor
-        socket.once('erro', ({ mensagem }) => {
+        function onErroHandler({ mensagem }) {
+            cleanup();
             setEnviando(false);
             setErros({ geral: mensagem });
-        });
+        }
+
+        socket.once('mesa_criada', onMesaCriadaHandler);
+        socket.once('erro',        onErroHandler);
 
         // Timeout de segurança: se o servidor não responder em 10s.
         // Usa a forma funcional de setEnviando pra checar o valor ATUAL
@@ -181,6 +196,7 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
         setTimeout(() => {
             setEnviando(atual => {
                 if (!atual) return atual;
+                cleanup();
                 setErros({ geral: 'Tempo esgotado. Tente novamente.' });
                 return false;
             });

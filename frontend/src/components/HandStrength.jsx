@@ -185,24 +185,10 @@ function monteCarlo(mao, mesa, nOponentes = 1, N = 600) {
 
 const CIRC = 213.6; // 2 * π * r  onde r = 34
 
-const css = `
-  @keyframes hs-pop   { from{transform:scale(0.85);opacity:0} to{transform:scale(1);opacity:1} }
-  @keyframes hs-pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-  .hs-root { font-family: sans-serif; }
-  .hs-ring-fill {
-    fill: none; stroke-width: 5; stroke-linecap: round;
-    transition: stroke-dashoffset 0.7s cubic-bezier(.4,0,.2,1), stroke 0.4s;
-  }
-  .hs-ring-bg { fill: none; stroke-width: 5; }
-  .hs-bar     { height: 100%; border-radius: 3px; transition: width 0.6s ease, background 0.4s; }
-  .hs-badge   { transition: background 0.4s, color 0.4s, border-color 0.4s; }
-  .hs-improved {
-    font-size: 11px; font-weight: 600; text-align: center;
-    margin-top: 6px; animation: hs-pop 0.35s ease;
-  }
-  .hs-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%;
-            animation: hs-pulse 1.4s ease-in-out infinite; margin-right: 4px; }
-`;
+// Estilos (.hs-*) movidos pro CSS global em main.jsx — este componente
+// desmonta/remonta a cada fold/mão nova (retorna null até o useEffect
+// popular `dados`), e um <style> preso a ele nesse padrão já causou um
+// bug intermitente de tela preta em outro componente do app.
 
 
 // ================================================================
@@ -293,7 +279,6 @@ export default function HandStrength({
                 transition:   'border-color 0.4s',
                 flexShrink:   0,
             }}>
-                <style>{css}</style>
                 {/* % win */}
                 <span style={{ fontSize:'14px', fontWeight:'800', color: cor, lineHeight:1 }}>
                     {win}%
@@ -316,8 +301,6 @@ export default function HandStrength({
 
     return (
         <div className="hs-root">
-            <style>{css}</style>
-
             <div ref={containerRef} style={{
                 background:   '#111827',
                 border:       `1px solid ${cor}44`,

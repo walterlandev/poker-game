@@ -22,6 +22,7 @@
 ================================================================ */
 
 import admin from 'firebase-admin';
+import { verificarPin } from './wallet/wallet-manager.js';
 
 // Catálogo de preços — fonte única de verdade no backend
 // (nunca confiar no preço enviado pelo cliente)
@@ -48,11 +49,19 @@ export function registrarEventosTemas(socket) {
     // comprar_tema
     // Valida saldo, debita e adiciona tema à lista do jogador.
     // ----------------------------------------------------------------
-    socket.on('comprar_tema', async ({ temaId } = {}) => {
+    socket.on('comprar_tema', async ({ temaId, pin } = {}) => {
         const jogadorUid = uid();
         if (!jogadorUid) return;
 
         try {
+            // PIN obrigatório pra qualquer operação que debita saldo —
+            // mesma exigência de depósito/saque/envio de ₿C (faltava aqui).
+            const pinCheck = await verificarPin(jogadorUid, pin);
+            if (!pinCheck.ok) {
+                socket.emit('tema:erro', { mensagem: pinCheck.erro });
+                return;
+            }
+
             // Valida o temaId recebido
             if (!PRECOS.hasOwnProperty(temaId)) {
                 socket.emit('tema:erro', { mensagem: 'Tema não encontrado.' });
