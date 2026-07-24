@@ -71,6 +71,9 @@ export default function Mesa({ mesa, meuUid, minhasCartas = [], meuAvatar = '', 
     // clamp: mínimo 44px, máximo 72px
     const avatarSz = Math.max(44, Math.min(72, Math.round(dims.w * 0.13)));
 
+    // ── Tela pequena: cartas ao lado do avatar em vez de embaixo ───
+    const layoutCompacto = dims.w < 340;
+
     // ── Tamanho das cartas comunitárias escala com a oval ──────────
     const cardW = Math.max(32, Math.min(56, Math.round(dims.w * 0.09)));
     const cardH = Math.round(cardW * 1.42);
@@ -151,6 +154,7 @@ export default function Mesa({ mesa, meuUid, minhasCartas = [], meuAvatar = '', 
                                     tempoMs={tempoDoJogador(uid)}
                                     avatarSz={avatarSz}
                                     tema={tema}
+                                    compacto={layoutCompacto}
                                 />
                             </div>
                         ))}

@@ -158,16 +158,18 @@ export class GameManager {
             mensagemVitoria:      null,
             ultimaAcaoDescritiva: 'Mesa criada. Aguardando jogadores.',
             ordem:                [usuario.uid],
+            senha:                config.senha ? String(config.senha) : null,
             jogadores: {
                 [usuario.uid]: this._criarJogador(usuario, config.buyIn || 1000, 'humano'),
             },
         };
 
         mesas.set(mesaId, mesa);
+        this.io.emit('mesas_atualizadas');
         return { sucesso: true, mesaId };
     }
 
-    entrarMesa(mesaId, usuario, socket) {
+    entrarMesa(mesaId, usuario, socket, senhaInformada) {
         const mesa = mesas.get(mesaId);
         if (!mesa)                                         return { sucesso: false, erro: 'Mesa não encontrada.' };
         if (Object.keys(mesa.jogadores).length >= 9)       return { sucesso: false, erro: 'Mesa cheia.' };
@@ -178,6 +180,13 @@ export class GameManager {
             return { sucesso: true, mesaId };
         }
 
+        // Mesa privada: exige a senha certa pra quem ainda não está sentado.
+        // Antes disso não era checado no servidor — a senha só aparecia na
+        // tela, mas qualquer um conseguia entrar sem ela.
+        if (mesa.senha && mesa.senha !== String(senhaInformada || '')) {
+            return { sucesso: false, erro: 'Senha incorreta.' };
+        }
+
         mesa.ordem.push(usuario.uid);
         mesa.jogadores[usuario.uid] = this._criarJogador(usuario, mesa.valorBuyIn, 'humano');
 
@@ -185,6 +194,7 @@ export class GameManager {
         socket.data.uid = usuario.uid;
 
         this.emitirEstado(mesaId);
+        this.io.emit('mesas_atualizadas');
         return { sucesso: true, mesaId };
     }
 
@@ -205,6 +215,7 @@ export class GameManager {
         if (humanos.length === 0) {
             this._limparTimers(mesaId);
             mesas.delete(mesaId);
+            this.io.emit('mesas_atualizadas');
             return;
         }
 
@@ -229,11 +240,13 @@ export class GameManager {
             if (eraSuaVez) {
                 this._limparTimers(mesaId);
                 this._avancarJogo(mesaId);
+                this.io.emit('mesas_atualizadas');
                 return;
             }
         }
 
         this.emitirEstado(mesaId);
+        this.io.emit('mesas_atualizadas');
     }
 
     adicionarBot(mesaId, rankPontosJogador = 0) {
@@ -267,6 +280,7 @@ export class GameManager {
             uid:            usuario.uid,
             nome:           usuario.nome,
             avatar:         usuario.avatar || '',
+            tema:           usuario.tema || 'classico',
             saldo:          buyIn,
             cartas:         [],
             status:         'ativo',
@@ -285,6 +299,11 @@ export class GameManager {
     iniciarRodada(mesaId) {
         const mesa = mesas.get(mesaId);
         if (!mesa) return;
+
+        // Só interessa avisar o lobby quando a mesa estava "Aguardando"
+        // (visível na lista pública) e está prestes a começar a jogar —
+        // evita ficar avisando à toa a cada nova mão de um jogo já em curso.
+        const eraAguardando = mesa.fase === 'AGUARDANDO';
 
         const ativos = mesa.ordem.filter(uid => {
             const j = mesa.jogadores[uid];
@@ -358,6 +377,7 @@ export class GameManager {
         mesa.ultimaAcaoDescritiva = 'Nova rodada iniciada. Blinds apostados.';
 
         this.emitirEstado(mesaId);
+        if (eraAguardando) this.io.emit('mesas_atualizadas');
         this._gerenciarTurno(mesaId);
     }
 

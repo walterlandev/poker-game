@@ -36,7 +36,8 @@ import {
     updateEmail,
 } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../services/firebase-config';
+import { ref as refStorage, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../../services/firebase-config';
 
 // Lista de avatares disponíveis em /public/
 const AVATARES = [
@@ -70,7 +71,8 @@ export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
 
     // ── Upload de foto ──
     const inputFotoRef = useRef(null);
-    const [fotoLocal,   setFotoLocal  ] = useState(null); // base64 da foto carregada
+    const [fotoLocal,   setFotoLocal  ] = useState(null); // base64 — só pra pré-visualização
+    const [fotoArquivo, setFotoArquivo] = useState(null); // File — o que de fato sobe pro Storage
     const [carregandoFoto, setCarregandoFoto] = useState(false);
 
     function mostrarFeedback(tipo, mensagem) {
@@ -105,12 +107,13 @@ export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
         }
 
         setCarregandoFoto(true);
+        setFotoArquivo(file); // guarda o arquivo de verdade — sobe pro Storage ao salvar
 
         const reader = new FileReader();
         reader.onload = (ev) => {
             const base64 = ev.target.result;
             setFotoLocal(base64);
-            setAvatar(base64); // usa a foto local como avatar
+            setAvatar(base64); // só pra pré-visualização enquanto não salva
             setCarregandoFoto(false);
         };
         reader.onerror = () => {
@@ -148,12 +151,19 @@ export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
             const user = auth.currentUser;
             if (!user) throw new Error('Usuário não autenticado.');
 
-            // Avatar final: foto local (base64) ou url do avatar selecionado
-            const avatarFinal = avatar;
+            // Se escolheu uma foto do dispositivo, sobe pro Firebase Storage
+            // primeiro — assim o avatar final é uma URL de verdade (não
+            // base64), que os outros jogadores na mesa também conseguem ver.
+            // Base64 nunca é enviado pelo socket (arquivo grande demais).
+            let avatarFinal = avatar;
+            if (fotoArquivo) {
+                const caminho    = `avatares/${user.uid}/foto.jpg`;
+                const storageRef = refStorage(storage, caminho);
+                await uploadBytes(storageRef, fotoArquivo, { contentType: fotoArquivo.type });
+                avatarFinal = await getDownloadURL(storageRef);
+            }
 
             // 1. Atualiza nome e avatar no Firebase Auth
-            // Nota: Firebase Auth não aceita base64 em photoURL,
-            // então usamos a URL do avatar padrão se for base64
             const photoURLParaAuth = avatarFinal.startsWith('data:')
                 ? (usuario?.avatar || '/avata01.png')
                 : avatarFinal;
@@ -168,7 +178,7 @@ export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
                 await updateEmail(user, email.trim());
             }
 
-            // 3. Atualiza perfil no Firestore (aceita base64)
+            // 3. Atualiza perfil no Firestore (avatarFinal já é URL, nunca base64)
             const ref = doc(db, 'jogadores', user.uid);
             await updateDoc(ref, {
                 nome:     nome.trim(),
@@ -177,6 +187,7 @@ export default function ModalPerfil({ usuario, onFechar, onAtualizar }) {
                 email:    email.trim(),
             });
 
+            setFotoArquivo(null);
             mostrarFeedback('sucesso', 'Perfil atualizado com sucesso!');
 
             onAtualizar?.({

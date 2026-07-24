@@ -164,6 +164,7 @@ export function registrarEventosTemas(socket) {
             }
 
             await refJogador(jogadorUid).update({ tema: temaId });
+            socket.data.tema = temaId;
 
             socket.emit('tema:ativado', { temaId });
             console.log(`🎨 Tema "${temaId}" ativado por ${socket.data.nome}`);
