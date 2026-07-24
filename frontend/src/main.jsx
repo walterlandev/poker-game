@@ -28,7 +28,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
-import ErrorBoundary from './ErrorBoundary.jsx';
 
 // ================================================================
 // ESTILOS GLOBAIS INLINE
@@ -229,8 +228,6 @@ document.head.appendChild(styleTag);
 
 createRoot(document.getElementById('root')).render(
     <StrictMode>
-        <ErrorBoundary>
-            <App />
-        </ErrorBoundary>
+        <App />
     </StrictMode>
 );
