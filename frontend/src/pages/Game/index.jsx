@@ -103,6 +103,7 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
     const souHost        = mesa.host === meuUid;
     const jogadoresArray = Object.entries(mesa.jogadores || {});
     const foldado        = euSou?.status === 'fold' || euSou?.status === 'FOLD';
+    const emAllIn        = euSou?.status === 'all-in' || euSou?.status === 'ALL-IN';
     const jogoAtivo      = mesa.fase !== 'AGUARDANDO' && mesa.fase !== 'SHOWDOWN';
     const fichasMesa     = euSou?.saldo || 0;
     const temCartas      = minhasCartas.length === 2;
@@ -206,8 +207,9 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
                     </button>
                 )}
 
-                {/* ActionBar */}
-                {jogoAtivo && euSou && (
+                {/* ActionBar — some quando não há mais decisão a tomar
+                    (já desistiu ou já está all-in nesta mão) */}
+                {jogoAtivo && euSou && !foldado && !emAllIn && (
                     <ActionBar
                         ehMinhaVez={ehMinhaVez}
                         saldoAtual={fichasMesa}
@@ -217,6 +219,14 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
                         pote={mesa.pote || 0}
                         onAcao={handleAcao}
                     />
+                )}
+
+                {/* Aguardando o showdown enquanto all-in/fold */}
+                {jogoAtivo && euSou && (foldado || emAllIn) && (
+                    <div style={css.aguardando}>
+                        <span style={css.pulseDot} />
+                        {emAllIn ? 'Você está All-in — aguardando o resultado da mão...' : 'Você desistiu desta mão.'}
+                    </div>
                 )}
 
                 {/* SHOWDOWN */}
