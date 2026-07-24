@@ -23,6 +23,7 @@ export default function Jogador({
     tempoMs        = 45000,
     avatarSz       = 58,     // escala responsiva vinda do Mesa.jsx
     tema           = 'classico',
+    compacto       = false,  // tela pequena: cartas ao lado do avatar em vez de embaixo
 }) {
     if (!jogador) return null;
 
@@ -31,7 +32,7 @@ export default function Jogador({
     const apostaVal = jogador.apostaRodada || jogador.aposta || 0;
 
     // Dimensões escaladas proporcionalmente ao avatarSz
-    const cardW      = Math.round(avatarSz * 0.47);  // ex: 58→27px
+    const cardW      = Math.round(avatarSz * 0.55);  // ex: 58→32px (era 0.47)
     const cardH      = Math.round(cardW * 1.40);
     const cardFv     = Math.max(8,  Math.round(cardW * 0.36));
     const cardFn     = Math.max(10, Math.round(cardW * 0.50));
@@ -43,6 +44,10 @@ export default function Jogador({
     const cartas = souEu && cartasPrivadas.length > 0
         ? cartasPrivadas
         : (jogador.cartas || []);
+
+    // Baralho comprado é do DONO das cartas, não de quem está olhando —
+    // assim o tema fica visível pros adversários também, não só pra você.
+    const temaCartas = jogador.tema || tema;
 
     return (
         <div style={{
@@ -78,6 +83,14 @@ export default function Jogador({
                     </span>
                 </div>
             )}
+
+            {/* Avatar + cartas — lado a lado em tela pequena, empilhado normalmente */}
+            <div style={{
+                display:       'flex',
+                flexDirection: compacto ? 'row' : 'column',
+                alignItems:    'center',
+                gap:           Math.round(avatarSz * 0.1) + 'px',
+            }}>
 
             {/* Avatar + ring de turno */}
             <div style={{
@@ -154,11 +167,13 @@ export default function Jogador({
                     {cartas.map((c, i) => {
                         const carta = parsearCarta(c);
                         return carta
-                            ? <CartaMini key={i} carta={carta} w={cardW} h={cardH} fv={cardFv} fn={cardFn} tema={tema} />
-                            : <CartaVerso key={i} w={cardW} h={cardH} tema={tema} />;
+                            ? <CartaMini key={i} carta={carta} w={cardW} h={cardH} fv={cardFv} fn={cardFn} tema={temaCartas} />
+                            : <CartaVerso key={i} w={cardW} h={cardH} tema={temaCartas} />;
                     })}
                 </div>
             )}
+
+            </div>
 
             {/* Painel nome + saldo */}
             <div style={{

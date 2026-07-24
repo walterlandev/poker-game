@@ -186,6 +186,9 @@ io.on('connection', (socket) => {
         // que o cliente mande sobre isso) — lida direto do Firestore.
         const perfil = await buscarPerfil(dados.uid);
         socket.data.isAdmin = !!perfil?.isAdmin;
+        // Tema comprado/ativo também vem do Firestore — assim os outros
+        // jogadores na mesa veem o baralho de verdade, não só quem comprou.
+        socket.data.tema = perfil?.tema || 'classico';
 
         // Reconexão: se esse jogador já está sentado em alguma mesa (caiu a
         // conexão e o Socket.io reconectou sozinho — o socket é novo pro
@@ -221,6 +224,7 @@ io.on('connection', (socket) => {
             uid:        socket.data.uid,
             nome:       socket.data.nome,
             avatar:     socket.data.avatar,
+            tema:       socket.data.tema,
             rankPontos: config.rankPontos || 0,
         };
 
@@ -302,9 +306,10 @@ io.on('connection', (socket) => {
             uid:    socket.data.uid,
             nome:   socket.data.nome,
             avatar: socket.data.avatar,
+            tema:   socket.data.tema,
         };
 
-        const resultado = gameManager.entrarMesa(dados.mesaId, usuario, socket);
+        const resultado = gameManager.entrarMesa(dados.mesaId, usuario, socket, dados.senha);
 
         if (!resultado.sucesso) {
             // Devolve buyIn se não conseguiu entrar
@@ -511,6 +516,7 @@ io.on('connection', (socket) => {
             uid:    socket.data.uid,
             nome:   socket.data.nome,
             avatar: socket.data.avatar || '',
+            tema:   socket.data.tema,
         };
 
         const resultado = tournamentManager.criarTorneio(config, host);
@@ -567,6 +573,7 @@ io.on('connection', (socket) => {
             uid:    socket.data.uid,
             nome:   socket.data.nome,
             avatar: socket.data.avatar || '',
+            tema:   socket.data.tema,
         };
 
         const resultado = tournamentManager.entrarTorneio(torneioId, usuario);

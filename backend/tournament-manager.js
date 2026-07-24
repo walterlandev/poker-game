@@ -77,6 +77,7 @@ export class TournamentManager {
             uid:      usuario.uid,
             nome:     usuario.nome,
             avatar:   usuario.avatar || '',
+            tema:     usuario.tema   || 'classico',
             status:   'aguardando',
             rebuys:   0,
             mesaAtual: null,
