@@ -83,10 +83,16 @@ PEÇAS DO QUEBRA-CABEÇA (onde cada coisa mora)
   Abas: Carteira | Mesas | Torneio | Ranking | Loja | Admin (só se for admin)
 
   - CARTEIRA: saldo (real + bônus), depositar, sacar, enviar ₿C, extrato
-  - MESAS: lista de mesas públicas e privadas abertas (só aparecem mesas
-    que ainda não começaram a jogar e não estão cheias — 9 jogadores é o
-    máximo). Atualiza sozinho em tempo real quando uma mesa é criada,
-    começa a jogar, ou é fechada (não precisa ficar recarregando a página)
+  - MESAS: lista de mesas públicas e privadas com vaga (< 9 jogadores) —
+    inclusive mesas já em andamento, mostradas com o selo "Em jogo" e
+    botão "Observar / Entrar" (quem entra senta e é servido a partir da
+    próxima mão; não existe modo espectador-só-observando de verdade,
+    "Observar" aqui é só o texto do botão). Só some da lista quando fica
+    CHEIA (9 jogadores). Atualiza sozinho em tempo real quando uma mesa é
+    criada, muda de fase, enche ou é fechada (não precisa recarregar).
+    (Mudou em 24/07/2026 — antes sumia da lista assim que o jogo
+    começava; um jogador com 2 contas testando notou que a própria mesa
+    "sumia" pra ele mesmo e pediu pra mudar esse comportamento.)
   - TORNEIO: torneios abertos, criar torneio, entrar via convite
   - RANKING: top jogadores por pontuação
   - LOJA: comprar ₿C com dinheiro real, comprar temas/baralhos diferentes
@@ -103,8 +109,8 @@ PEÇAS DO QUEBRA-CABEÇA (onde cada coisa mora)
   - Mesa PRIVADA exige a senha certa pra qualquer um que ainda não esteja
     sentado — sem a senha certa, não entra
   - Mesa aparece na lista pública (aba Mesas) até ela ficar CHEIA (9
-    jogadores) ou o jogo COMEÇAR — a partir daí ela some da lista
-    automaticamente
+    jogadores) — continua na lista mesmo depois do jogo começar (ver
+    2.2 acima)
   - Convite por link: dentro da mesa (enquanto ainda está "Aguardando"),
     tem um botão "Convidar amigos pra mesa" que copia um link
     (?mesa=CÓDIGO) — quem abre esse link entra direto na mesa

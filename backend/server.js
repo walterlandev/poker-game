@@ -124,11 +124,16 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/mesas', (req, res) => {
+    // Mostra mesas com vaga (< 9), mesmo já em andamento — o jogador entra
+    // sentado e é servido a partir da próxima mão (entrarMesa não bloqueia
+    // por fase). Mesas cheias somem da lista, estejam ou não em jogo, já
+    // que ninguém consegue mesmo entrar nelas.
     const mesas = gameManager.getMesasAtivas()
-        .filter(m => m.fase === 'AGUARDANDO' && Object.keys(m.jogadores).length < 9)
+        .filter(m => Object.keys(m.jogadores).length < 9)
         .map(m => ({
             id:           m.id,
             nome:         m.nome,
+            fase:         m.fase,
             jogadores:    Object.keys(m.jogadores).length,
             maxJogadores: 9,
             bigBlind:     m.bigBlind,

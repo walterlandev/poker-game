@@ -18,11 +18,17 @@ fizer mudanças relevantes.
 
 ## Regras que NÃO PODEM ser esquecidas
 
-1. **Deploy reinicia o backend, e isso APAGA todo jogo em andamento.**
-   Mesas e torneios vivem só em memória (um `Map`), não em banco. Antes de
-   dar `git push` de uma mudança em `backend/`, avise o usuário — se tiver
-   gente jogando, a mesa vai sumir. Mudança só em `frontend/` não reinicia
-   o backend (pode subir sem esse aviso).
+1. **Todo `git push origin main` reinicia o backend na Hostinger — mesmo
+   quando só `frontend/` mudou — e isso APAGA todo jogo em andamento.**
+   Mesas e torneios vivem só em memória (um `Map`), não em banco.
+   CONFIRMADO na prática em 24/07/2026: um push só de frontend (fix
+   cosmético em `ListaMesas.jsx`) derrubou uma mesa real em andamento —
+   a suposição antiga aqui ("mudança só em frontend não reinicia o
+   backend") estava ERRADA; a Hostinger parece redeployar o app inteiro
+   a cada push na `main`, sem filtrar por path. **Trate TODO push como
+   risco de derrubar jogo em andamento — sempre avise o usuário antes,
+   sem exceção**, e confira `curl .../health` (uptime) logo depois pra
+   confirmar se reiniciou mesmo.
 
 2. **Nunca confie em valores vindos do cliente pra qualquer coisa
    financeira.** Todo cálculo de taxa, valor debitado/creditado, tem que
