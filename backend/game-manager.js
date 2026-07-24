@@ -956,8 +956,16 @@ export class GameManager {
         const potes     = [];
         let   capAnter  = 0;
 
+        // IMPORTANTE: o valor de cada pote soma a contribuição de TODOS os
+        // jogadores que apostaram nesta mão — inclusive quem já desistiu
+        // (fold). O dinheiro de quem desistiu continua fisicamente no pote;
+        // só a ELEGIBILIDADE pra ganhar é restrita a quem não desistiu.
+        // Usar só elegiveisUids aqui fazia o pote sair menor que o real,
+        // "perdendo" fichas de quem tinha dado fold.
+        const todosUids = Object.keys(mesa.jogadores);
+
         for (const cap of caps) {
-            const valorDoPote = elegiveisUids.reduce((soma, uid) => {
+            const valorDoPote = todosUids.reduce((soma, uid) => {
                 const total = mesa.jogadores[uid].apostaTotal || 0;
                 return soma + Math.min(Math.max(total - capAnter, 0), cap - capAnter);
             }, 0);

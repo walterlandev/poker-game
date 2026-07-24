@@ -202,6 +202,10 @@ export default function ActionBar({
 
     const ehAllIn = valorRaise >= maxRaise;
 
+    // Sem espaço pra aumentar de verdade (o mínimo já ultrapassa tudo que
+    // você tem) — só sobra pagar (all-in incompleto) ou desistir.
+    const podeRaise = minRaise < maxRaise;
+
     // ---- Atalhos rápidos de raise ----
     const atalhos = useMemo(() => {
         const poteBruto = pote || maiorAposta * 2 || bigBlind * 4;
@@ -231,8 +235,9 @@ export default function ActionBar({
     }, [ehCheck, custo, handleAcao]);
 
     const handleRaise = useCallback(() => {
+        if (!podeRaise) return;
         handleAcao('RAISE', valorRaise);
-    }, [valorRaise, handleAcao]);
+    }, [valorRaise, handleAcao, podeRaise]);
 
     const handleAllIn = useCallback(() => {
         setValorRaise(maxRaise);
@@ -336,9 +341,10 @@ export default function ActionBar({
                         <span className="hkey ab-hkeys">C</span>
                     </button>
 
-                    {/* RAISE */}
+                    {/* RAISE — desabilitado se não sobra saldo pra aumentar de verdade */}
                     <button
                         className="ab-btn btn-raise"
+                        disabled={!podeRaise}
                         style={{ transform: pressionado === 'RAISE' ? 'scale(0.96)' : undefined }}
                         onPointerDown={handleRaise}
                     >
