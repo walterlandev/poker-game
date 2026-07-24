@@ -280,7 +280,10 @@ const css = {
         alignItems:     'center',
         justifyContent: 'center',
         gap:            '5px',
-        zIndex:         2,
+        // Maior que a ficha de aposta flutuante do jogador (zIndex 6 em
+        // Jogador.jsx) — sem isso, em mesas menores a ficha por cima do
+        // avatar podia cobrir as cartas comunitárias no centro.
+        zIndex:         7,
         padding:        '4px',
         pointerEvents:  'none',
     },
