@@ -495,7 +495,7 @@ const css = {
         alignItems:     'center',
         justifyContent: 'center',
         overflow:       'visible',
-        padding:        '30px 12px',
+        padding:        '52px 12px',
         minHeight:      0,
     },
 

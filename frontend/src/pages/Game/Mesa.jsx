@@ -47,10 +47,12 @@ export default function Mesa({ mesa, meuUid, minhasCartas = [], meuAvatar = '', 
     const offset         = meuIndex >= 0 ? meuIndex : 0;
 
     // ── Semi-eixos: posiciona os jogadores NA BORDA da oval ──────────
-    // 88% → centro do avatar fica sobre a borda do trilho
-    // (metade dentro do feltro, metade fora — visual de "sentado na mesa")
-    const sx = (dims.w / 2) * 0.88;
-    const sy = (dims.h / 2) * 0.88;
+    // 82% → centro do avatar fica sobre a borda do trilho, com uma folga
+    // maior que antes (era 88%) pra sobrar espaço pro avatar + a ficha de
+    // aposta flutuante acima dele não serem cobertos pelo cabeçalho em
+    // mesas grandes (tela cheia).
+    const sx = (dims.w / 2) * 0.82;
+    const sy = (dims.h / 2) * 0.82;
 
     // ── Posições dos jogadores em % da oval ────────────────────────
     // +90° → indiceRel=0 (jogador local) fica na BASE (ângulo 90° = baixo)
