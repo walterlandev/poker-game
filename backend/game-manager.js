@@ -135,7 +135,14 @@ export class GameManager {
 
     criarMesa(config, usuario) {
         const mesaId = Math.random().toString(36).substring(2, 6).toUpperCase();
-        const bb     = (config.smallBlind || 10) * 2;
+        // Nunca confiar em smallBlind vindo do cliente sem validar sinal/tipo —
+        // um valor negativo faria _aplicarBlind() creditar fichas em vez de
+        // debitar (mesmo exploit de "imprimir" ₿C do buyIn, ver CLAUDE.md).
+        const smallBlindBruto = Number(config.smallBlind);
+        const smallBlind = Number.isFinite(smallBlindBruto) && smallBlindBruto > 0
+            ? Math.floor(smallBlindBruto)
+            : 10;
+        const bb = smallBlind * 2;
 
         const mesa = {
             id:                   mesaId,
@@ -146,7 +153,7 @@ export class GameManager {
             maiorAposta:          0,
             ultimoRaiseVal:       bb,
             bigBlind:             bb,
-            smallBlind:           config.smallBlind || 10,
+            smallBlind:           smallBlind,
             valorBuyIn:           config.buyIn || 1000,
             dealer:               null,
             sbId:                 null,

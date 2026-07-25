@@ -28,6 +28,8 @@ import {
     debitarEntradaMesa,
     creditarSaidaMesa,
     atualizarAvatar,
+    verificarIdToken,
+    firebaseEstaAtivo,
 } from './firebase-admin.js';
 
 import { registrarEventosWallet, resetarLimiteDiario, minerarBlocoSeNecessario } from './wallet/wallet-manager.js';
@@ -191,18 +193,32 @@ io.on('connection', (socket) => {
     // autenticar
     // ----------------------------------------------------------------
     socket.on('autenticar', async (dados) => {
-        if (!dados?.uid) {
+        // Nunca confiar no uid que o cliente afirma ser: ele é público
+        // (visível pra outros jogadores na mesma mesa e via GET /jogador/:uid),
+        // então sem verificar o ID token do Firebase qualquer um podia abrir
+        // uma conexão alegando ser outro uid — inclusive um admin — e
+        // assumir a conta dele (sentar a vítima numa mesa e sacar o saldo
+        // real dela). Em modo offline (testes locais sem Firebase) não tem
+        // como verificar token, então confia no uid só nesse caso.
+        let uid = dados?.uid;
+        if (firebaseEstaAtivo()) {
+            uid = await verificarIdToken(dados?.idToken);
+            if (!uid) {
+                socket.emit('erro', { mensagem: 'Sessão inválida. Faça login novamente.' });
+                return;
+            }
+        } else if (!uid) {
             socket.emit('erro', { mensagem: 'UID inválido.' });
             return;
         }
 
-        socket.data.uid    = dados.uid;
+        socket.data.uid    = uid;
         socket.data.nome   = dados.nome   || 'Anônimo';
         socket.data.avatar = dados.avatar || '';
 
         // Checagem de admin fica no SERVIDOR (não dá pra confiar em nada
         // que o cliente mande sobre isso) — lida direto do Firestore.
-        const perfil = await buscarPerfil(dados.uid);
+        const perfil = await buscarPerfil(uid);
         socket.data.isAdmin = !!perfil?.isAdmin;
         // Tema comprado/ativo também vem do Firestore — assim os outros
         // jogadores na mesa veem o baralho de verdade, não só quem comprou.
@@ -214,17 +230,17 @@ io.on('connection', (socket) => {
         // a mesa e reentra na sala automaticamente. Sem isso, depois de uma
         // queda de WebSocket o jogador ficava "fantasma": não recebia mais
         // estado_mesa e os cliques de ação não faziam nada (silenciosamente).
-        const mesaExistente = gameManager.getMesasAtivas().find(m => m.jogadores[dados.uid]);
+        const mesaExistente = gameManager.getMesasAtivas().find(m => m.jogadores[uid]);
         if (mesaExistente) {
             socket.data.mesaId = mesaExistente.id;
             socket.join(mesaExistente.id);
             socketMesa.set(socket.id, mesaExistente.id);
-            const estadoFiltrado = gameManager.filtrarEstadoParaJogador(mesaExistente, dados.uid);
+            const estadoFiltrado = gameManager.filtrarEstadoParaJogador(mesaExistente, uid);
             socket.emit('estado_mesa', estadoFiltrado);
             console.log(`🔁 ${dados.nome} reconectado à mesa ${mesaExistente.id}`);
         }
 
-        console.log(`✅ Autenticado: ${dados.nome} (${dados.uid})${socket.data.isAdmin ? ' [admin]' : ''}`);
+        console.log(`✅ Autenticado: ${dados.nome} (${uid})${socket.data.isAdmin ? ' [admin]' : ''}`);
         socket.emit('autenticado', { sucesso: true, isAdmin: socket.data.isAdmin });
     });
 

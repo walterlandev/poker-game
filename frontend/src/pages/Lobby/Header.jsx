@@ -43,44 +43,6 @@ export default function Header({ usuario, onAbrirLoja, onAbrirCarteira, onAbrirP
     return (
         <header style={estilos.header}>
 
-            <style>{`
-                .header-inner {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    padding: 10px 14px;
-                    gap: 10px;
-                    max-width: 1200px;
-                    margin: 0 auto;
-                    box-sizing: border-box;
-                    width: 100%;
-                }
-                .header-nome {
-                    font-size: 15px;
-                    font-weight: 600;
-                    color: #F8FAFC;
-                    margin: 0;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
-                    max-width: 140px;
-                }
-                .header-rank-texto { font-size: 11px; margin: 2px 0 0; }
-                .header-saldo-valor {
-                    font-size: 17px;
-                    font-weight: 700;
-                    color: #F59E0B;
-                    line-height: 1;
-                    white-space: nowrap;
-                }
-                @media (min-width: 768px) {
-                    .header-inner { padding: 14px 32px; }
-                    .header-nome  { font-size: 18px; max-width: 300px; }
-                    .header-rank-texto   { font-size: 13px; }
-                    .header-saldo-valor  { font-size: 22px; }
-                }
-            `}</style>
-
             <div style={estilos.linhaDecoracao} />
 
             <div className="header-inner">

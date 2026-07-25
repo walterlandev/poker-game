@@ -125,6 +125,31 @@ async function getPerfil(uid) {
 /** Bots nunca têm saldo real — operações ignoradas */
 const ehBot = (uid) => !uid || uid.startsWith('bot_');
 
+/** true em produção (Firebase inicializado); false no modo offline de testes locais */
+export function firebaseEstaAtivo() {
+    return !!db;
+}
+
+/**
+ * Verifica um ID token do Firebase e devolve o uid REAL do dono da sessão.
+ * Nunca confiar no uid que o cliente afirma ser no evento 'autenticar' —
+ * ele é público (aparece pra outros jogadores na mesma mesa e via
+ * GET /jogador/:uid), então sem essa verificação qualquer um podia abrir
+ * uma conexão alegando ser outro uid (inclusive um admin) e assumir a
+ * conta dele. Retorna null se o token for inválido/expirado.
+ */
+export async function verificarIdToken(idToken) {
+    if (!db)       return null; // modo offline: sem Firebase inicializado, não dá pra verificar
+    if (!idToken)  return null;
+    try {
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        return decoded.uid;
+    } catch (e) {
+        console.error('Token de autenticação inválido:', e.message);
+        return null;
+    }
+}
+
 
 // ================================================================
 // BLOCO 3: DEBITAR ENTRADA NA MESA

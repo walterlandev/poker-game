@@ -411,6 +411,110 @@ FRONTEND / VISUAL
 
 
 ================================================================================
+3.2 SESSÃO 24/07/2026 (continuação) — TELA PRETA + EXPLOITS DE AUTENTICAÇÃO/BLIND
+================================================================================
+  Pedido do usuário: investigar print de tela preta no Chrome (erro
+  "insertBefore") e depois fazer uma verificação geral por outros erros.
+
+  TELA PRETA (regressão do padrão já conhecido)
+  [x] <style> solto ainda existia em 4 lugares que não tinham sido
+      cobertos na correção anterior (que só tratou ActionBar/HandStrength):
+      CartasComunitarias.jsx (CartaRevelada, monta/desmonta a cada
+      flop/turn/river), Lobby/index.jsx, Header.jsx e Loja/index.jsx
+      (a tela inteira do Lobby monta/desmonta ao trocar pra tela de
+      jogo). Todos movidos pro CSS global em main.jsx. Confirmado por
+      grep que não sobrou nenhum <style> solto em componente no
+      frontend inteiro, e build de produção limpo.
+
+  FINANCEIRO / SEGURANÇA (crítico — achados novos, não documentados antes)
+  [x] CRÍTICO: evento 'autenticar' (server.js) aceitava o uid que o
+      cliente mandasse, sem checar nenhum token — não existia
+      verifyIdToken em lugar nenhum do backend. Como o uid de qualquer
+      jogador é público (aparece pra quem está na mesma mesa e via
+      GET /jogador/:uid), um atacante podia abrir uma conexão alegando
+      ser outro uid — inclusive um admin — e assumir a conta dele
+      (sentar a vítima numa mesa junto com uma segunda conta própria e
+      sacar o saldo real dela via sair_mesa, sem PIN/taxa/limite).
+      Corrigido: frontend agora manda idToken real do Firebase
+      (auth.currentUser.getIdToken()) junto no 'autenticar'; backend
+      verifica com admin.auth().verifyIdToken() (nova função
+      verificarIdToken em firebase-admin.js) e usa SEMPRE o uid do
+      token verificado, ignorando o uid que o cliente alegou. Em modo
+      offline (sem Firebase, testes locais) continua confiando no uid
+      puro, já que não tem como verificar token sem o Admin SDK ativo.
+  [x] CRÍTICO: criar_mesa repassava config.smallBlind quase direto do
+      cliente pro game-manager (só `|| 10`, que não bloqueia negativo).
+      _aplicarBlind fazia `Math.min(valor, saldo)` com valor negativo
+      e depois `saldo -= apostaReal` — como apostaReal ficava negativo,
+      isso SOMAVA fichas em vez de subtrair. Criar uma mesa com
+      smallBlind: -1000000 fazia todo mundo que passasse pelo SB/BB
+      ganhar milhões de ₿C reais por mão, sacáveis normalmente. Mesmo
+      padrão do bug de buyIn já corrigido antes, só que nunca tinha
+      sido aplicado ao smallBlind. Corrigido em game-manager.js
+      (criarMesa): valida Number.isFinite + > 0, senão usa 10.
+      criarMesaTorneio não precisou de correção — o valor já vem
+      calculado no servidor pelo tournament-manager.js, nunca do
+      cliente.
+
+  COMO FOI TESTADO
+  Achados pelo agente de auditoria e confirmados lendo o código antes
+  de corrigir. Depois, com o backend local: (1) modo offline —
+  script socket.io-client criou mesa com smallBlind: -1000000 e
+  confirmou mesa.smallBlind = 10 / bigBlind = 20 (antes seria
+  -1000000/-2000000); (2) modo com Firebase real — usando
+  admin.auth().createCustomToken() + REST signInWithCustomToken pra
+  mintar um ID token de verdade para um uid de teste, confirmado que:
+  autenticar sem idToken é rejeitado, com token forjado é rejeitado, e
+  com token válido de um uid mas alegando ser OUTRO uid no payload, o
+  servidor autentica como o dono real do token (log:
+  "Autenticado: AtacanteFingindoSerB (uid_teste_A_spoof)", não o uid
+  alegado). Processos de teste mortos e firebase-credentials.json
+  restaurado ao final. Build de produção do frontend e node --check
+  do backend rodados sem erros.
+
+  ACHADO À PARTE (não corrigido, só observado)
+  Um processo `node server.js` local ficou rodando esquecido desde
+  23/07 07:54 (porta 3001, backend/) — não foi tocado, só reportado ao
+  usuário pra decidir se mata ou deixa.
+
+  TESTE PONTA-A-PONTA (pedido do usuário: "build agora e vamos testa")
+  Depois das correções acima, subiu backend local (porta 3001, Firebase
+  real) + frontend local (porta 5174, apontando pro backend local via
+  frontend/.env.local — sem mexer no .env que aponta pra produção) e
+  dirigiu o navegador de ponta a ponta com playwright-core headless
+  (chromium já estava em cache de uma investigação anterior; pacote
+  playwright-core instalado à parte, fora do projeto): criou conta nova
+  de teste, criou PIN, entrou no Lobby, abriu a aba Loja, criou uma mesa
+  com 2 bots, iniciou o jogo e acompanhou a mão até o Flop (cartas
+  comunitárias reveladas — o componente exato que tinha o <style>
+  problemático). Zero pageerrors e zero console.error do início ao fim.
+  Print do Flop confirma renderização normal (sem tela preta). Conta de
+  teste e as duas de uid fake usadas no teste de spoofing foram
+  deletadas do Firebase (Auth + Firestore) ao final.
+
+  BUG NOVO ENCONTRADO NO CAMINHO (não corrigido — fora do escopo pedido)
+  Corrida de verdade no fluxo de cadastro: CriarPin.jsx usa o socket
+  pra emitir 'wallet:criar_pin' e esperar 'wallet:pin_criado', mas quem
+  efetivamente CONECTA o socket (conectarSocket, App.jsx) só roda
+  DEPOIS que o wizard de cadastro termina (handleAutenticado, chamado
+  só no fim da etapa PIN) — ou, em paralelo, via onAuthStateChanged, mas
+  só se o getDoc() dele ganhar a corrida contra a escrita do Firestore
+  feita por criarPerfil() no meio do cadastro. Se onAuthStateChanged
+  perder essa corrida (visto de forma reprodutível no teste local), o
+  socket nunca conecta e a etapa "Criar PIN" fica presa pra sempre em
+  "Salvando...", sem erro nenhum na tela. Contorno usado no teste:
+  recarregar a página (a sessão do Firebase persiste, e da segunda vez
+  o doc já existe) — isso levou direto pro Lobby, mas PULOU a criação
+  do PIN de verdade (o jogador fica sem PIN configurado). Vale investigar
+  se isso também acontece pra usuários reais em conexões mais lentas.
+
+  OUTRO ACHADO COSMÉTICO (não corrigido — fora do escopo pedido)
+  No painel de Ranking do Lobby, os valores aparecem como "₿C undefined"
+  em vez de um número — parece um campo com nome diferente do esperado
+  no objeto de ranking vindo do servidor. Não investigado a fundo.
+
+
+================================================================================
 4. PENDÊNCIAS E RISCOS CONHECIDOS
 ================================================================================
 
@@ -425,6 +529,27 @@ RISCO ALTO — Estado do jogo só em memória
   → Enquanto isso: evitar reiniciar o servidor durante partidas reais,
     ou avisar os jogadores antes de um deploy.
 
+CORRIDA NO CADASTRO PODE PULAR A CRIAÇÃO DO PIN
+  Descoberto em 24/07/2026 testando o cadastro ponta-a-ponta (ver seção
+  3.2). CriarPin.jsx depende do socket já estar conectado pra salvar o
+  PIN (emite 'wallet:criar_pin' e espera 'wallet:pin_criado'), mas quem
+  conecta o socket de fato só roda depois que o wizard de cadastro
+  termina — a única forma de já estar conectado nesse meio-tempo é o
+  onAuthStateChanged (App.jsx) ganhar a corrida contra a escrita do
+  Firestore feita por criarPerfil(). Se perder essa corrida, a etapa
+  "Criar PIN" trava pra sempre em "Salvando...", sem nenhum erro visível.
+  Reproduzido de forma consistente localmente. Não corrigido ainda —
+  fora do escopo da sessão em que foi achado.
+  → Possível correção: CriarPin.jsx conectar o socket ele mesmo (ou
+    App.jsx conectar assim que o Firebase autentica, sem depender do
+    getDoc do Firestore terminar primeiro).
+
+RANKING MOSTRA "₿C undefined"
+  Painel de Ranking do Lobby mostra "₿C undefined" no lugar de um
+  número pros jogadores listados. Observado en passant no teste de
+  24/07/2026, não investigado — provável nome de campo diferente do
+  esperado no objeto que o servidor manda.
+
 SAQUE AINDA É MANUAL
   Não existe hoje uma forma automática de mandar PIX pra uma chave
   qualquer pela API do Mercado Pago (o produto deles não oferece isso
@@ -436,8 +561,14 @@ TELA PRETA INTERMITENTE (erro "insertBefore" do React)
   decodificação de sourcemap, e testes automatizados com Playwright) mas
   a causa exata NÃO foi 100% confirmada — foi mitigada removendo um
   padrão de código (tags <style> que entravam/saíam do DOM junto com
-  modais e spinners) que parecia coincidir com o erro. Pode ainda
-  acontecer em algum caso não coberto. Se voltar a acontecer, vale
+  modais e spinners) que parecia coincidir com o erro. Em 24/07/2026
+  apareceu de novo (print do Chrome) e uma varredura por todo o
+  frontend achou mais 4 componentes com o mesmo padrão que não tinham
+  sido cobertos da primeira vez (CartasComunitarias, Lobby/index,
+  Header, Loja/index — ver seção 3.2). Depois dessa varredura não
+  sobrou nenhum <style> solto em componente no repo inteiro (confirmado
+  por grep), mas como a causa raiz nunca foi 100% confirmada, pode
+  ainda existir algum caso não coberto. Se voltar a acontecer, vale
   reconectar o depurador ao vivo em vez de tentar adivinhar de novo.
 
 CÓDIGO MORTO AINDA EXISTE

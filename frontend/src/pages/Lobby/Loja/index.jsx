@@ -41,16 +41,6 @@ export default function Loja({ usuario, socket }) {
     return (
         <div style={estilos.container}>
 
-            <style>{`
-                .loja-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
-                .loja-corpo { display: flex; flex-direction: column; gap: 14px; }
-                @media (min-width: 768px) {
-                    .loja-tabs { display: none; }
-                    .loja-corpo { flex-direction: row; align-items: flex-start; gap: 20px; }
-                    .loja-col { flex: 1; display: block !important; }
-                }
-            `}</style>
-
             {/* ---- Cabeçalho ---- */}
             <div style={estilos.cabecalho}>
                 <div>

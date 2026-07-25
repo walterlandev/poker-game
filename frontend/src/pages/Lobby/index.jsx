@@ -256,46 +256,6 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
     return (
         <div style={estilos.pagina} className="lobby-pagina">
 
-            <style>{`
-                .lobby-pagina   { max-width: 480px; }
-                .lobby-body     { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-                .lobby-esquerda { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-                .lobby-direita  { display: none; }
-                .lobby-conteudo {
-                    flex: 1; overflow-y: auto;
-                    padding: 12px 14px 100px;
-                    -webkit-overflow-scrolling: touch;
-                }
-                .lobby-rodape {
-                    position: fixed; bottom: 0;
-                    left: 50%; transform: translateX(-50%);
-                    width: 100%; max-width: 480px;
-                    padding: 10px 14px max(14px, env(safe-area-inset-bottom));
-                    background: linear-gradient(to top, #0a0f1e 70%, transparent);
-                    z-index: 100; box-sizing: border-box;
-                }
-                /* Sub-filtro mesas */
-                .sub-filtro-btn {
-                    flex: 1; padding: 7px 4px;
-                    border-radius: 7px; cursor: pointer;
-                    font-size: 12px; font-family: inherit;
-                    transition: all 0.15s;
-                    -webkit-tap-highlight-color: transparent;
-                }
-
-                @media (min-width: 768px) {
-                    .lobby-pagina   { max-width: 1200px !important; }
-                    .lobby-body     { flex-direction: row; }
-                    .lobby-esquerda { flex: 1; border-right: 1px solid rgba(255,255,255,0.06); min-width: 0; }
-                    .lobby-direita  { display: flex; flex-direction: column; width: 320px; flex-shrink: 0; background: #0d1424; }
-                    .lobby-conteudo { padding: 16px 20px 100px; }
-                    .lobby-rodape   { max-width: 1200px; padding: 12px 20px max(16px, env(safe-area-inset-bottom)); }
-                }
-                @media (min-width: 1024px) {
-                    .lobby-direita { width: 380px; }
-                }
-            `}</style>
-
             {/* ---- HEADER ---- */}
             <Header
                 usuario={usuario}

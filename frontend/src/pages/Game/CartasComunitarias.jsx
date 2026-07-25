@@ -87,15 +87,6 @@ function CartaRevelada({ carta, tema, animada = false, indice = 0 }) {
 
     return (
         <>
-            <style>{`
-                @keyframes virarCarta {
-                    0%   { transform: rotateY(90deg) scale(0.8); opacity: 0; }
-                    50%  { transform: rotateY(45deg) scale(0.9); opacity: 0.5; }
-                    100% { transform: rotateY(0deg)  scale(1);   opacity: 1; }
-                }
-                .carta-revelada { animation: virarCarta 0.4s ease forwards; }
-            `}</style>
-
             <div
                 className={animada ? 'carta-revelada' : ''}
                 style={{

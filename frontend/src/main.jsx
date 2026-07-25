@@ -159,6 +159,100 @@ const estilosGlobais = `
     50%      { box-shadow: 0 0 60px rgba(245,158,11,0.8); }
   }
 
+  /* CartasComunitarias.jsx (CartaRevelada) — mesmo padrão de risco de
+     tela preta: o <style> ficava dentro do componente que monta/desmonta
+     a cada flop/turn/river. */
+  @keyframes virarCarta {
+    0%   { transform: rotateY(90deg) scale(0.8); opacity: 0; }
+    50%  { transform: rotateY(45deg) scale(0.9); opacity: 0.5; }
+    100% { transform: rotateY(0deg)  scale(1);   opacity: 1; }
+  }
+  .carta-revelada { animation: virarCarta 0.4s ease forwards; }
+
+  /* Lobby/index.jsx, Header.jsx e Loja/index.jsx — mesmo padrão: essas
+     telas inteiras montam/desmontam ao trocar Lobby <-> Game, então um
+     <style> preso a elas corre o mesmo risco de tela preta. */
+  .lobby-pagina   { max-width: 480px; }
+  .lobby-body     { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+  .lobby-esquerda { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+  .lobby-direita  { display: none; }
+  .lobby-conteudo {
+    flex: 1; overflow-y: auto;
+    padding: 12px 14px 100px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .lobby-rodape {
+    position: fixed; bottom: 0;
+    left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 480px;
+    padding: 10px 14px max(14px, env(safe-area-inset-bottom));
+    background: linear-gradient(to top, #0a0f1e 70%, transparent);
+    z-index: 100; box-sizing: border-box;
+  }
+  /* Sub-filtro mesas */
+  .sub-filtro-btn {
+    flex: 1; padding: 7px 4px;
+    border-radius: 7px; cursor: pointer;
+    font-size: 12px; font-family: inherit;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  @media (min-width: 768px) {
+    .lobby-pagina   { max-width: 1200px !important; }
+    .lobby-body     { flex-direction: row; }
+    .lobby-esquerda { flex: 1; border-right: 1px solid rgba(255,255,255,0.06); min-width: 0; }
+    .lobby-direita  { display: flex; flex-direction: column; width: 320px; flex-shrink: 0; background: #0d1424; }
+    .lobby-conteudo { padding: 16px 20px 100px; }
+    .lobby-rodape   { max-width: 1200px; padding: 12px 20px max(16px, env(safe-area-inset-bottom)); }
+  }
+  @media (min-width: 1024px) {
+    .lobby-direita { width: 380px; }
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    gap: 10px;
+    max-width: 1200px;
+    margin: 0 auto;
+    box-sizing: border-box;
+    width: 100%;
+  }
+  .header-nome {
+    font-size: 15px;
+    font-weight: 600;
+    color: #F8FAFC;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 140px;
+  }
+  .header-rank-texto { font-size: 11px; margin: 2px 0 0; }
+  .header-saldo-valor {
+    font-size: 17px;
+    font-weight: 700;
+    color: #F59E0B;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  @media (min-width: 768px) {
+    .header-inner { padding: 14px 32px; }
+    .header-nome  { font-size: 18px; max-width: 300px; }
+    .header-rank-texto   { font-size: 13px; }
+    .header-saldo-valor  { font-size: 22px; }
+  }
+
+  .loja-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .loja-corpo { display: flex; flex-direction: column; gap: 14px; }
+  @media (min-width: 768px) {
+    .loja-tabs { display: none; }
+    .loja-corpo { flex-direction: row; align-items: flex-start; gap: 20px; }
+    .loja-col { flex: 1; display: block !important; }
+  }
+
   /* Layout da tela de jogo (era um <style> dentro do componente Game) */
   .game-pagina { max-width: 100vw; }
   @media (min-width: 900px) {
