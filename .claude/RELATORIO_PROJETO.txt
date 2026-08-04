@@ -697,11 +697,26 @@ RELATÓRIO DE VULNERABILIDADES NPM (04/08/2026) — CORRIGIDO
   13.10.0) — risco alto demais pra peça que cuida de carteira/saldo
   real sem uma bateria de testes antes. Validado depois do fix: syntax
   check limpo, build do frontend limpo, backend testado rodando local
-  (modo offline E com Firebase real) sem erro nenhum. Faltou: commitar
-  e dar push (nada foi publicado ainda — e como node_modules do
-  backend é rastreado pelo git, ver entrada acima, o push é
-  obrigatório pra esse fix valer em produção, não só o
-  package-lock.json).
+  (modo offline E com Firebase real) sem erro nenhum. Publicado em
+  produção (mesclado com um commit de README que tinha sido feito
+  direto no GitHub nesse meio-tempo) — backend confirmado reiniciado
+  e saudável depois do push.
+
+  CORREÇÃO DAS 8 MODERADAS RESTANTES (mesmo dia, cobrança do usuário
+  com relatório de outro scanner que classificava a mesma
+  vulnerabilidade do uuid como "Alto"/CVSS 7.5): usei
+  `"overrides": { "uuid": "^11.1.1" }` no backend/package.json em vez
+  de `--force` — isso força TODAS as dependências transitivas
+  (gaxios, google-gax, teeny-request, @google-cloud/storage) a usar o
+  uuid corrigido sem tocar na versão do firebase-admin/@google-cloud/*
+  em si. `npm audit` foi pra 0 vulnerabilidades. Testado de verdade
+  antes de considerar pronto: backend sobe, Firebase Admin inicializa,
+  lê blockchain do Firestore, E uma transação de escrita completa
+  (runTransaction com increment, o mesmo padrão usado em
+  debitarEntradaMesa/creditarSaidaMesa) rodou e conferiu o valor
+  certo. `overrides` é a ferramenta certa pra esse tipo de problema
+  (dependência transitiva desatualizada que o pacote pai ainda não
+  atualizou) — mais seguro que forçar um downgrade do pacote direto.
 
 
 ================================================================================
