@@ -550,6 +550,33 @@ RANKING MOSTRA "₿C undefined"
   24/07/2026, não investigado — provável nome de campo diferente do
   esperado no objeto que o servidor manda.
 
+FOTO DE PERFIL: NÃO SABEMOS SE SOBREVIVE A UM DEPLOY
+  O usuário perguntou (24/07/2026) se guardar a foto de perfil no
+  próprio disco da Hostinger (backend/public/avatares/, servido em
+  /avatares — é o que já está implementado, ver seção 2.10) é uma
+  solução válida pra foto aparecer pros adversários. Testado ao vivo
+  contra produção: upload funciona, a URL retornada já é absoluta
+  (usa SERVER_URL), então QUALQUER jogador vê a foto normalmente hoje
+  — isso não é o problema.
+  O que ficou em aberto: essa pasta não é rastreada pelo git (não tem
+  nem entrada no .gitignore, simplesmente nunca foi commitada) e o
+  servidor recria ela vazia no boot (fs.mkdirSync(...,{recursive:true})
+  em server.js). Se a Hostinger faz um `git pull` in-place a cada
+  deploy, os arquivos enviados sobrevivem tranquilamente (git pull não
+  mexe em arquivo não rastreado). Se ela faz um clone limpo / apaga a
+  pasta do app inteira a cada deploy, todo avatar enviado por usuário
+  é perdido a cada push — e o campo `avatar` no Firestore ficaria
+  apontando pra uma URL 404.
+  MARCADOR DE TESTE PLANTADO: subi uma imagem de teste (PNG 1x1) pra
+  https://brown-wolverine-631802.hostingersite.com/avatares/ncnoBxfwKMRhWaA1OujSb3Y9HsD2.png
+  (conta de teste já apagada do Firebase, mas o arquivo em si não pode
+  ser removido sem acesso ao filesystem da Hostinger). Da PRÓXIMA vez
+  que fizermos um `git push origin main`, dá pra checar essa mesma URL
+  depois do redeploy: se continuar retornando 200, os uploads
+  sobrevivem a deploys normalmente; se virar 404, confirma que a pasta
+  é apagada a cada deploy e a foto de perfil precisa de um storage de
+  verdade (S3, Cloudinary, ou pagar o plano do Firebase Storage).
+
 SAQUE AINDA É MANUAL
   Não existe hoje uma forma automática de mandar PIX pra uma chave
   qualquer pela API do Mercado Pago (o produto deles não oferece isso
@@ -604,6 +631,77 @@ MESA VERTICAL
 BOTÃO DE ATUALIZAR MANUAL NO LOBBY
   Chegou a ser oferecido como reforço (além do tempo real que já
   funciona), mas não foi decidido/construído ainda.
+
+BACKEND/NODE_MODULES É RASTREADO PELO GIT (achado em 04/08/2026)
+  Descoberto ao investigar por que um `npm audit fix` no backend
+  aparecia como milhares de arquivos alterados no `git status`:
+  `backend/node_modules/` está COMMITADO no repositório (6181+
+  arquivos rastreados), apesar do `.gitignore` da raiz listar
+  `node_modules`. Isso só é possível porque foi commitado antes dessa
+  entrada existir (ou direto, ignorando o .gitignore) — o .gitignore
+  não afeta arquivos já rastreados. `frontend/node_modules/` NÃO é
+  rastreado (só o backend). Bate com a suspeita de que a Hostinger
+  provavelmente só faz `git pull` + restart (sem rodar `npm install`
+  no servidor) — por isso o node_modules precisa vir pronto no commit.
+  → Implicação prática: qualquer atualização de dependência do backend
+    (ex: `npm audit fix`, `npm update`) só faz efeito em produção se o
+    `node_modules` atualizado for commitado E pushado junto — só mudar
+    package.json/package-lock.json não basta como bastaria num projeto
+    normal.
+
+CORRIDA NO CADASTRO — AINDA NÃO CORRIGIDA
+  Ver entrada acima ("CORRIDA NO CADASTRO PODE PULAR A CRIAÇÃO DO
+  PIN") — confirmado reproduzir de novo em 04/08/2026 durante outros
+  testes. Continua pendente.
+
+BUG DE ALL-IN REPETIDO / TIMER PRESO — INVESTIGAÇÃO INTERROMPIDA (04/08/2026)
+  Usuário relatou em produção (mesa real, conta própria "walterlan"):
+  o timer de ação de um jogador ficava rodando sem parar, e ele
+  conseguiu clicar All-in mais de uma vez na mesma mão (o que não
+  deveria ser possível). Lido o código do servidor (_gerenciarTurno,
+  _encontrarProximo, _avancarFase, processarAcao) — a lógica de pular
+  jogadores all-in/fold e travar ações fora de vez parece
+  estruturalmente correta (mesa.turno !== uid é validado no servidor
+  antes de qualquer ação). Hipótese alternativa: o print mostrava TRÊS
+  jogadores diferentes marcados ALL-IN na mesma mão (não
+  necessariamente o mesmo jogador agindo duas vezes) — pode ter sido
+  interpretação equivocada de "vários all-in numa mesa multi-way", que
+  é comportamento normal de poker. Não foi possível confirmar nem
+  descartar de vez — a sessão foi interrompida no meio de uma
+  reprodução ao vivo (criar mesa com bots via socket.io-client,
+  travar a mão no Flop, e então entrar nessa mesma mesa já em
+  andamento pela lista do lobby via Playwright, pra ver se o clique
+  em "Entrar" — caminho de código diferente de "Criar Mesa", que já
+  tinha sido testado e não reproduziu nada — dispara o erro). Scripts
+  de teste descartados junto com o encerramento da sessão anterior
+  (pasta scratchpad foi limpa). Se o usuário voltar a ver esse
+  comportamento de forma clara e isolada (ele mesmo clicando all-in
+  duas vezes na própria vez, não múltiplos jogadores), vale retomar
+  essa investigação — o próximo passo natural é justamente terminar
+  o teste de "entrar numa mesa em andamento" que ficou pela metade.
+
+RELATÓRIO DE VULNERABILIDADES NPM (04/08/2026) — CORRIGIDO
+  Usuário trouxe um relatório (provavelmente GitHub Dependabot, dado
+  que os números batiam com a contagem DEDUPLICADA entre os dois
+  package.json, não a soma bruta): 2 críticas, 13 altas, 12
+  moderadas. `npm audit` confirmou: frontend tinha 12 vulnerabilidades
+  (2 críticas: protobufjs, websocket-driver — mesmas do backend, daí
+  a contagem deduplicada bater "2" e não "4"), backend tinha 22 (as
+  mesmas 2 críticas + as demais). Rodado `npm audit fix` (sem --force)
+  nos dois: frontend foi para 0 vulnerabilidades; backend foi de 22
+  para 8 (todas moderadas, mesma causa raiz: um `uuid` antigo
+  enterrado dentro de dependências internas do Google Cloud SDK usado
+  pelo firebase-admin — gaxios/google-gax/teeny-request). NÃO rodado
+  `npm audit fix --force` pro restante porque ele reinstalaria
+  `firebase-admin@10.3.0`, um DOWNGRADE de major version (estava em
+  13.10.0) — risco alto demais pra peça que cuida de carteira/saldo
+  real sem uma bateria de testes antes. Validado depois do fix: syntax
+  check limpo, build do frontend limpo, backend testado rodando local
+  (modo offline E com Firebase real) sem erro nenhum. Faltou: commitar
+  e dar push (nada foi publicado ainda — e como node_modules do
+  backend é rastreado pelo git, ver entrada acima, o push é
+  obrigatório pra esse fix valer em produção, não só o
+  package-lock.json).
 
 
 ================================================================================
