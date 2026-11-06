@@ -1137,3 +1137,34 @@ button.config-item:hover { background: var(--cor-superficie-2); }
 @media (max-width: 380px) {
     .cart-total { font-size: 34px; }
 }
+
+/* Carteira: PIN, requisitos e bônus */
+.cart-form.sem-borda { padding: 0; border: 0; background: transparent; animation: none; }
+.cart-campo.com-ok { border-color: var(--cor-positivo); }
+.cart-nota.positivo { color: var(--cor-positivo-texto); }
+.cart-requisitos, .cart-regras { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.cart-requisitos li, .cart-regras li { display: flex; align-items: center; gap: 8px; font-size: var(--t-12); color: var(--cor-texto-3); }
+.cart-requisitos li.ok { color: var(--cor-positivo-texto); }
+.cart-regras li { font-size: var(--t-14); color: var(--cor-texto-2); }
+.cart-regras li .icone { flex-shrink: 0; }
+.cart-regras li.ok .icone { color: var(--cor-positivo-texto); }
+.cart-regras li.nao .icone { color: var(--cor-perigo-texto); }
+.cart-regras li.aviso .icone { color: var(--cor-destaque-texto); }
+.cart-forca .seg { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.cart-forca .seg i { height: 4px; border-radius: 2px; background: var(--cor-superficie-2); }
+.cart-forca span { display: block; margin-top: 4px; font-size: var(--t-12); font-weight: 600; }
+.cart-botoes { display: flex; gap: var(--s-2); margin-top: var(--s-2); }
+.cart-botoes .btn { flex: 1; min-height: 48px; }
+.cart-bonus { max-width: 400px; }
+.cart-bonus-valor {
+    display: flex; flex-direction: column; align-items: center; gap: 2px; margin: var(--s-2) 0; padding: var(--s-4);
+    border-radius: var(--r-painel); border: 1px dashed var(--cor-destaque-linha); background: var(--cor-destaque-suave);
+}
+.cart-bonus-valor b { font-size: var(--t-40); font-weight: 800; line-height: 1; color: var(--cor-destaque-texto); }
+.cart-bonus-valor span { font-size: var(--t-14); color: var(--cor-texto-2); }
+.cart-bonus .cart-vazio { padding: var(--s-4) 0; }
+.cart-badge-bonus { display: flex; flex-direction: column; gap: 6px; }
+.cart-badge-bonus .linha { display: flex; justify-content: space-between; font-size: var(--t-14); color: var(--cor-texto-2); }
+.cart-badge-bonus .barra { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--cor-superficie-2); }
+.cart-badge-bonus .barra .real { background: var(--cor-positivo); }
+.cart-badge-bonus .barra .bonus { background: var(--cor-destaque); }

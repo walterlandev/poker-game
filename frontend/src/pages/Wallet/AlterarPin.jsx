@@ -21,6 +21,7 @@
 ================================================================ */
 
 import { useState, useCallback } from 'react';
+import Icone from '../../components/Icone';
 
 
 // ================================================================
@@ -46,7 +47,7 @@ function forcaPin(pin) {
 
     const niveis = [
         { label: 'Muito fraco', cor: 'var(--cor-perigo-texto)' },
-        { label: 'Fraco',       cor: '#F97316' },
+        { label: 'Fraco',       cor: 'var(--cor-perigo-rotulo)' },
         { label: 'Razoável',    cor: 'var(--cor-destaque-texto)' },
         { label: 'Forte',       cor: 'var(--cor-positivo-texto)' },
         { label: 'Muito forte', cor: 'var(--cor-destaque)' },
@@ -145,352 +146,108 @@ export default function AlterarPin({ usuario, socket, onConcluido, onCancelar })
     // ================================================================
     if (concluido) {
         return (
-            <div style={estilos.container}>
-                <div style={estilos.sucessoBox}>
-                    <span style={{ fontSize: '40px' }}>✅</span>
-                    <p style={estilos.sucessoTitulo}>PIN alterado!</p>
-                    <p style={estilos.sucessoSub}>Seu novo PIN já está ativo.</p>
-                </div>
+            <div className="cart-vazio" role="status">
+                <span className="cart-pin-icone" aria-hidden="true"><Icone nome="check" tamanho={22} /></span>
+                <p className="titulo">PIN alterado</p>
+                <p className="sub">Seu novo PIN já está ativo.</p>
             </div>
         );
     }
 
+    const requisitos = [
+        { texto: 'Mínimo 6 caracteres',      ok: pinNovo.length >= 6 },
+        { texto: '1 letra maiúscula (A-Z)',  ok: /[A-Z]/.test(pinNovo) },
+        { texto: '1 número (0-9)',           ok: /[0-9]/.test(pinNovo) },
+        { texto: '1 símbolo (!@#$%^&*)',     ok: /[^A-Za-z0-9]/.test(pinNovo) },
+    ];
+    const pontosForca = pontosPin(pinNovo);
+    const podeSalvar  = pinAtual && novoValido && pinsBatem && !salvando;
 
-    // ================================================================
-    // RENDERIZAÇÃO PRINCIPAL
-    // ================================================================
     return (
-        <div style={estilos.container}>
+        <div className="cart-form sem-borda">
+            <p className="cart-nota">O PIN protege depósitos, saques e envios da sua carteira ₿C.</p>
 
-            {/* ---- Cabeçalho ---- */}
-            <div style={estilos.cabecalho}>
-                <p style={estilos.titulo}>🔐 Alterar PIN de segurança</p>
-                <p style={estilos.subtitulo}>
-                    O PIN protege saques e transferências da sua carteira ₿C.
-                </p>
-            </div>
+            <CampoPin
+                id="pin-atual" rotulo="PIN atual" valor={pinAtual} ver={verAtual} setVer={setVerAtual}
+                onChange={v => { setPinAtual(v); setErroAtual(''); }} erro={erroAtual}
+                desabilitado={salvando} autoComplete="current-password" placeholder="Seu PIN atual…"
+            />
 
-            {/* ---- PIN atual ---- */}
-            <div style={estilos.campo}>
-                <label style={estilos.label}>PIN atual</label>
-                <div style={estilos.inputContainer}>
-                    <input
-                        type={verAtual ? 'text' : 'password'}
-                        placeholder="Seu PIN atual"
-                        value={pinAtual}
-                        onChange={e => { setPinAtual(e.target.value); setErroAtual(''); }}
-                        disabled={salvando}
-                        style={{
-                            ...estilos.input,
-                            borderColor: erroAtual
-                                ? 'var(--cor-perigo-linha)'
-                                : 'var(--cor-linha)',
-                        }}
-                        autoComplete="current-password"
-                    />
-                    <button type="button" onClick={() => setVerAtual(v => !v)} style={estilos.btnOlho} tabIndex={-1}>
-                        {verAtual ? '🙈' : '👁️'}
-                    </button>
-                </div>
-                {erroAtual && <p style={estilos.erroTexto}>{erroAtual}</p>}
-            </div>
-
-            <div style={estilos.divisor} />
-
-            {/* ---- Novo PIN ---- */}
-            <div style={estilos.campo}>
-                <label style={estilos.label}>Novo PIN</label>
-
-                {/* Requisitos */}
-                <div style={estilos.requisitos}>
-                    {[
-                        { texto: 'Mínimo 6 caracteres',     ok: pinNovo.length >= 6 },
-                        { texto: '1 letra maiúscula (A-Z)', ok: /[A-Z]/.test(pinNovo) },
-                        { texto: '1 número (0-9)',           ok: /[0-9]/.test(pinNovo) },
-                        { texto: '1 símbolo (!@#$%^&*)',     ok: /[^A-Za-z0-9]/.test(pinNovo) },
-                    ].map((req, i) => (
-                        <span key={i} style={{
-                            fontSize:  '11px',
-                            color:     req.ok ? 'var(--cor-positivo-texto)' : 'var(--cor-texto-3)',
-                            marginRight: '10px',
-                        }}>
-                            {req.ok ? '✓' : '○'} {req.texto}
-                        </span>
-                    ))}
-                </div>
-
-                <div style={estilos.inputContainer}>
-                    <input
-                        type={verNovo ? 'text' : 'password'}
-                        placeholder="Novo PIN seguro"
-                        value={pinNovo}
-                        onChange={e => { setPinNovo(e.target.value); setErrosNovo([]); }}
-                        disabled={salvando}
-                        style={{
-                            ...estilos.input,
-                            borderColor: errosNovo.length > 0
-                                ? 'var(--cor-perigo-linha)'
-                                : novoValido && pinNovo.length > 0
-                                    ? 'var(--cor-positivo)'
-                                    : 'var(--cor-linha)',
-                        }}
-                        autoComplete="new-password"
-                    />
-                    <button type="button" onClick={() => setVerNovo(v => !v)} style={estilos.btnOlho} tabIndex={-1}>
-                        {verNovo ? '🙈' : '👁️'}
-                    </button>
-                </div>
-
-                {/* Barra de força */}
-                {pinNovo.length > 0 && forca && (
-                    <div style={{ marginTop: '4px' }}>
-                        <div style={estilos.forcaContainer}>
-                            {[0,1,2,3,4].map(i => (
-                                <div key={i} style={{
-                                    ...estilos.forcaSegmento,
-                                    background: i < [0,1,2,3,4].filter(() => {
-                                        let p = 0;
-                                        if (pinNovo.length >= 6)          p++;
-                                        if (pinNovo.length >= 10)         p++;
-                                        if (/[A-Z]/.test(pinNovo))        p++;
-                                        if (/[0-9]/.test(pinNovo))        p++;
-                                        if (/[^A-Za-z0-9]/.test(pinNovo)) p++;
-                                        return i < p;
-                                    }).length ? forca.cor : 'var(--cor-linha)',
-                                }} />
-                            ))}
-                        </div>
-                        <span style={{ fontSize: '10px', color: forca.cor, display: 'block', marginTop: '2px' }}>
-                            {forca.label}
-                        </span>
+            <CampoPin
+                id="pin-novo" rotulo="Novo PIN" valor={pinNovo} ver={verNovo} setVer={setVerNovo}
+                onChange={v => { setPinNovo(v); setErrosNovo([]); }} erro={errosNovo.length > 0 ? errosNovo.join(', ') + '.' : ''}
+                ok={novoValido && pinNovo.length > 0}
+                desabilitado={salvando} autoComplete="new-password" placeholder="Novo PIN seguro…"
+            />
+            <ul className="cart-requisitos">
+                {requisitos.map(r => (
+                    <li key={r.texto} className={r.ok ? 'ok' : ''}>
+                        <Icone nome={r.ok ? 'check' : 'info'} tamanho={14} />{r.texto}
+                    </li>
+                ))}
+            </ul>
+            {pinNovo.length > 0 && forca && (
+                <div className="cart-forca" aria-label={`Força do PIN: ${forca.label}`}>
+                    <div className="seg">
+                        {[0, 1, 2, 3, 4].map(i => <i key={i} style={i < pontosForca ? { background: forca.cor } : undefined} />)}
                     </div>
-                )}
-            </div>
-
-            {/* ---- Confirmar novo PIN ---- */}
-            <div style={estilos.campo}>
-                <label style={estilos.label}>Confirmar novo PIN</label>
-                <div style={estilos.inputContainer}>
-                    <input
-                        type={verConfirmar ? 'text' : 'password'}
-                        placeholder="Repita o novo PIN"
-                        value={confirmar}
-                        onChange={e => { setConfirmar(e.target.value); setErroConfirm(''); }}
-                        disabled={salvando}
-                        style={{
-                            ...estilos.input,
-                            borderColor: erroConfirm
-                                ? 'var(--cor-perigo-linha)'
-                                : pinsBatem
-                                    ? 'var(--cor-positivo)'
-                                    : 'var(--cor-linha)',
-                        }}
-                        autoComplete="new-password"
-                    />
-                    <button type="button" onClick={() => setVerConfirmar(v => !v)} style={estilos.btnOlho} tabIndex={-1}>
-                        {verConfirmar ? '🙈' : '👁️'}
-                    </button>
+                    <span style={{ color: forca.cor }}>{forca.label}</span>
                 </div>
-                {erroConfirm && <p style={estilos.erroTexto}>{erroConfirm}</p>}
-                {pinsBatem && <p style={{ fontSize: '11px', color: 'var(--cor-positivo-texto)', margin: '2px 0 0' }}>✓ PINs conferem</p>}
-            </div>
-
-            {/* ---- Erro geral ---- */}
-            {erroGeral && (
-                <div style={estilos.erroGeral}>{erroGeral}</div>
             )}
 
-            {/* ---- Botões ---- */}
-            <div style={estilos.botoes}>
-                <button onClick={onCancelar} style={estilos.btnCancelar} disabled={salvando}>
+            <CampoPin
+                id="pin-confirmar" rotulo="Confirmar novo PIN" valor={confirmar} ver={verConfirmar} setVer={setVerConfirmar}
+                onChange={v => { setConfirmar(v); setErroConfirm(''); }} erro={erroConfirm} ok={pinsBatem}
+                desabilitado={salvando} autoComplete="new-password" placeholder="Repita o novo PIN…"
+            />
+            {pinsBatem && <p className="cart-nota positivo">Os PINs conferem.</p>}
+
+            {erroGeral && <p className="cart-erro" role="alert">{erroGeral}</p>}
+
+            <div className="cart-botoes">
+                <button type="button" onClick={onCancelar} className="btn btn-neutro" disabled={salvando}>
                     Cancelar
                 </button>
-                <button
-                    onClick={handleSalvar}
-                    disabled={!pinAtual || !novoValido || !pinsBatem || salvando}
-                    style={{
-                        ...estilos.btnSalvar,
-                        opacity: pinAtual && novoValido && pinsBatem && !salvando ? 1 : 0.4,
-                        cursor:  pinAtual && novoValido && pinsBatem && !salvando ? 'pointer' : 'not-allowed',
-                    }}
-                >
-                    {salvando ? 'Salvando...' : '🔐 Salvar novo PIN'}
+                <button type="button" onClick={handleSalvar} disabled={!podeSalvar} aria-busy={salvando || undefined} className="btn btn-principal">
+                    {salvando ? 'Salvando…' : 'Salvar novo PIN'}
                 </button>
             </div>
-
         </div>
     );
 }
 
+// Mesmos critérios de forcaPin, só para desenhar os segmentos
+function pontosPin(pin) {
+    let p = 0;
+    if (pin.length >= 6)          p++;
+    if (pin.length >= 10)         p++;
+    if (/[A-Z]/.test(pin))        p++;
+    if (/[0-9]/.test(pin))        p++;
+    if (/[^A-Za-z0-9]/.test(pin)) p++;
+    return p;
+}
 
-// ================================================================
-// ESTILOS
-// ================================================================
-
-const estilos = {
-
-    container: {
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '14px',
-        padding:       '4px 0',
-    },
-
-    cabecalho: {
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '4px',
-    },
-
-    titulo: {
-        fontSize:   '16px',
-        fontWeight: '700',
-        color:      'var(--cor-texto)',
-        margin:     0,
-    },
-
-    subtitulo: {
-        fontSize:   '12px',
-        color:      'var(--cor-texto-3)',
-        margin:     0,
-        lineHeight: 1.5,
-    },
-
-    divisor: {
-        height:     '1px',
-        background: 'var(--cor-superficie)',
-    },
-
-    campo: {
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '6px',
-    },
-
-    label: {
-        fontSize:      '11px',
-        fontWeight:    '500',
-        color:         'var(--cor-texto-3)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-    },
-
-    requisitos: {
-        display:   'flex',
-        flexWrap:  'wrap',
-        gap:       '4px',
-        padding:   '8px',
-        background:'var(--cor-superficie)',
-        borderRadius: '6px',
-    },
-
-    inputContainer: { position: 'relative' },
-
-    input: {
-        width:        '100%',
-        padding:      '11px 40px 11px 12px',
-        background:   'var(--cor-superficie)',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '8px',
-        color:        'var(--cor-texto)',
-        fontSize:     '14px',
-        outline:      'none',
-        boxSizing:    'border-box',
-        transition:   'border-color 0.2s',
-        fontFamily:   'inherit',
-    },
-
-    btnOlho: {
-        position:   'absolute',
-        right:      '10px',
-        top:        '50%',
-        transform:  'translateY(-50%)',
-        background: 'none',
-        border:     'none',
-        cursor:     'pointer',
-        fontSize:   '15px',
-        padding:    '4px',
-        lineHeight: 1,
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    erroTexto: {
-        fontSize: '11px',
-        color:    'var(--cor-perigo-texto)',
-        margin:   0,
-    },
-
-    forcaContainer: {
-        display: 'flex',
-        gap:     '3px',
-    },
-
-    forcaSegmento: {
-        flex:         1,
-        height:       '3px',
-        borderRadius: '2px',
-        transition:   'background 0.3s',
-    },
-
-    erroGeral: {
-        padding:      '10px 12px',
-        background:   'var(--cor-perigo-suave)',
-        border:       '1px solid var(--cor-perigo-linha)',
-        borderRadius: '8px',
-        fontSize:     '13px',
-        color:        'var(--cor-perigo-texto)',
-    },
-
-    botoes: {
-        display: 'flex',
-        gap:     '10px',
-    },
-
-    btnCancelar: {
-        flex:         1,
-        padding:      '12px',
-        background:   'transparent',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '10px',
-        color:        'var(--cor-texto-3)',
-        fontSize:     '13px',
-        cursor:       'pointer',
-        fontFamily:   'inherit',
-    },
-
-    btnSalvar: {
-        flex:         2,
-        padding:      '12px',
-        background:   'var(--cor-destaque)',
-        border:       'none',
-        borderRadius: '10px',
-        color:        'var(--cor-texto-inverso)',
-        fontSize:     '14px',
-        fontWeight:   '600',
-        transition:   'opacity 0.2s',
-        fontFamily:   'inherit',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    sucessoBox: {
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'center',
-        gap:            '10px',
-        padding:        '30px 20px',
-        textAlign:      'center',
-    },
-
-    sucessoTitulo: {
-        fontSize:   '20px',
-        fontWeight: '800',
-        color:      'var(--cor-positivo-texto)',
-        margin:     0,
-    },
-
-    sucessoSub: {
-        fontSize: '13px',
-        color:    'var(--cor-texto-3)',
-        margin:   0,
-    },
-};
+function CampoPin({ id, rotulo, valor, ver, setVer, onChange, erro, ok, desabilitado, autoComplete, placeholder }) {
+    return (
+        <>
+            <label className="cart-campo-rot" htmlFor={id}>{rotulo}</label>
+            <div className={`cart-campo${erro ? ' com-erro' : ok ? ' com-ok' : ''}`}>
+                <input
+                    id={id}
+                    type={ver ? 'text' : 'password'}
+                    placeholder={placeholder}
+                    value={valor}
+                    onChange={e => onChange(e.target.value)}
+                    disabled={desabilitado}
+                    autoComplete={autoComplete}
+                    aria-invalid={!!erro}
+                    aria-describedby={erro ? `${id}-erro` : undefined}
+                />
+                <button type="button" onClick={() => setVer(v => !v)} className="cart-campo-acao" aria-label={ver ? 'Ocultar PIN' : 'Mostrar PIN'} aria-pressed={ver}>
+                    <Icone nome="olho" tamanho={18} />
+                </button>
+            </div>
+            {erro && <p id={`${id}-erro`} className="cart-erro" role="alert">{erro}</p>}
+        </>
+    );
+}
