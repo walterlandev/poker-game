@@ -459,6 +459,15 @@ export class GameManager {
                 j.status = 'sitout';
                 j.cartas = [];
             }
+            // Quem fica de fora também zera as apostas: _calcularPotes soma
+            // apostaTotal de TODOS em mesa.jogadores, e o valor velho de quem
+            // quebrou na mão anterior inflava as faixas de side pot desta
+            // mão (o ajuste de "diferença" jogava o excesso, negativo, no
+            // último pote — dava até prêmio negativo / saldo negativo).
+            if (j && j.saldo <= 0) {
+                j.apostaRodada = 0;
+                j.apostaTotal  = 0;
+            }
         });
 
         // Mesa de torneio que ficou com um só jogador com fichas (os outros

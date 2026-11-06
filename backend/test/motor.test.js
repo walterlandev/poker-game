@@ -199,6 +199,39 @@ test('fichas de quem deu fold e SAIU da mesa continuam no pote principal certo',
     assert.equal(mesa.jogadores.h2.saldo, 1000 - 100 - 300 + 600);
 });
 
+test('aposta de uma mão anterior de quem quebrou não entra nos side pots da mão seguinte', (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { gm, mesaId, mesa } = montarMesa([1000, 100, 300, 1000]);
+    // Mão 1: h2 (BB) paga all-in de 300 e perde → fica sem fichas
+    gm.iniciarRodada(mesaId);
+    definirCartas(mesa, { h0: ['9♣', '8♣'], h1: ['6♦', '5♦'], h2: ['7♠', '2♦'], h3: ['A♠', 'A♦'] },
+                  ['3♣', '8♦', 'J♥', 'Q♠', '4♣']);
+    agir(gm, mesaId, 'h3', 'RAISE', 300);
+    agir(gm, mesaId, 'h0', 'FOLD');
+    agir(gm, mesaId, 'h1', 'FOLD');
+    agir(gm, mesaId, 'h2', 'CALL');
+    avancar(t, 1500 * 4);
+    assert.equal(mesa.jogadores.h2.saldo, 0);
+    // Mão 2 (h2 fica de fora): dealer h1, SB h3, BB h0, h1 age primeiro
+    avancar(t, 8000);
+    assert.equal(mesa.fase, 'PRE-FLOP');
+    assert.equal(mesa.turno, 'h1');
+    definirCartas(mesa, { h0: ['Q♣', 'Q♦'], h1: ['A♣', 'A♥'], h3: ['K♣', 'K♥'] },
+                  ['2♣', '7♦', '9♥', '3♠', '4♦']);
+    const totalAntes = totalFichas(mesa);
+    const h3Antes = mesa.jogadores.h3.saldo + mesa.jogadores.h3.apostaRodada;
+    agir(gm, mesaId, 'h1', 'RAISE', 90);           // all-in (90)
+    agir(gm, mesaId, 'h3', 'CALL');
+    agir(gm, mesaId, 'h0', 'CALL');
+    agir(gm, mesaId, 'h3', 'RAISE', 200);
+    agir(gm, mesaId, 'h0', 'CALL');
+    for (let i = 0; i < 4; i++) agir(gm, mesaId, mesa.turno, 'CHECK');
+    assert.equal(mesa.fase, 'SHOWDOWN');
+    assert.equal(totalFichas(mesa), totalAntes);
+    assert.equal(mesa.jogadores.h1.saldo, 270);                    // pote principal 3 × 90
+    assert.equal(mesa.jogadores.h3.saldo, h3Antes - 290 + 400);    // side pot 2 × 200
+});
+
 test('iniciarRodada com mão em andamento não apaga o pote', (t) => {
     t.mock.timers.enable(TIMERS);
     const { gm, mesaId, mesa } = montarMesa([1000, 1000, 1000]);
