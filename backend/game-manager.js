@@ -848,6 +848,13 @@ export class GameManager {
             const uid = ordem[index];
             const j   = mesa.jogadores[uid];
 
+            // Sem aposta na mesa: a volta fecha ao passar pelo ASSENTO de
+            // quem abriu a rodada, mesmo que ele tenha dado fold (ou esteja
+            // all-in) — antes essa checagem vinha depois do "pula fold", e
+            // um fold de quem abriu a rodada (com check disponível) deixava
+            // a rodada de checks girando para sempre.
+            if (targetAp === 0 && uid === aggressor) return null;  // volta completa
+
             if (!j) continue;
             if (!j.cartas || j.cartas.length === 0) continue;
             if (j.status === 'fold' || j.status === 'sitout' || j.status === 'all-in') continue;
@@ -855,10 +862,7 @@ export class GameManager {
             const ap = j.apostaRodada || 0;
 
             // Sem aposta na mesa → todos checam, aguarda primeira volta
-            if (targetAp === 0) {
-                if (uid === aggressor) return null;  // volta completa
-                return uid;
-            }
+            if (targetAp === 0) return uid;
 
             // Jogador ainda não igualou → precisa agir
             if (ap < targetAp) return uid;
