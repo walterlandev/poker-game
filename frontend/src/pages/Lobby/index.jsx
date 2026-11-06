@@ -80,7 +80,7 @@ const INTERVALO_RANKING = 60000;
 export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, conviteMesa }) {
 
     const [tabAtiva,      setTabAtiva     ] = useState(() =>
-        conviteTorneio ? TABS.CAMPEONATO : conviteMesa ? TABS.MESAS : TABS.CARTEIRA
+        conviteTorneio ? TABS.CAMPEONATO : TABS.MESAS
     );
     const [filtroMesas,   setFiltroMesas  ] = useState(FILTRO_MESAS.PUBLICAS);
     const [mesasPublicas, setMesasPublicas] = useState([]);
