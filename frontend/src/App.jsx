@@ -8,7 +8,7 @@
    → Passa setUsuario para Lobby para atualizações locais
 ================================================================ */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { onAuthStateChanged }               from 'firebase/auth';
 import { doc, getDoc }                      from 'firebase/firestore';
 import { io }                               from 'socket.io-client';
@@ -54,33 +54,47 @@ export default function App() {
     // ----------------------------------------------------------------
     // Conecta o socket e autentica no servidor
     // ----------------------------------------------------------------
-    const conectarSocket = useCallback((perfil) => {
-        if (socket.connected) return;
-        socket.connect();
-        // .on (não .once): precisa reautenticar em TODA reconexão, não só
-        // na primeira. Depois de uma queda de WebSocket o Socket.io
-        // reconecta sozinho, mas o servidor vê isso como uma conexão nova
-        // (perde socket.data e a sala da mesa) — sem reautenticar de novo
-        // aqui, o jogador virava "fantasma": parava de receber atualização
-        // de estado e os cliques de ação (fold/call/raise) não faziam nada.
-        socket.on('connect', async () => {
-            // Avatar base64 pode ter centenas de KB — enviamos apenas URLs
-            const avatarSocket = perfil.avatar?.startsWith('data:') ? '' : (perfil.avatar || '');
-            // idToken: prova real de identidade, verificada no servidor
-            // (admin.auth().verifyIdToken). O uid sozinho não basta — é
-            // público (aparece pra outros jogadores na mesma mesa), então
-            // sem o token qualquer um podia se autenticar como outra pessoa.
-            const idToken = await auth.currentUser?.getIdToken();
-            socket.emit('autenticar', {
-                uid:    perfil.uid,
-                nome:   perfil.nome,
-                avatar: avatarSocket,
-                idToken,
-            });
+    const perfilSocket = useRef(null);
+    const handlersOk   = useRef(false);
+
+    const autenticarSocket = useCallback(async () => {
+        const perfil = perfilSocket.current;
+        if (!perfil) return;
+        // Avatar base64 pode ter centenas de KB — enviamos apenas URLs
+        const avatarSocket = perfil.avatar?.startsWith('data:') ? '' : (perfil.avatar || '');
+        // idToken: prova real de identidade, verificada no servidor
+        // (admin.auth().verifyIdToken). O uid sozinho não basta — é
+        // público (aparece pra outros jogadores na mesma mesa), então
+        // sem o token qualquer um podia se autenticar como outra pessoa.
+        const idToken = await auth.currentUser?.getIdToken();
+        socket.emit('autenticar', {
+            uid:    perfil.uid,
+            nome:   perfil.nome,
+            avatar: avatarSocket,
+            idToken,
         });
-        socket.on('disconnect', (m) => console.warn('Desconectado:', m));
-        socket.on('erro',       ({ mensagem }) => console.error('Erro servidor:', mensagem));
     }, []);
+
+    const conectarSocket = useCallback((perfil) => {
+        perfilSocket.current = perfil;
+        // Listeners registrados UMA vez só (antes eram empilhados a cada
+        // chamada, e nunca registrados se o socket já estivesse conectado —
+        // o que acontece quando o CriarPin conecta o socket durante o cadastro).
+        if (!handlersOk.current) {
+            handlersOk.current = true;
+            // .on (não .once): precisa reautenticar em TODA reconexão, não só
+            // na primeira. Depois de uma queda de WebSocket o Socket.io
+            // reconecta sozinho, mas o servidor vê isso como uma conexão nova
+            // (perde socket.data e a sala da mesa) — sem reautenticar de novo
+            // aqui, o jogador virava "fantasma": parava de receber atualização
+            // de estado e os cliques de ação (fold/call/raise) não faziam nada.
+            socket.on('connect',    autenticarSocket);
+            socket.on('disconnect', (m) => console.warn('Desconectado:', m));
+            socket.on('erro',       ({ mensagem }) => console.error('Erro servidor:', mensagem));
+        }
+        if (socket.connected) autenticarSocket();
+        else socket.connect();
+    }, [autenticarSocket]);
 
     // ----------------------------------------------------------------
     // Monitora sessão Firebase e carrega perfil do Firestore
@@ -215,7 +229,10 @@ export default function App() {
     // Handlers de navegação
     // ----------------------------------------------------------------
     const handleAutenticado = useCallback((perfil) => {
-        setUsuario(perfil);
+        // Perfis vindos do Login/Cadastro são dados crus do Firestore: sem
+        // o campo temPin. Normaliza (nunca guarda o hash em si no estado).
+        const { pinHash, ...resto } = perfil;
+        setUsuario({ ...resto, temPin: perfil.temPin ?? !!pinHash });
         conectarSocket(perfil);
         setTela(TELAS.LOBBY);
     }, [conectarSocket]);
@@ -307,6 +324,18 @@ export default function App() {
                 usuario={usuario}
                 mesaId={mesaAtual}
                 onSair={handleSairMesa}
+            />
+        );
+    }
+
+    // Conta sem PIN (ex.: fechou/recarregou a página no meio do cadastro):
+    // não entra no Lobby até criar o PIN.
+    if (usuario && usuario.temPin === false) {
+        return (
+            <Auth
+                onAutenticado={handleAutenticado}
+                socket={socket}
+                usuarioSemPin={usuario}
             />
         );
     }

@@ -30,13 +30,13 @@ import Cadastro from './Cadastro';
 import CriarPin from './CriarPin';
 
 
-export default function Auth({ onAutenticado, socket }) {
+export default function Auth({ onAutenticado, socket, usuarioSemPin = null }) {
 
     // Controla qual tela mostrar: 'login' | 'cadastro' | 'criarPin'
-    const [tela, setTela] = useState('login');
+    const [tela, setTela] = useState(usuarioSemPin ? 'criarPin' : 'login');
 
     // Guarda o usuário recém-cadastrado enquanto cria o PIN
-    const [usuarioPendente, setUsuarioPendente] = useState(null);
+    const [usuarioPendente, setUsuarioPendente] = useState(usuarioSemPin);
 
 
     // ----------------------------------------------------------------
@@ -54,7 +54,7 @@ export default function Auth({ onAutenticado, socket }) {
     // Agora sim o jogador entra no Lobby.
     // ----------------------------------------------------------------
     function handlePinCriado() {
-        onAutenticado(usuarioPendente);
+        onAutenticado({ ...usuarioPendente, temPin: true });
         setUsuarioPendente(null);
     }
 

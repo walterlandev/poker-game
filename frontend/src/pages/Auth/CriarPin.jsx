@@ -30,7 +30,72 @@
      onConcluido → fn(): chamada após PIN criado com sucesso
 ================================================================ */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { auth } from '../../services/firebase-config';
+
+const TIMEOUT_SOCKET_MS = 10000;
+const TIMEOUT_PIN_MS    = 15000;
+
+
+// ================================================================
+// Garante que o socket está conectado E autenticado no servidor.
+// O servidor ignora 'wallet:criar_pin' em silêncio se o socket ainda
+// não passou por 'autenticar' — por isso não dá pra confiar que o
+// App.jsx já fez isso (durante o cadastro ele só conecta no fim).
+// Rejeita com Error se não conseguir dentro do prazo.
+// ================================================================
+function garantirSocketAutenticado(socket, usuario) {
+    return new Promise((resolve, reject) => {
+        let finalizado = false;
+        let timer = null;
+
+        function limpar() {
+            clearTimeout(timer);
+            socket.off('connect',     aoConectar);
+            socket.off('autenticado', aoAutenticar);
+            socket.off('erro',        aoErro);
+        }
+        function terminar(err) {
+            if (finalizado) return;
+            finalizado = true;
+            limpar();
+            if (err) reject(err); else resolve();
+        }
+
+        async function enviarAutenticar() {
+            try {
+                const idToken = await auth.currentUser?.getIdToken();
+                const avatar  = usuario?.avatar?.startsWith('data:') ? '' : (usuario?.avatar || '');
+                socket.emit('autenticar', {
+                    uid:  usuario?.uid,
+                    nome: usuario?.nome,
+                    avatar,
+                    idToken,
+                });
+            } catch {
+                terminar(new Error('Não foi possível validar sua sessão. Tente novamente.'));
+            }
+        }
+
+        function aoConectar()   { enviarAutenticar(); }
+        function aoAutenticar() { terminar(null); }
+        function aoErro(e)      { terminar(new Error(e?.mensagem || 'Falha ao autenticar.')); }
+
+        socket.on('autenticado', aoAutenticar);
+        socket.on('erro',        aoErro);
+        timer = setTimeout(
+            () => terminar(new Error('Sem resposta do servidor. Verifique sua conexão e tente novamente.')),
+            TIMEOUT_SOCKET_MS
+        );
+
+        if (socket.connected) {
+            enviarAutenticar();
+        } else {
+            socket.on('connect', aoConectar);
+            socket.connect();
+        }
+    });
+}
 
 
 // ================================================================
@@ -88,6 +153,12 @@ export default function CriarPin({ usuario, socket, onConcluido }) {
     const [salvando,    setSalvando   ] = useState(false);
     const [concluido,   setConcluido  ] = useState(false);
 
+    const montado = useRef(true);
+    useEffect(() => {
+        montado.current = true;
+        return () => { montado.current = false; };
+    }, []);
+
     const forca      = pin.length > 0 ? forcaPin(pin) : null;
     const errosPin   = validarPin(pin);
     const pinValido  = errosPin.length === 0;
@@ -134,23 +205,47 @@ export default function CriarPin({ usuario, socket, onConcluido }) {
         setSalvando(true);
         setErroGeral('');
 
-        // Emite ao backend — o backend faz o hash com bcrypt
-        socket.emit('wallet:criar_pin', {
-            uid: usuario?.uid,
-            pin,
-        });
+        try {
+            await garantirSocketAutenticado(socket, usuario);
+        } catch (e) {
+            if (!montado.current) return;
+            setSalvando(false);
+            setErroGeral(e.message);
+            return;
+        }
 
-        socket.once('wallet:pin_criado', () => {
+        // Aguarda a resposta com prazo — nunca fica em "Salvando..." para sempre
+        let timer = null;
+        function limpar() {
+            clearTimeout(timer);
+            socket.off('wallet:pin_criado', aoCriar);
+            socket.off('wallet:pin_erro',   aoErro);
+        }
+        function aoCriar() {
+            limpar();
+            if (!montado.current) return;
             setSalvando(false);
             setConcluido(true);
             // Aguarda 1.5s para mostrar o sucesso antes de avançar
             setTimeout(() => onConcluido(), 1500);
-        });
-
-        socket.once('wallet:pin_erro', (err) => {
+        }
+        function aoErro(err) {
+            limpar();
+            if (!montado.current) return;
             setSalvando(false);
             setErroGeral(err?.mensagem || 'Erro ao salvar PIN. Tente novamente.');
-        });
+        }
+        socket.on('wallet:pin_criado', aoCriar);
+        socket.on('wallet:pin_erro',   aoErro);
+        timer = setTimeout(() => {
+            limpar();
+            if (!montado.current) return;
+            setSalvando(false);
+            setErroGeral('O servidor não respondeu. Toque em "Criar PIN" para tentar de novo.');
+        }, TIMEOUT_PIN_MS);
+
+        // Emite ao backend — o backend faz o hash com bcrypt
+        socket.emit('wallet:criar_pin', { uid: usuario?.uid, pin });
 
     }, [pin, confirmar, socket, usuario, onConcluido]);
 
