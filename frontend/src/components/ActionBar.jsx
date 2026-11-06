@@ -24,7 +24,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 // ALLIN_NOS_ATALHOS: true → "All-in" aparece também na linha de atalhos
 //                    de aposta (leva o slider ao máximo); o botão All-in
 //                    de ação direta continua existindo.
-const ACAO_NO_CLIQUE    = false;
+const ACAO_NO_CLIQUE    = true;
 const ALLIN_NOS_ATALHOS = false;
 const EVENTO_ACAO       = ACAO_NO_CLIQUE ? 'onClick' : 'onPointerDown';
 
