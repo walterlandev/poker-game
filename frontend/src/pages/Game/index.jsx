@@ -17,6 +17,8 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
     const [notifGanho,   setNotifGanho  ] = useState(null);
     const [linkCopiado,  setLinkCopiado ] = useState(false);
     const [confirmarSaida, setConfirmarSaida] = useState(false);
+    const [recomprando,    setRecomprando   ] = useState(false);
+    const recomprandoRef = useRef(false);
 
     const timerRef   = useRef(null);
     const ganhoRef   = useRef(null);
@@ -86,7 +88,29 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
 
     const handleAcao    = useCallback((a, v=0) => socket?.emit('acao', { acao: a, valor: v }), [socket]);
     const handleIniciar = useCallback(()       => socket?.emit('iniciar_rodada'), [socket]);
-    const handleRebuy    = useCallback((valor) => socket?.emit('rebuy', { valor }), [socket]);
+    const handleRebuy    = useCallback((valor) => {
+        // Uma recompra por vez (o servidor também recusa operação duplicada)
+        if (recomprandoRef.current) return;
+        recomprandoRef.current = true;
+        setRecomprando(true);
+        socket?.emit('rebuy', { valor });
+    }, [socket]);
+
+    // Libera o botão quando o servidor responde (estado/saldo/erro) ou após 8 s
+    useEffect(() => {
+        if (!recomprando || !socket) return undefined;
+        const liberar = () => { recomprandoRef.current = false; setRecomprando(false); };
+        const t = setTimeout(liberar, 8000);
+        socket.once('estado_mesa', liberar);
+        socket.once('wallet:saldo_atualizado', liberar);
+        socket.once('erro', liberar);
+        return () => {
+            clearTimeout(t);
+            socket.off('estado_mesa', liberar);
+            socket.off('wallet:saldo_atualizado', liberar);
+            socket.off('erro', liberar);
+        };
+    }, [recomprando, socket]);
     const handleSair    = useCallback(()       => { socket?.emit('sair_mesa'); onSair?.(); }, [socket, onSair]);
 
     const handleCompartilhar = useCallback(() => {
@@ -212,7 +236,7 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
                             </p>
                             <div className="linha">
                                 {temSaldoParaRebuy && (
-                                    <button type="button" onClick={() => handleRebuy(buyInMesa)} className="btn btn-principal">
+                                    <button type="button" onClick={() => handleRebuy(buyInMesa)} className="btn btn-principal" disabled={recomprando} aria-busy={recomprando || undefined}>
                                         {treino ? `Recomprar ${fmt(buyInMesa)} fichas` : `Comprar ₿C ${buyInMesa.toLocaleString('pt-BR')}`}
                                     </button>
                                 )}

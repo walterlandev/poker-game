@@ -27,7 +27,7 @@ function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
-export default function ListaMesas({ mesas = [], carregando, privadas, onEntrar }) {
+export default function ListaMesas({ mesas = [], carregando, privadas, onEntrar, ocupado = false }) {
 
     if (carregando) {
         return (
@@ -59,7 +59,7 @@ export default function ListaMesas({ mesas = [], carregando, privadas, onEntrar 
                 <span>Blinds</span><span>Mesa</span><span>Buy-in</span><span>Lugares</span><span>Estado</span><span />
             </div>
             {mesas.map(mesa => (
-                <LinhaMesa key={mesa.id} mesa={mesa} privada={privadas} onEntrar={onEntrar} />
+                <LinhaMesa key={mesa.id} mesa={mesa} privada={privadas} onEntrar={onEntrar} ocupado={ocupado} />
             ))}
             <p className="lista-mesas-total">
                 {mesas.length} {mesas.length === 1 ? 'mesa disponível' : 'mesas disponíveis'}
@@ -68,7 +68,7 @@ export default function ListaMesas({ mesas = [], carregando, privadas, onEntrar 
     );
 }
 
-function LinhaMesa({ mesa, privada, onEntrar }) {
+function LinhaMesa({ mesa, privada, onEntrar, ocupado }) {
     const fase = infoFase(mesa.fase);
     // GET /mesas manda `jogadores` como CONTAGEM (número), não como objeto
     // — Object.keys(numero) sempre retorna [] (length 0), então o card
@@ -118,7 +118,8 @@ function LinhaMesa({ mesa, privada, onEntrar }) {
                     type="button"
                     className="btn btn-neutro"
                     onClick={() => onEntrar(mesa.id)}
-                    disabled={estaCheia}
+                    disabled={estaCheia || ocupado}
+                    aria-busy={ocupado || undefined}
                     aria-label={estaCheia ? `${nome}: mesa cheia` : `Entrar na mesa ${nome}`}
                 >
                     {estaCheia ? 'Cheia' : 'Entrar'}

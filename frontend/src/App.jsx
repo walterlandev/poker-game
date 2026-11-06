@@ -242,6 +242,19 @@ export default function App() {
         setTela(TELAS.JOGO);
     }, []);
 
+    // Torneio cancelado sem jogadores: mostra a mensagem e leva o jogador
+    // para a aba Torneio do lobby (de qualquer tela em que ele esteja).
+    const [avisoTorneio, setAvisoTorneio] = useState(null);
+    useEffect(() => {
+        const onCancelado = ({ mensagem } = {}) => {
+            setAvisoTorneio({ mensagem: mensagem || 'O torneio foi cancelado por falta de jogadores.', em: Date.now() });
+            setMesaAtual(null);
+            setTela(t => (t === TELAS.JOGO ? TELAS.LOBBY : t));
+        };
+        socket.on('torneio:cancelado_sem_jogadores', onCancelado);
+        return () => socket.off('torneio:cancelado_sem_jogadores', onCancelado);
+    }, []);
+
     const handleSairMesa = useCallback(() => {
         // Game já emite 'sair_mesa' internamente; aqui apenas limpa o estado local
         setMesaAtual(null);
@@ -348,6 +361,8 @@ export default function App() {
             onUsuarioAtualizado={setUsuario}
             conviteTorneio={conviteTorneio}
             conviteMesa={conviteMesa}
+            avisoTorneio={avisoTorneio}
+            onFecharAvisoTorneio={() => setAvisoTorneio(null)}
         />
     );
 }

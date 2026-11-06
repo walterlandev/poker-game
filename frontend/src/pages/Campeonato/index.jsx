@@ -17,6 +17,7 @@ export default function Campeonato({ usuario, socket, onEntrarMesa, conviteTorne
     const [torneioAtual, setTorneioAtual] = useState(null);
     const [modalCriar,   setModalCriar  ] = useState(false);
     const [carregando,   setCarregando  ] = useState(false);
+    const [rebuyEnviando, setRebuyEnviando] = useState(false);
     const [erro,         setErro        ] = useState(null);
     const [rebuyInfo,    setRebuyInfo   ] = useState(null);  // modal rebuy
 
@@ -46,7 +47,10 @@ export default function Campeonato({ usuario, socket, onEntrarMesa, conviteTorne
             if (dados.elegiveisUids?.includes(usuario?.uid)) setRebuyInfo(dados);
         };
 
-        const onRebuyConfirmado = () => setRebuyInfo(null);
+        const onRebuyConfirmado = () => { setRebuyInfo(null); setRebuyEnviando(false); };
+        // Torneio cancelado por falta de jogadores: volta para a lista de torneios
+        // (a mensagem é mostrada pelo App, em qualquer tela)
+        const onCancelado = () => { setTorneioAtual(null); setRebuyInfo(null); };
 
         const onCriado = ({ torneioId }) => {
             socket.emit('pedir_estado_torneio', { torneioId });
@@ -62,6 +66,7 @@ export default function Campeonato({ usuario, socket, onEntrarMesa, conviteTorne
         socket.on('torneio:rebuy_confirmado', onRebuyConfirmado);
         socket.on('torneio:criado',           onCriado);
         socket.on('torneio:entrou',           onEntrou);
+        socket.on('torneio:cancelado_sem_jogadores', onCancelado);
 
         socket.emit('listar_torneios');
 
@@ -73,6 +78,7 @@ export default function Campeonato({ usuario, socket, onEntrarMesa, conviteTorne
             socket.off('torneio:rebuy_confirmado', onRebuyConfirmado);
             socket.off('torneio:criado',           onCriado);
             socket.off('torneio:entrou',           onEntrou);
+            socket.off('torneio:cancelado_sem_jogadores', onCancelado);
         };
     }, [socket, usuario, onEntrarMesa]);
 
@@ -90,7 +96,7 @@ export default function Campeonato({ usuario, socket, onEntrarMesa, conviteTorne
     // Handlers
     // ----------------------------------------------------------------
     function handleEntrar(torneioId) {
-        if (!socket) return;
+        if (!socket || carregando) return;
         setErro(null);
         setCarregando(true);
         socket.emit('entrar_torneio', { torneioId });
@@ -107,7 +113,9 @@ export default function Campeonato({ usuario, socket, onEntrarMesa, conviteTorne
     }
 
     function handleRebuy() {
-        if (!rebuyInfo || !socket) return;
+        if (!rebuyInfo || !socket || rebuyEnviando) return;
+        setRebuyEnviando(true);
+        setTimeout(() => setRebuyEnviando(false), 8000);
         socket.emit('torneio_rebuy', { torneioId: rebuyInfo.torneioId });
     }
 

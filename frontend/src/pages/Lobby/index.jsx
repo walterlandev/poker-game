@@ -24,7 +24,7 @@
      onEntrarMesa → função chamada quando entra em uma mesa
 ================================================================ */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getAuth, signOut }                 from 'firebase/auth';
 
 import Header              from './Header';
@@ -77,10 +77,10 @@ const INTERVALO_RANKING = 60000;
 // BLOCO 2: COMPONENTE PRINCIPAL
 // ================================================================
 
-export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, conviteMesa }) {
+export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, conviteMesa, avisoTorneio = null, onFecharAvisoTorneio }) {
 
     const [tabAtiva,      setTabAtiva     ] = useState(() =>
-        conviteTorneio ? TABS.CAMPEONATO : TABS.MESAS
+        conviteTorneio || avisoTorneio ? TABS.CAMPEONATO : TABS.MESAS
     );
     const [filtroMesas,   setFiltroMesas  ] = useState(FILTRO_MESAS.PUBLICAS);
     const [mesasPublicas, setMesasPublicas] = useState([]);
@@ -96,6 +96,7 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
     const [backendOnline, setBackendOnline] = useState(true);
     const [erroEntrada,   setErroEntrada  ] = useState(null);
     const [entrando,      setEntrando     ] = useState(false);
+    const entrandoRef = useRef(false);
 
     // Controla o modal de boas-vindas:
     // Abre automaticamente se o jogador ainda não resgatou o bônus
@@ -189,6 +190,9 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
     // Handlers de mesa
     // ----------------------------------------------------------------
     function _emitirEntrarMesa(mesaId, senha) {
+        // Uma operação por vez: evita duplo clique (o servidor também recusa)
+        if (entrandoRef.current) return;
+        entrandoRef.current = true;
         setEntrando(true);
         setErroEntrada(null);
 
@@ -203,7 +207,10 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
             cleanup();
             setErroEntrada(mensagem);
         }
+        let resolvido = false;
         function cleanup() {
+            resolvido = true;
+            entrandoRef.current = false;
             setEntrando(false);
             socket.off('entrou_mesa', onEntrou);
             socket.off('erro',        onErro);
@@ -214,6 +221,7 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
 
         // Timeout de segurança: 8 s
         setTimeout(() => {
+            if (resolvido) return;
             cleanup();
             setErroEntrada('Tempo esgotado. Tente novamente.');
         }, 8000);
@@ -298,6 +306,13 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
                         </div>
                     )}
 
+                    {avisoTorneio && (
+                        <button type="button" className="aviso-inline info" role="status" onClick={onFecharAvisoTorneio}>
+                            <span>{avisoTorneio.mensagem}</span>
+                            <Icone nome="fechar" tamanho={16} />
+                        </button>
+                    )}
+
                     {erroEntrada && (
                         <button type="button" className="aviso-inline erro" onClick={() => setErroEntrada(null)}>
                             <span>{erroEntrada}</span>
@@ -348,6 +363,7 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
                                     mesas={mesasPublicas}
                                     carregando={carregando}
                                     privadas={false}
+                                    ocupado={entrando}
                                     onEntrar={handleEntrarPublica}
                                 />
                             )}
@@ -356,6 +372,7 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
                                     mesas={mesasPrivadas}
                                     carregando={carregando}
                                     privadas={true}
+                                    ocupado={entrando}
                                     onEntrar={handleClicarPrivada}
                                 />
                             )}

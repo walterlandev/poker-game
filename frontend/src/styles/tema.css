@@ -559,7 +559,7 @@ button { touch-action: manipulation; color: inherit; }
     line-height: 1.1; user-select: none; -webkit-tap-highlight-color: transparent;
     transition: transform .12s, filter .12s, background-color .15s;
 }
-.ab-btn small { font-size: var(--t-14); font-weight: 600; font-variant-numeric: tabular-nums; }
+.ab-btn small { display: block; margin-top: 1px; font-size: var(--t-14); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ab-btn:active:not(:disabled), .ab-btn.pressionado { transform: translateY(1px); filter: brightness(.92); }
 .ab-btn:disabled { opacity: .35; cursor: default; }
 .ab-btn .tecla { position: absolute; top: 4px; right: 6px; font-size: 10px; font-weight: 600; font-stretch: 100%; opacity: .55; display: none; }
@@ -912,3 +912,8 @@ button.config-item:hover { background: var(--cor-superficie-2); }
 .info-linha span { color: var(--cor-texto-3); }
 .info-linha b { font-weight: 500; color: var(--cor-texto-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .info-linha b.mono { font-family: ui-monospace, Consolas, monospace; }
+
+.aviso-inline.info {
+    border-color: var(--cor-destaque-linha); background: var(--cor-destaque-suave); color: var(--cor-texto);
+}
+.btn[aria-busy="true"] { cursor: progress; }
