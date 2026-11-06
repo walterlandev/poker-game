@@ -141,14 +141,14 @@ export default function History({ transacoes, socket, onCarregar }) {
                         style={{
                             ...estilos.btnFiltro,
                             background: filtroPeriodo === f.id
-                                ? 'rgba(245,158,11,0.15)'
-                                : 'rgba(255,255,255,0.04)',
+                                ? 'var(--cor-destaque-suave)'
+                                : 'var(--cor-superficie)',
                             border: filtroPeriodo === f.id
-                                ? '1px solid rgba(245,158,11,0.40)'
-                                : '1px solid rgba(255,255,255,0.07)',
+                                ? '1px solid var(--cor-destaque-linha)'
+                                : '1px solid var(--cor-linha)',
                             color: filtroPeriodo === f.id
-                                ? '#F59E0B'
-                                : 'rgba(255,255,255,0.40)',
+                                ? 'var(--cor-destaque-texto)'
+                                : 'var(--cor-texto-3)',
                             fontWeight: filtroPeriodo === f.id ? '600' : '400',
                         }}
                     >
@@ -163,21 +163,21 @@ export default function History({ transacoes, socket, onCarregar }) {
                     <CardResumoItem
                         label="Entradas"
                         valor={`₿C ${fmtBC(resumo.totalEntradas)}`}
-                        cor="#22C55E"
+                        cor="var(--cor-positivo-texto)"
                         icone="⬇️"
                     />
                     <div style={estilos.resumoDivisor} />
                     <CardResumoItem
                         label="Saídas"
                         valor={`₿C ${fmtBC(resumo.totalSaidas)}`}
-                        cor="#EF4444"
+                        cor="var(--cor-perigo-texto)"
                         icone="⬆️"
                     />
                     <div style={estilos.resumoDivisor} />
                     <CardResumoItem
                         label="Taxas"
                         valor={`R$ ${fmt(bcParaBRL(resumo.totalTaxas))}`}
-                        cor="#F59E0B"
+                        cor="var(--cor-destaque-texto)"
                         icone="📋"
                     />
                 </div>
@@ -192,14 +192,14 @@ export default function History({ transacoes, socket, onCarregar }) {
                         style={{
                             ...estilos.chipTipo,
                             background: filtroTipo === f.id
-                                ? 'rgba(124,58,237,0.18)'
-                                : 'rgba(255,255,255,0.04)',
+                                ? 'var(--cor-destaque-suave)'
+                                : 'var(--cor-superficie)',
                             border: filtroTipo === f.id
-                                ? '1px solid rgba(124,58,237,0.45)'
-                                : '1px solid rgba(255,255,255,0.07)',
+                                ? '1px solid var(--cor-destaque-linha)'
+                                : '1px solid var(--cor-linha)',
                             color: filtroTipo === f.id
-                                ? '#A78BFA'
-                                : 'rgba(255,255,255,0.40)',
+                                ? 'var(--cor-destaque-texto)'
+                                : 'var(--cor-texto-3)',
                             fontWeight: filtroTipo === f.id ? '600' : '400',
                         }}
                     >
@@ -275,15 +275,15 @@ function CardTx({ tx }) {
             onClick={() => setExpandido(p => !p)}
             style={{
                 ...estilos.cardTx,
-                borderColor: expandido ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)',
-                background:  expandido ? 'rgba(255,255,255,0.04)' : '#111827',
+                borderColor: expandido ? 'var(--cor-linha)' : 'var(--cor-superficie)',
+                background:  expandido ? 'var(--cor-superficie)' : 'var(--cor-superficie)',
             }}
         >
             {/* Linha principal */}
             <div style={estilos.txLinha}>
 
                 {/* Ícone do tipo */}
-                <div style={{ ...estilos.txIcone, background: `${cor}15`, border: `1px solid ${cor}30` }}>
+                <div style={{ ...estilos.txIcone, background: `color-mix(in srgb, ${cor} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${cor} 19%, transparent)` }}>
                     <span style={{ fontSize: '16px' }}>{icone}</span>
                 </div>
 
@@ -324,10 +324,10 @@ function CardTx({ tx }) {
                 <div style={estilos.txDetalhes}>
 
                     {tx.taxaBC > 0 && (
-                        <DetalheLinha label="Taxa cobrada" valor={`₿C ${fmtBC(tx.taxaBC)}`} cor="#F59E0B" />
+                        <DetalheLinha label="Taxa cobrada" valor={`₿C ${fmtBC(tx.taxaBC)}`} cor="var(--cor-destaque-texto)" />
                     )}
                     {tx.taxaBRL > 0 && (
-                        <DetalheLinha label="Taxa em R$" valor={`R$ ${fmt(tx.taxaBRL)}`} cor="#F59E0B" />
+                        <DetalheLinha label="Taxa em R$" valor={`R$ ${fmt(tx.taxaBRL)}`} cor="var(--cor-destaque-texto)" />
                     )}
                     {tx.brlLiquido > 0 && (
                         <DetalheLinha label="Valor líquido recebido" valor={`R$ ${fmt(tx.brlLiquido)}`} />
@@ -368,7 +368,7 @@ function DetalheLinha({ label, valor, cor, mono }) {
             <span style={estilos.detalheLabelI}>{label}</span>
             <span style={{
                 ...estilos.detalheValorI,
-                color:      cor || 'rgba(255,255,255,0.6)',
+                color:      cor || 'var(--cor-texto-2)',
                 fontFamily: mono ? 'monospace' : 'inherit',
                 fontSize:   mono ? '10px' : '12px',
             }}>
@@ -413,8 +413,8 @@ const estilos = {
     cardResumo: {
         display:      'flex',
         alignItems:   'center',
-        background:   '#111827',
-        border:       '1px solid rgba(255,255,255,0.07)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '10px',
         padding:      '12px',
         gap:          '0',
@@ -431,12 +431,12 @@ const estilos = {
     resumoDivisor: {
         width:      '1px',
         height:     '32px',
-        background: 'rgba(255,255,255,0.07)',
+        background: 'var(--cor-linha)',
     },
 
     resumoLabel: {
         fontSize: '10px',
-        color:    'rgba(255,255,255,0.35)',
+        color:    'var(--cor-texto-3)',
         margin:   0,
         textTransform: 'uppercase',
         letterSpacing: '0.04em',
@@ -483,7 +483,7 @@ const estilos = {
 
     estadoTexto: {
         fontSize:   '13px',
-        color:      'rgba(255,255,255,0.30)',
+        color:      'var(--cor-texto-3)',
         margin:     0,
         lineHeight: 1.5,
         whiteSpace: 'pre-line',
@@ -491,9 +491,9 @@ const estilos = {
 
     btnLimparFiltro: {
         background:   'transparent',
-        border:       '1px solid rgba(255,255,255,0.15)',
+        border:       '1px solid var(--cor-linha-forte)',
         borderRadius: '6px',
-        color:        'rgba(255,255,255,0.45)',
+        color:        'var(--cor-texto-3)',
         fontSize:     '12px',
         padding:      '6px 14px',
         cursor:       'pointer',
@@ -509,8 +509,8 @@ const estilos = {
 
     // Card individual de transação
     cardTx: {
-        background:   '#111827',
-        border:       '1px solid rgba(255,255,255,0.06)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-superficie)',
         borderRadius: '10px',
         padding:      '12px',
         cursor:       'pointer',
@@ -540,19 +540,19 @@ const estilos = {
     txLabel: {
         fontSize:   '13px',
         fontWeight: '600',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         margin:     0,
     },
 
     txData: {
         fontSize: '10px',
-        color:    'rgba(255,255,255,0.30)',
+        color:    'var(--cor-texto-3)',
         margin:   '2px 0 0',
     },
 
     txContraparte: {
         fontSize:  '10px',
-        color:     'rgba(255,255,255,0.40)',
+        color:     'var(--cor-texto-3)',
         margin:    '1px 0 0',
         overflow:  'hidden',
         textOverflow: 'ellipsis',
@@ -567,13 +567,13 @@ const estilos = {
 
     txValorBRL: {
         fontSize: '10px',
-        color:    'rgba(255,255,255,0.30)',
+        color:    'var(--cor-texto-3)',
         margin:   '2px 0 0',
     },
 
     txSeta: {
         fontSize:   '14px',
-        color:      'rgba(255,255,255,0.25)',
+        color:      'var(--cor-texto-3)',
         flexShrink: 0,
         transition: 'transform 0.2s',
         userSelect: 'none',
@@ -583,7 +583,7 @@ const estilos = {
     txDetalhes: {
         marginTop:    '10px',
         paddingTop:   '10px',
-        borderTop:    '1px solid rgba(255,255,255,0.06)',
+        borderTop:    '1px solid var(--cor-superficie)',
         display:      'flex',
         flexDirection:'column',
         gap:          '6px',
@@ -597,7 +597,7 @@ const estilos = {
 
     detalheLabelI: {
         fontSize: '11px',
-        color:    'rgba(255,255,255,0.35)',
+        color:    'var(--cor-texto-3)',
     },
 
     detalheValorI: {
@@ -608,7 +608,7 @@ const estilos = {
     // Contador de resultados
     contador: {
         fontSize:  '11px',
-        color:     'rgba(255,255,255,0.20)',
+        color:     'var(--cor-linha-forte)',
         margin:    0,
         textAlign: 'center',
     },

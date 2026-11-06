@@ -42,10 +42,10 @@ const TEMAS = [
         descricao: 'O visual tradicional do poker',
         imagem:    null,
         naipes: {
-            '♥': { cor: '#DC2626' },
-            '♦': { cor: '#DC2626' },
-            '♣': { cor: '#1a1a1a' },
-            '♠': { cor: '#1a1a1a' },
+            '♥': { cor: 'var(--cor-perigo-texto)' },
+            '♦': { cor: 'var(--cor-perigo-texto)' },
+            '♣': { cor: 'var(--cor-superficie)' },
+            '♠': { cor: 'var(--cor-superficie)' },
         },
         verso:  { fundo: '#1E3A8A', detalhe: '#1E40AF' },
         frente: { fundo: '#FFFFFF', borda: '#D1D5DB', raio: 8 },
@@ -58,13 +58,13 @@ const TEMAS = [
         descricao: 'Cada naipe com sua própria cor',
         imagem:    null,
         naipes: {
-            '♥': { cor: '#DC2626' },
-            '♦': { cor: '#2563EB' },
-            '♣': { cor: '#16A34A' },
-            '♠': { cor: '#1a1a1a' },
+            '♥': { cor: 'var(--cor-perigo-texto)' },
+            '♦': { cor: 'var(--cor-info)' },
+            '♣': { cor: 'var(--cor-positivo-texto)' },
+            '♠': { cor: 'var(--cor-superficie)' },
         },
-        verso:  { fundo: '#111827', detalhe: '#374151' },
-        frente: { fundo: '#FFFFFF', borda: '#9CA3AF', raio: 8 },
+        verso:  { fundo: 'var(--cor-superficie)', detalhe: 'var(--cor-superficie-3)' },
+        frente: { fundo: '#FFFFFF', borda: 'var(--cor-texto-2)', raio: 8 },
     },
     {
         id:        'royal',
@@ -92,12 +92,12 @@ const TEMAS = [
         imagem:    null,
         naipes: {
             '♥': { cor: '#F472B6' },
-            '♦': { cor: '#34D399' },
-            '♣': { cor: '#60A5FA' },
-            '♠': { cor: '#A78BFA' },
+            '♦': { cor: 'var(--cor-positivo-texto)' },
+            '♣': { cor: 'var(--cor-info)' },
+            '♠': { cor: 'var(--cor-destaque-texto)' },
         },
-        verso:  { fundo: '#0F0F1A', detalhe: '#7C3AED' },
-        frente: { fundo: '#0F172A', borda: '#7C3AED', raio: 10 },
+        verso:  { fundo: '#0F0F1A', detalhe: 'var(--cor-destaque)' },
+        frente: { fundo: 'var(--cor-superficie)', borda: 'var(--cor-destaque)', raio: 10 },
     },
     {
         id:        'dourado',
@@ -107,13 +107,13 @@ const TEMAS = [
         descricao: 'Luxo e elegância em tons de ouro',
         imagem:    null,
         naipes: {
-            '♥': { cor: '#EF4444' },
-            '♦': { cor: '#F59E0B' },
-            '♣': { cor: '#92400E' },
+            '♥': { cor: 'var(--cor-perigo-texto)' },
+            '♦': { cor: 'var(--cor-destaque-texto)' },
+            '♣': { cor: 'var(--cor-destaque-texto)' },
             '♠': { cor: '#78350F' },
         },
         verso:  { fundo: '#78350F', detalhe: '#B45309' },
-        frente: { fundo: '#FFFBEB', borda: '#D97706', raio: 8 },
+        frente: { fundo: '#FFFBEB', borda: 'var(--cor-destaque-texto)', raio: 8 },
     },
     {
         id:        'minimalista',
@@ -123,13 +123,13 @@ const TEMAS = [
         descricao: 'Design clean e moderno',
         imagem:    null,
         naipes: {
-            '♥': { cor: '#6B7280' },
-            '♦': { cor: '#6B7280' },
-            '♣': { cor: '#374151' },
-            '♠': { cor: '#374151' },
+            '♥': { cor: 'var(--cor-texto-3)' },
+            '♦': { cor: 'var(--cor-texto-3)' },
+            '♣': { cor: 'var(--cor-superficie-3)' },
+            '♠': { cor: 'var(--cor-superficie-3)' },
         },
-        verso:  { fundo: '#F9FAFB', detalhe: '#E5E7EB' },
-        frente: { fundo: '#FFFFFF', borda: '#E5E7EB', raio: 4 },
+        verso:  { fundo: '#F9FAFB', detalhe: 'var(--cor-texto)' },
+        frente: { fundo: '#FFFFFF', borda: 'var(--cor-texto)', raio: 4 },
     },
 ];
 
@@ -283,7 +283,7 @@ export default function TemasCartas({ saldoAtual, temaAtual, temasComprados = []
 
             <p style={estilos.avisoSaldo}>
                 Seu saldo:{' '}
-                <span style={{ color: '#F59E0B', fontWeight: '600' }}>
+                <span style={{ color: 'var(--cor-destaque-texto)', fontWeight: '600' }}>
                     ₿C {fmt(saldoAtual)}
                 </span>
             </p>
@@ -421,17 +421,17 @@ function PreviewTema({ tema, ativo, saldoAtual, comprado, operando, onComprar, o
 
                 {tema.premium ? (
                     <p style={estilos.temaPreco}>
-                        <span style={{ color: '#F59E0B', fontWeight: '700' }}>
+                        <span style={{ color: 'var(--cor-destaque-texto)', fontWeight: '700' }}>
                             ₿C {fmt(tema.preco)}
                         </span>
                         {semSaldo && (
-                            <span style={{ color: '#EF4444', fontSize: '11px', marginLeft: '6px' }}>
+                            <span style={{ color: 'var(--cor-perigo-texto)', fontSize: '11px', marginLeft: '6px' }}>
                                 (saldo insuficiente)
                             </span>
                         )}
                     </p>
                 ) : (
-                    <p style={{ ...estilos.temaPreco, color: '#22C55E' }}>Gratuito</p>
+                    <p style={{ ...estilos.temaPreco, color: 'var(--cor-positivo-texto)' }}>Gratuito</p>
                 )}
 
                 {ativo ? (
@@ -483,13 +483,13 @@ function MiniCardTema({ tema, selecionado, ativo, comprado, onSelecionar }) {
             style={{
                 ...estilos.miniCard,
                 border: selecionado
-                    ? '2px solid #7C3AED'
+                    ? '2px solid var(--cor-destaque)'
                     : ativo
-                        ? '2px solid #22C55E'
-                        : '1px solid rgba(255,255,255,0.07)',
+                        ? '2px solid var(--cor-positivo-texto)'
+                        : '1px solid var(--cor-linha)',
                 background: selecionado
-                    ? 'rgba(124,58,237,0.1)'
-                    : 'rgba(255,255,255,0.02)',
+                    ? 'var(--cor-destaque-suave)'
+                    : 'var(--cor-hover-linha)',
                 transform: selecionado ? 'scale(1.03)' : 'scale(1)',
             }}
         >
@@ -517,7 +517,7 @@ function MiniCardTema({ tema, selecionado, ativo, comprado, onSelecionar }) {
                     <div style={{
                         ...estilos.miniCarta,
                         background:   tema.verso.fundo,
-                        border:       '1px solid rgba(255,255,255,0.1)',
+                        border:       '1px solid var(--cor-linha)',
                         borderRadius: (tema.frente.raio / 2) + 'px',
                     }}>
                         <div style={{
@@ -531,7 +531,7 @@ function MiniCardTema({ tema, selecionado, ativo, comprado, onSelecionar }) {
 
             <span style={{
                 ...estilos.miniNome,
-                color:      selecionado ? '#A78BFA' : ativo ? '#22C55E' : 'rgba(255,255,255,0.6)',
+                color:      selecionado ? 'var(--cor-destaque-texto)' : ativo ? 'var(--cor-positivo-texto)' : 'var(--cor-texto-2)',
                 fontWeight: selecionado || ativo ? '600' : '400',
             }}>
                 {tema.nome}
@@ -542,10 +542,10 @@ function MiniCardTema({ tema, selecionado, ativo, comprado, onSelecionar }) {
                 <span style={estilos.miniPreco}>₿C {fmt(tema.preco)}</span>
             )}
             {tema.premium && comprado && !ativo && (
-                <span style={{ ...estilos.miniPreco, color: '#22C55E' }}>comprado</span>
+                <span style={{ ...estilos.miniPreco, color: 'var(--cor-positivo-texto)' }}>comprado</span>
             )}
             {!tema.premium && !ativo && (
-                <span style={{ ...estilos.miniPreco, color: '#22C55E' }}>grátis</span>
+                <span style={{ ...estilos.miniPreco, color: 'var(--cor-positivo-texto)' }}>grátis</span>
             )}
         </button>
     );
@@ -565,8 +565,8 @@ const estilos = {
     },
 
     previewContainer: {
-        background:    '#111827',
-        border:        '1px solid rgba(255,255,255,0.07)',
+        background:    'var(--cor-superficie)',
+        border:        '1px solid var(--cor-linha)',
         borderRadius:  '14px',
         padding:       '16px',
         display:       'flex',
@@ -604,8 +604,8 @@ const estilos = {
         bottom:        '6px',
         left:          '50%',
         transform:     'translateX(-50%)',
-        background:    'rgba(0,0,0,0.75)',
-        color:         '#F59E0B',
+        background:    'var(--cor-veu)',
+        color:         'var(--cor-destaque-texto)',
         fontSize:      '9px',
         fontWeight:    '700',
         padding:       '2px 8px',
@@ -672,56 +672,56 @@ const estilos = {
         flexWrap: 'wrap',
     },
 
-    temaNome: { fontSize: '16px', fontWeight: '700', color: '#F8FAFC', margin: 0 },
+    temaNome: { fontSize: '16px', fontWeight: '700', color: 'var(--cor-texto)', margin: 0 },
 
     badgePremium: {
         fontSize: '9px', fontWeight: '700',
-        background: 'rgba(217,119,6,0.2)', color: '#F59E0B',
+        background: 'var(--cor-destaque-suave)', color: 'var(--cor-destaque-texto)',
         padding: '2px 5px', borderRadius: '4px', letterSpacing: '0.05em',
     },
 
     badgeAtivo: {
         fontSize: '9px', fontWeight: '700',
-        background: 'rgba(34,197,94,0.2)', color: '#22C55E',
+        background: 'var(--cor-positivo-suave)', color: 'var(--cor-positivo-texto)',
         padding: '2px 5px', borderRadius: '4px', letterSpacing: '0.05em',
     },
 
     badgeComprado: {
         fontSize: '9px', fontWeight: '700',
-        background: 'rgba(124,58,237,0.2)', color: '#A78BFA',
+        background: 'var(--cor-destaque-suave)', color: 'var(--cor-destaque-texto)',
         padding: '2px 5px', borderRadius: '4px', letterSpacing: '0.05em',
     },
 
-    temaDescricao: { fontSize: '12px', color: 'rgba(255,255,255,0.4)', margin: 0, lineHeight: 1.4 },
-    temaPreco:     { fontSize: '14px', fontWeight: '500', color: '#F8FAFC', margin: 0 },
+    temaDescricao: { fontSize: '12px', color: 'var(--cor-texto-3)', margin: 0, lineHeight: 1.4 },
+    temaPreco:     { fontSize: '14px', fontWeight: '500', color: 'var(--cor-texto)', margin: 0 },
 
     btnAtivo: {
-        padding: '8px 12px', background: 'rgba(34,197,94,0.1)',
-        border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px',
-        color: '#22C55E', fontSize: '13px', fontWeight: '600',
+        padding: '8px 12px', background: 'var(--cor-positivo-suave)',
+        border: '1px solid var(--cor-positivo)', borderRadius: '8px',
+        color: 'var(--cor-positivo-texto)', fontSize: '13px', fontWeight: '600',
         textAlign: 'center', marginTop: 'auto',
     },
 
     btnAtivar: {
-        padding: '8px 12px', background: 'rgba(124,58,237,0.15)',
-        border: '1px solid rgba(124,58,237,0.4)', borderRadius: '8px',
-        color: '#A78BFA', fontSize: '13px', fontWeight: '600',
+        padding: '8px 12px', background: 'var(--cor-destaque-suave)',
+        border: '1px solid var(--cor-destaque-linha)', borderRadius: '8px',
+        color: 'var(--cor-destaque-texto)', fontSize: '13px', fontWeight: '600',
         cursor: 'pointer', marginTop: 'auto', outline: 'none',
         WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit',
     },
 
     btnComprar: {
-        padding: '8px 12px', background: 'linear-gradient(135deg, #D97706, #F59E0B)',
-        border: 'none', borderRadius: '8px', color: 'white',
+        padding: '8px 12px', background: 'var(--cor-destaque)',
+        border: 'none', borderRadius: '8px', color: 'var(--cor-texto-inverso)',
         fontSize: '13px', fontWeight: '600', cursor: 'pointer',
         marginTop: 'auto', outline: 'none', fontFamily: 'inherit',
         WebkitTapHighlightColor: 'transparent',
     },
 
     divisor:     { display: 'flex', alignItems: 'center', gap: '8px' },
-    linhaDivisor:{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' },
+    linhaDivisor:{ flex: 1, height: '1px', background: 'var(--cor-superficie)' },
     textDivisor: {
-        fontSize: '10px', color: 'rgba(255,255,255,0.2)',
+        fontSize: '10px', color: 'var(--cor-linha-forte)',
         textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0,
     },
 
@@ -758,10 +758,10 @@ const estilos = {
 
     miniNome:  { fontSize: '10px', textAlign: 'center', lineHeight: 1.2 },
     miniAtivo: {
-        fontSize: '9px', background: 'rgba(34,197,94,0.15)', color: '#22C55E',
+        fontSize: '9px', background: 'var(--cor-positivo-suave)', color: 'var(--cor-positivo-texto)',
         padding: '1px 5px', borderRadius: '3px', fontWeight: '600',
     },
-    miniPreco: { fontSize: '9px', color: 'rgba(255,255,255,0.3)', textAlign: 'center' },
+    miniPreco: { fontSize: '9px', color: 'var(--cor-texto-3)', textAlign: 'center' },
 
-    avisoSaldo: { fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', margin: 0 },
+    avisoSaldo: { fontSize: '12px', color: 'var(--cor-texto-3)', textAlign: 'center', margin: 0 },
 };

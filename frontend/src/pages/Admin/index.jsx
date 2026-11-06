@@ -109,8 +109,8 @@ export default function Admin({ socket }) {
                         onClick={() => trocarAba(a.id)}
                         style={{
                             ...css.aba,
-                            background: aba === a.id ? 'rgba(239,68,68,0.12)' : 'transparent',
-                            color:      aba === a.id ? '#FCA5A5' : 'rgba(255,255,255,0.4)',
+                            background: aba === a.id ? 'var(--cor-perigo-suave)' : 'transparent',
+                            color:      aba === a.id ? 'var(--cor-perigo-texto)' : 'var(--cor-texto-3)',
                             fontWeight: aba === a.id ? '600' : '400',
                         }}
                     >
@@ -213,10 +213,10 @@ export default function Admin({ socket }) {
 
 const css = {
     container: { display: 'flex', flexDirection: 'column', gap: '14px' },
-    titulo:    { fontSize: '18px', fontWeight: '700', color: '#F8FAFC', margin: 0 },
+    titulo:    { fontSize: '18px', fontWeight: '700', color: 'var(--cor-texto)', margin: 0 },
     abas: {
         display: 'flex', gap: '6px', flexWrap: 'wrap',
-        borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '8px',
+        borderBottom: '1px solid var(--cor-superficie)', paddingBottom: '8px',
     },
     aba: {
         border: 'none', borderRadius: '8px', padding: '7px 12px',
@@ -224,28 +224,28 @@ const css = {
         WebkitTapHighlightColor: 'transparent',
     },
     erro: {
-        background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-        borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: '#FCA5A5',
+        background: 'var(--cor-perigo-suave)', border: '1px solid var(--cor-perigo-linha)',
+        borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--cor-perigo-texto)',
     },
     lista: { display: 'flex', flexDirection: 'column', gap: '8px' },
-    vazio: { fontSize: '13px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '20px 0' },
+    vazio: { fontSize: '13px', color: 'var(--cor-texto-3)', textAlign: 'center', padding: '20px 0' },
     card: {
-        background: '#111827', border: '1px solid rgba(255,255,255,0.08)',
+        background: 'var(--cor-superficie)', border: '1px solid var(--cor-linha)',
         borderRadius: '10px', padding: '12px 14px', display: 'flex',
         flexDirection: 'column', gap: '4px',
     },
     cardTopo: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-    nome:   { fontSize: '14px', fontWeight: '600', color: '#F8FAFC' },
-    saldo:  { fontSize: '14px', fontWeight: '700', color: '#F59E0B' },
-    linha:    { fontSize: '12px', color: 'rgba(255,255,255,0.55)', margin: 0 },
-    linhaSub: { fontSize: '11px', color: 'rgba(255,255,255,0.30)', margin: 0 },
+    nome:   { fontSize: '14px', fontWeight: '600', color: 'var(--cor-texto)' },
+    saldo:  { fontSize: '14px', fontWeight: '700', color: 'var(--cor-destaque-texto)' },
+    linha:    { fontSize: '12px', color: 'var(--cor-texto-2)', margin: 0 },
+    linhaSub: { fontSize: '11px', color: 'var(--cor-texto-3)', margin: 0 },
     btnCopiarPix: {
         marginLeft:   '8px',
         padding:      '2px 8px',
-        background:   'rgba(124,58,237,0.15)',
-        border:       '1px solid rgba(124,58,237,0.35)',
+        background:   'var(--cor-destaque-suave)',
+        border:       '1px solid var(--cor-destaque-linha)',
         borderRadius: '6px',
-        color:        '#A78BFA',
+        color:        'var(--cor-destaque-texto)',
         fontSize:     '11px',
         fontWeight:   '600',
         cursor:       'pointer',
@@ -253,17 +253,17 @@ const css = {
         WebkitTapHighlightColor: 'transparent',
     },
     avisoTitular: {
-        fontSize: '11px', color: '#FCD34D', margin: 0,
-        background: 'rgba(245,158,11,0.08)', padding: '6px 8px', borderRadius: '6px',
+        fontSize: '11px', color: 'var(--cor-destaque-texto)', margin: 0,
+        background: 'var(--cor-destaque-suave)', padding: '6px 8px', borderRadius: '6px',
     },
-    uid:      { fontSize: '10px', color: 'rgba(255,255,255,0.20)', margin: '2px 0 0', fontFamily: 'monospace' },
+    uid:      { fontSize: '10px', color: 'var(--cor-linha-forte)', margin: '2px 0 0', fontFamily: 'monospace' },
     badgeAdmin: {
-        fontSize: '9px', fontWeight: '700', color: '#FCA5A5',
-        background: 'rgba(239,68,68,0.15)', padding: '1px 6px', borderRadius: '4px', marginLeft: '6px',
+        fontSize: '9px', fontWeight: '700', color: 'var(--cor-perigo-texto)',
+        background: 'var(--cor-perigo-suave)', padding: '1px 6px', borderRadius: '4px', marginLeft: '6px',
     },
     btnConfirmar: {
-        marginTop: '8px', padding: '9px', background: 'rgba(34,197,94,0.15)',
-        border: '1px solid rgba(34,197,94,0.4)', borderRadius: '8px', color: '#4ADE80',
+        marginTop: '8px', padding: '9px', background: 'var(--cor-positivo-suave)',
+        border: '1px solid var(--cor-positivo)', borderRadius: '8px', color: 'var(--cor-positivo-texto)',
         fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit',
         WebkitTapHighlightColor: 'transparent',
     },

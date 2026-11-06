@@ -8,7 +8,7 @@
    → Passa setUsuario para Lobby para atualizações locais
 ================================================================ */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { onAuthStateChanged }               from 'firebase/auth';
 import { doc, getDoc }                      from 'firebase/firestore';
 import { io }                               from 'socket.io-client';
@@ -54,33 +54,47 @@ export default function App() {
     // ----------------------------------------------------------------
     // Conecta o socket e autentica no servidor
     // ----------------------------------------------------------------
-    const conectarSocket = useCallback((perfil) => {
-        if (socket.connected) return;
-        socket.connect();
-        // .on (não .once): precisa reautenticar em TODA reconexão, não só
-        // na primeira. Depois de uma queda de WebSocket o Socket.io
-        // reconecta sozinho, mas o servidor vê isso como uma conexão nova
-        // (perde socket.data e a sala da mesa) — sem reautenticar de novo
-        // aqui, o jogador virava "fantasma": parava de receber atualização
-        // de estado e os cliques de ação (fold/call/raise) não faziam nada.
-        socket.on('connect', async () => {
-            // Avatar base64 pode ter centenas de KB — enviamos apenas URLs
-            const avatarSocket = perfil.avatar?.startsWith('data:') ? '' : (perfil.avatar || '');
-            // idToken: prova real de identidade, verificada no servidor
-            // (admin.auth().verifyIdToken). O uid sozinho não basta — é
-            // público (aparece pra outros jogadores na mesma mesa), então
-            // sem o token qualquer um podia se autenticar como outra pessoa.
-            const idToken = await auth.currentUser?.getIdToken();
-            socket.emit('autenticar', {
-                uid:    perfil.uid,
-                nome:   perfil.nome,
-                avatar: avatarSocket,
-                idToken,
-            });
+    const perfilSocket = useRef(null);
+    const handlersOk   = useRef(false);
+
+    const autenticarSocket = useCallback(async () => {
+        const perfil = perfilSocket.current;
+        if (!perfil) return;
+        // Avatar base64 pode ter centenas de KB — enviamos apenas URLs
+        const avatarSocket = perfil.avatar?.startsWith('data:') ? '' : (perfil.avatar || '');
+        // idToken: prova real de identidade, verificada no servidor
+        // (admin.auth().verifyIdToken). O uid sozinho não basta — é
+        // público (aparece pra outros jogadores na mesma mesa), então
+        // sem o token qualquer um podia se autenticar como outra pessoa.
+        const idToken = await auth.currentUser?.getIdToken();
+        socket.emit('autenticar', {
+            uid:    perfil.uid,
+            nome:   perfil.nome,
+            avatar: avatarSocket,
+            idToken,
         });
-        socket.on('disconnect', (m) => console.warn('Desconectado:', m));
-        socket.on('erro',       ({ mensagem }) => console.error('Erro servidor:', mensagem));
     }, []);
+
+    const conectarSocket = useCallback((perfil) => {
+        perfilSocket.current = perfil;
+        // Listeners registrados UMA vez só (antes eram empilhados a cada
+        // chamada, e nunca registrados se o socket já estivesse conectado —
+        // o que acontece quando o CriarPin conecta o socket durante o cadastro).
+        if (!handlersOk.current) {
+            handlersOk.current = true;
+            // .on (não .once): precisa reautenticar em TODA reconexão, não só
+            // na primeira. Depois de uma queda de WebSocket o Socket.io
+            // reconecta sozinho, mas o servidor vê isso como uma conexão nova
+            // (perde socket.data e a sala da mesa) — sem reautenticar de novo
+            // aqui, o jogador virava "fantasma": parava de receber atualização
+            // de estado e os cliques de ação (fold/call/raise) não faziam nada.
+            socket.on('connect',    autenticarSocket);
+            socket.on('disconnect', (m) => console.warn('Desconectado:', m));
+            socket.on('erro',       ({ mensagem }) => console.error('Erro servidor:', mensagem));
+        }
+        if (socket.connected) autenticarSocket();
+        else socket.connect();
+    }, [autenticarSocket]);
 
     // ----------------------------------------------------------------
     // Monitora sessão Firebase e carrega perfil do Firestore
@@ -215,7 +229,10 @@ export default function App() {
     // Handlers de navegação
     // ----------------------------------------------------------------
     const handleAutenticado = useCallback((perfil) => {
-        setUsuario(perfil);
+        // Perfis vindos do Login/Cadastro são dados crus do Firestore: sem
+        // o campo temPin. Normaliza (nunca guarda o hash em si no estado).
+        const { pinHash, ...resto } = perfil;
+        setUsuario({ ...resto, temPin: perfil.temPin ?? !!pinHash });
         conectarSocket(perfil);
         setTela(TELAS.LOBBY);
     }, [conectarSocket]);
@@ -223,6 +240,19 @@ export default function App() {
     const handleEntrarMesa = useCallback((mesaId) => {
         setMesaAtual(mesaId);
         setTela(TELAS.JOGO);
+    }, []);
+
+    // Torneio cancelado sem jogadores: mostra a mensagem e leva o jogador
+    // para a aba Torneio do lobby (de qualquer tela em que ele esteja).
+    const [avisoTorneio, setAvisoTorneio] = useState(null);
+    useEffect(() => {
+        const onCancelado = ({ mensagem } = {}) => {
+            setAvisoTorneio({ mensagem: mensagem || 'O torneio foi cancelado por falta de jogadores.', em: Date.now() });
+            setMesaAtual(null);
+            setTela(t => (t === TELAS.JOGO ? TELAS.LOBBY : t));
+        };
+        socket.on('torneio:cancelado_sem_jogadores', onCancelado);
+        return () => socket.off('torneio:cancelado_sem_jogadores', onCancelado);
     }, []);
 
     const handleSairMesa = useCallback(() => {
@@ -237,21 +267,21 @@ export default function App() {
     if (tela === TELAS.CARREGANDO) return (
         <div style={{
             minHeight:      '100vh',
-            background:     '#0a0f1e',
+            background:     'var(--cor-fundo)',
             display:        'flex',
             flexDirection:  'column',
             alignItems:     'center',
             justifyContent: 'center',
             gap:            '32px',
-            fontFamily:     'sans-serif',
+            fontFamily:     'var(--fonte)',
         }}>
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'8px' }}>
                 <img src="/logo.png" alt="Poker Game"
                     style={{ width:'80px', height:'80px', objectFit:'contain' }} />
-                <h1 style={{ fontSize:'32px', fontWeight:'800', color:'#F8FAFC', margin:0 }}>
+                <h1 style={{ fontSize:'32px', fontWeight:'800', color:'var(--cor-texto)', margin:0 }}>
                     Poker Game
                 </h1>
-                <p style={{ fontSize:'13px', color:'#D97706', margin:0 }}>
+                <p style={{ fontSize:'13px', color:'var(--cor-destaque-texto)', margin:0 }}>
                     Powered by BC Bitchager
                 </p>
             </div>
@@ -259,12 +289,12 @@ export default function App() {
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'12px' }}>
                 <div style={{
                     width:'36px', height:'36px',
-                    border:'3px solid rgba(255,255,255,0.1)',
-                    borderTop:'3px solid #7C3AED',
+                    border:'3px solid var(--cor-linha)',
+                    borderTop:'3px solid var(--cor-destaque)',
                     borderRadius:'50%',
                     animation:'girar 0.8s linear infinite',
                 }} />
-                <p style={{ fontSize:'14px', color:'rgba(255,255,255,0.4)', margin:0 }}>
+                <p style={{ fontSize:'14px', color:'var(--cor-texto-3)', margin:0 }}>
                     Verificando sessão...
                 </p>
             </div>
@@ -277,21 +307,21 @@ export default function App() {
                 {erroGlobal && (
                     <div style={{
                         position:   'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
-                        background: 'rgba(239,68,68,0.12)',
-                        border:     '1px solid rgba(239,68,68,0.35)',
+                        background: 'var(--cor-perigo-suave)',
+                        border:     '1px solid var(--cor-perigo-linha)',
                         borderTop:  'none',
                         borderRadius: '0 0 10px 10px',
                         padding:    '12px 20px',
                         display:    'flex', alignItems: 'center', gap: '10px',
-                        fontFamily: 'sans-serif',
+                        fontFamily: 'var(--fonte)',
                     }}>
                         <span style={{ fontSize: '18px' }}>⚠️</span>
-                        <p style={{ margin: 0, fontSize: '13px', color: '#FCA5A5', flex: 1 }}>
+                        <p style={{ margin: 0, fontSize: '13px', color: 'var(--cor-perigo-texto)', flex: 1 }}>
                             {erroGlobal}
                         </p>
                         <button
                             onClick={() => setErroGlobal(null)}
-                            style={{ background: 'none', border: 'none', color: '#FCA5A5', cursor: 'pointer', fontSize: '18px', padding: '0 4px' }}
+                            style={{ background: 'none', border: 'none', color: 'var(--cor-perigo-texto)', cursor: 'pointer', fontSize: '18px', padding: '0 4px' }}
                         >×</button>
                     </div>
                 )}
@@ -311,6 +341,18 @@ export default function App() {
         );
     }
 
+    // Conta sem PIN (ex.: fechou/recarregou a página no meio do cadastro):
+    // não entra no Lobby até criar o PIN.
+    if (usuario && usuario.temPin === false) {
+        return (
+            <Auth
+                onAutenticado={handleAutenticado}
+                socket={socket}
+                usuarioSemPin={usuario}
+            />
+        );
+    }
+
     return (
         <Lobby
             usuario={usuario}
@@ -319,6 +361,8 @@ export default function App() {
             onUsuarioAtualizado={setUsuario}
             conviteTorneio={conviteTorneio}
             conviteMesa={conviteMesa}
+            avisoTorneio={avisoTorneio}
+            onFecharAvisoTorneio={() => setAvisoTorneio(null)}
         />
     );
 }

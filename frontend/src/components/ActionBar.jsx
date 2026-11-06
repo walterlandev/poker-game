@@ -13,10 +13,37 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
-// Estilos (.ab-*) movidos pro CSS global em main.jsx — um <style> preso
+// Estilos (.ab-*) ficam no CSS global (styles/tema.css) — um <style> preso
 // aqui dentro seria desmontado/remontado a cada fold/all-in (este
 // componente entra e sai do DOM condicionalmente), o mesmo padrão que já
 // causou um bug intermitente de tela preta em outro lugar do app.
+
+// ── Chaves de comportamento (seção 8 do DESIGN.md) ─────────────────
+// ACAO_NO_CLIQUE:    true → Fold/Call/Raise/All-in disparam no clique
+//                    (soltar o dedo); false → no pointerdown (toque).
+// ALLIN_NOS_ATALHOS: true → "All-in" aparece também na linha de atalhos
+//                    de aposta (leva o slider ao máximo); o botão All-in
+//                    de ação direta continua existindo.
+const ACAO_NO_CLIQUE    = true;
+const ALLIN_NOS_ATALHOS = true;
+const EVENTO_ACAO       = ACAO_NO_CLIQUE ? 'onClick' : 'onPointerDown';
+
+const ROTULO_ATALHO = { Min: 'Mín', '½': '½ pote', '⅔': '⅔ pote', Pote: 'Pote' };
+
+function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
+
+// Contagem do turno a partir do prazo absoluto do servidor (só exibição)
+function ContagemTurno({ expiraEm }) {
+    const [agora, setAgora] = useState(() => Date.now());
+    useEffect(() => {
+        if (!expiraEm) return undefined;
+        const id = setInterval(() => setAgora(Date.now()), 250);
+        return () => clearInterval(id);
+    }, [expiraEm]);
+    if (!expiraEm) return null;
+    const seg = Math.max(0, Math.ceil((expiraEm - agora) / 1000));
+    return <span className="num">{seg} s</span>;
+}
 
 
 // ================================================================
@@ -30,8 +57,13 @@ export default function ActionBar({
     maiorAposta   = 0,
     bigBlind      = 20,
     pote          = 0,
+    expiraEm      = null,   // prazo do turno atual (mesa.turnoExpiraEm) — só exibição
+    nomeDaVez     = '',     // primeiro nome de quem está na vez — só exibição
+    treino        = false,  // mesa de treino: fichas sem o símbolo ₿C — só exibição
     onAcao,
 }) {
+    const moeda = (n) => (treino ? fmt(n) : `₿C ${fmt(n)}`);
+
 
     // Custo para igualar a maior aposta
     const custo     = Math.max(0, maiorAposta - apostaRodada);
@@ -139,119 +171,122 @@ export default function ActionBar({
     // ================================================================
     // RENDER
     // ================================================================
+    const evento = (fn) => ({ [EVENTO_ACAO]: fn });
+
     return (
-        <div className="ab-root">
-            <div className={`ab-bar${!ehMinhaVez ? ' ab-disabled' : ''}`}>
+        <div className="ab">
+            <div className={`ab-faixa${ehMinhaVez ? '' : ' espera'}`} aria-live="polite">
+                {ehMinhaVez
+                    ? <span>Sua vez</span>
+                    : <span>{nomeDaVez ? <>Vez de <b>{nomeDaVez}</b></> : 'Aguarde sua vez'}</span>}
+                <ContagemTurno expiraEm={expiraEm} />
+            </div>
+
+            <div className={`ab-corpo${ehMinhaVez ? '' : ' inativo'}`}>
+
+                {/* ── Atalhos de aposta (só ajustam o valor do raise) ── */}
+                <div className={`ab-atalhos ab-controle${ALLIN_NOS_ATALHOS ? ' com-allin' : ''}`}>
+                    {atalhos.map(({ label, val }, i) => (
+                        <button
+                            key={label}
+                            type="button"
+                            className={`ab-atalho${valorRaise === val && !ehAllIn && atalhos.findIndex(a => a.val === val) === i ? ' ativo' : ''}`}
+                            disabled={!ehMinhaVez || !podeRaise}
+                            onPointerDown={() => setValorRaise(val)}
+                        >
+                            {ROTULO_ATALHO[label] || label}
+                            <span className="num">{fmt(val)}</span>
+                        </button>
+                    ))}
+                    {ALLIN_NOS_ATALHOS && (
+                        <button
+                            type="button"
+                            className={`ab-atalho allin${ehAllIn ? ' ativo' : ''}`}
+                            disabled={!ehMinhaVez || !podeRaise}
+                            onPointerDown={() => setValorRaise(maxRaise)}
+                        >
+                            All-in
+                            <span className="num">{fmt(maxRaise)}</span>
+                        </button>
+                    )}
+                </div>
 
                 {/* ── Slider de raise ──────────────────────────────── */}
-                <div className="ab-raise-row">
-                    <span className="ab-raise-label">Raise</span>
-
-                    <div className={`ab-raise-val${ehAllIn ? ' allin' : ''}`}>
-                        {ehAllIn ? `ALL-IN ₿C ${maxRaise}` : `₿C ${valorRaise}`}
-                    </div>
-
+                <div className="ab-slider-linha ab-controle">
+                    <span className="dica" aria-hidden="true">← →</span>
                     <input
                         type="range"
                         className="ab-slider"
+                        aria-label="Valor do raise"
                         min={minRaise}
                         max={maxRaise}
                         step={stepRaise}
                         value={valorRaise}
-                        disabled={!ehMinhaVez}
+                        disabled={!ehMinhaVez || !podeRaise}
                         onChange={e => setValorRaise(parseInt(e.target.value))}
                     />
-
-                    {/* Atalhos rápidos (só desktop) */}
-                    <div className="ab-shortcuts">
-                        {atalhos.map(({ label, val }) => (
-                            <button
-                                key={label}
-                                className="ab-sc"
-                                onPointerDown={() => setValorRaise(val)}
-                            >
-                                {label}
-                                <span>₿C {val}</span>
-                            </button>
-                        ))}
-                    </div>
+                    <span className={`valor num${ehAllIn ? ' allin' : ''}`}>
+                        {ehAllIn ? `All-in ${moeda(maxRaise)}` : moeda(valorRaise)}
+                    </span>
                 </div>
 
                 {/* ── Botões de ação ────────────────────────────────── */}
-                <div className="ab-btns">
-
-                    {/* FOLD */}
+                <div className="ab-botoes ab-controle">
                     <button
-                        className={`ab-btn btn-fold`}
-                        style={{ transform: pressionado === 'FOLD' ? 'scale(0.96)' : undefined }}
-                        onPointerDown={() => handleAcao('FOLD', 0)}
+                        type="button"
+                        className={`ab-btn fold${pressionado === 'FOLD' ? ' pressionado' : ''}`}
+                        disabled={!ehMinhaVez}
+                        {...evento(() => handleAcao('FOLD', 0))}
                     >
-                        <span className="lbl">Fold</span>
-                        <span className="hkey ab-hkeys">F</span>
+                        Fold
+                        <span className="tecla" aria-hidden="true">F</span>
                     </button>
 
-                    {/* CHECK ou CALL */}
                     <button
-                        className={`ab-btn ${ehCheck ? 'btn-check' : 'btn-call'}`}
-                        style={{ transform: (pressionado === 'CHECK' || pressionado === 'CALL') ? 'scale(0.96)' : undefined }}
-                        onPointerDown={handleCheckCall}
+                        type="button"
+                        className={`ab-btn ${ehCheck ? 'check' : 'call'}${(pressionado === 'CHECK' || pressionado === 'CALL') ? ' pressionado' : ''}`}
+                        disabled={!ehMinhaVez}
+                        {...evento(handleCheckCall)}
                     >
-                        <span className="lbl">
-                            {ehCheck
-                                ? 'Check'
-                                : callEhAllIn
-                                    ? `All-in ₿C ${custoReal}`
-                                    : `Call ₿C ${custoReal}`}
-                        </span>
-                        <span className="hkey ab-hkeys">C</span>
+                        {ehCheck
+                            ? 'Check'
+                            : <span>{callEhAllIn ? 'All-in' : 'Call'} <small>{moeda(custoReal)}</small></span>}
+                        <span className="tecla" aria-hidden="true">C</span>
                     </button>
 
                     {/* RAISE — desabilitado se não sobra saldo pra aumentar de verdade */}
                     <button
-                        className="ab-btn btn-raise"
-                        disabled={!podeRaise}
-                        style={{ transform: pressionado === 'RAISE' ? 'scale(0.96)' : undefined }}
-                        onPointerDown={handleRaise}
+                        type="button"
+                        className={`ab-btn raise${pressionado === 'RAISE' ? ' pressionado' : ''}`}
+                        disabled={!ehMinhaVez || !podeRaise}
+                        {...evento(handleRaise)}
                     >
-                        <span className="lbl">Raise</span>
-                        <span className="hkey ab-hkeys">R</span>
+                        <span>{ehAllIn ? 'All-in' : 'Raise'} <small>{moeda(valorRaise)}</small></span>
+                        <span className="tecla" aria-hidden="true">R</span>
                     </button>
 
-                    {/* ALL-IN */}
+                    {/* ALL-IN — ação direta */}
                     <button
-                        className="ab-btn btn-allin"
-                        style={{ transform: pressionado === 'ALLIN' ? 'scale(0.96)' : undefined }}
-                        onPointerDown={handleAllIn}
+                        type="button"
+                        className={`ab-btn allin${pressionado === 'ALLIN' ? ' pressionado' : ''}`}
+                        disabled={!ehMinhaVez}
+                        {...evento(handleAllIn)}
                     >
-                        <span className="lbl">All-in</span>
-                        <span className="hkey ab-hkeys">A</span>
+                        All-in
+                        <span className="tecla" aria-hidden="true">A</span>
                     </button>
-
                 </div>
 
-                {/* ── Linha de info ─────────────────────────────────── */}
+                {/* ── Linha de info (desktop) ───────────────────────── */}
                 <div className="ab-info">
-                    <span className="ab-info-item">
-                        Fichas <b>₿C {saldoAtual.toLocaleString('pt-BR')}</b>
-                    </span>
-                    <span className="ab-info-item">
+                    <span>Fichas <b>{moeda(saldoAtual)}</b></span>
+                    <span>
                         {ehCheck
-                            ? <><b style={{ color: '#4ade80' }}>Check grátis</b></>
-                            : <>Para pagar <b>₿C {custoReal.toLocaleString('pt-BR')}</b>{callEhAllIn ? ' (all-in)' : ''}</>
-                        }
+                            ? <b className="positivo">Check grátis</b>
+                            : <>Para pagar <b>{moeda(custoReal)}</b>{callEhAllIn ? ' (all-in)' : ''}</>}
                     </span>
-                    <span className="ab-info-item">
-                        Pote <b>₿C {pote.toLocaleString('pt-BR')}</b>
-                    </span>
-
-                    {ehMinhaVez && (
-                        <span className="ab-turn-badge">
-                            <span className="ab-dot" />
-                            Sua vez
-                        </span>
-                    )}
+                    <span>Pote <b>{moeda(pote)}</b></span>
                 </div>
-
             </div>
         </div>
     );

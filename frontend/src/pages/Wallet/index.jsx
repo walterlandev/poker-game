@@ -188,12 +188,12 @@ export default function WalletIndex({ usuario, socket }) {
                 <div style={{
                     ...estilos.feedback,
                     background: feedback.tipo === 'sucesso'
-                        ? 'rgba(34,197,94,0.10)'
-                        : 'rgba(239,68,68,0.10)',
+                        ? 'var(--cor-positivo-suave)'
+                        : 'var(--cor-perigo-suave)',
                     border: feedback.tipo === 'sucesso'
-                        ? '1px solid rgba(34,197,94,0.30)'
-                        : '1px solid rgba(239,68,68,0.30)',
-                    color: feedback.tipo === 'sucesso' ? '#4ADE80' : '#FCA5A5',
+                        ? '1px solid var(--cor-positivo)'
+                        : '1px solid var(--cor-perigo-linha)',
+                    color: feedback.tipo === 'sucesso' ? 'var(--cor-positivo-texto)' : 'var(--cor-perigo-texto)',
                 }}>
                     <span style={{ fontSize: '15px' }}>
                         {feedback.tipo === 'sucesso' ? '✓' : '✕'}
@@ -214,14 +214,14 @@ export default function WalletIndex({ usuario, socket }) {
                             style={{
                                 ...estilos.tab,
                                 background: ativa
-                                    ? 'rgba(245,158,11,0.12)'
+                                    ? 'var(--cor-destaque-suave)'
                                     : 'transparent',
                                 borderBottom: ativa
-                                    ? '2px solid #F59E0B'
+                                    ? '2px solid var(--cor-destaque-texto)'
                                     : '2px solid transparent',
                                 color: ativa
-                                    ? '#F59E0B'
-                                    : 'rgba(255,255,255,0.40)',
+                                    ? 'var(--cor-destaque-texto)'
+                                    : 'var(--cor-texto-3)',
                                 fontWeight: ativa ? '600' : '400',
                             }}
                         >
@@ -264,7 +264,7 @@ const estilos = {
         justifyContent: 'space-between',
         alignItems:     'flex-start',
         padding:        '16px 16px 12px',
-        borderBottom:   '1px solid rgba(255,255,255,0.06)',
+        borderBottom:   '1px solid var(--cor-superficie)',
     },
 
     titulo: {
@@ -273,13 +273,13 @@ const estilos = {
         gap:        '7px',
         fontSize:   '18px',
         fontWeight: '700',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         margin:     0,
     },
 
     subtitulo: {
         fontSize:  '12px',
-        color:     'rgba(255,255,255,0.35)',
+        color:     'var(--cor-texto-3)',
         margin:    '3px 0 0',
     },
 
@@ -289,15 +289,15 @@ const estilos = {
         flexDirection:  'column',
         alignItems:     'flex-end',
         gap:            '2px',
-        background:     'rgba(245,158,11,0.08)',
-        border:         '1px solid rgba(245,158,11,0.20)',
+        background:     'var(--cor-destaque-suave)',
+        border:         '1px solid var(--cor-destaque-suave)',
         borderRadius:   '8px',
         padding:        '8px 12px',
     },
 
     saldoLabel: {
         fontSize:   '10px',
-        color:      'rgba(245,158,11,0.70)',
+        color:      'var(--cor-destaque-linha)',
         fontWeight: '500',
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
@@ -306,7 +306,7 @@ const estilos = {
     saldoValor: {
         fontSize:   '15px',
         fontWeight: '700',
-        color:      '#F59E0B',
+        color:      'var(--cor-destaque-texto)',
     },
 
     // Feedback de sucesso ou erro
@@ -348,7 +348,7 @@ const estilos = {
 
     divisor: {
         height:     '1px',
-        background: 'rgba(255,255,255,0.06)',
+        background: 'var(--cor-superficie)',
         margin:     '0 16px',
     },
 

@@ -1,0 +1,917 @@
+<!doctype html>
+<html lang="pt-BR" data-tema="claro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#DCD5C8">
+<title>Bitchager, prévia do tema claro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   TOKENS
+   Nomes semânticos. :root = tema escuro (valores idênticos aos da
+   prévia escura); [data-tema="claro"] = tema claro, só troca valores.
+   Tabela completa em frontend/DESIGN-claro.md.
+   ============================================================ */
+:root{
+  color-scheme:dark;
+  /* superfícies e texto */
+  --c-pagina:#120E0C;            /* moldura da prévia (fora do app) */
+  --c-fundo:#1C1714;             /* tabaco */
+  --c-superficie:#2A221D;        /* couro */
+  --c-superficie-2:#3A2F28;      /* couro-claro */
+  --c-superficie-2-hover:#4A3D34;
+  --c-texto:#F1E8D8;             /* marfim */
+  --c-texto-2:#B8A893;
+  --c-texto-3:#857766;
+  --c-linha:rgba(241,232,216,.10);
+  --c-hover-linha:rgba(241,232,216,.03);
+  --textura-fundo:none;
+
+  /* destaque único: latão */
+  --c-destaque:#D9A441;          /* preenchimento: faixa, Raise, Criar mesa */
+  --c-destaque-texto:#D9A441;    /* ₿C e item ativo escritos sobre a superfície */
+  --c-sobre-destaque:#1C1714;
+  --c-destaque-tinta:rgba(217,164,65,.14);
+  --c-destaque-borda:rgba(217,164,65,.55);
+  --c-foco:#D9A441;
+
+  /* estados */
+  --c-positivo:#6FAE84;          /* sálvia */
+  --c-positivo-texto:#6FAE84;
+  --c-sobre-positivo:#10261A;
+  --c-perigo:#E0573A;            /* brasa */
+  --c-perigo-texto:#F08A6F;
+  --c-perigo-rotulo:#E0573A;
+  --c-sobre-perigo:#FFFFFF;
+  --c-perigo-tinta:rgba(224,87,58,.08);
+  --c-perigo-borda:rgba(224,87,58,.5);
+
+  /* mesa (feltro igual nos dois temas) */
+  --c-feltro:#6E1F2B;
+  --c-feltro-luz:#83283A;
+  --c-feltro-fundo:#4A1420;
+  --c-feltro-sombra:rgba(20,5,8,.6);
+  --c-feltro-texto:#F1E8D8;
+  --c-feltro-texto-2:rgba(241,232,216,.62);
+  --c-feltro-vidro:rgba(28,23,20,.55);
+  --c-feltro-vidro-2:rgba(28,23,20,.75);
+  --c-feltro-destaque:#D9A441;
+  --c-verso-borda:rgba(217,164,65,.58);
+  --c-carta-vazia:rgba(241,232,216,.22);
+  --c-trilho-1:#4A3A2E; --c-trilho-2:#2E241E; --c-trilho-3:#241C17;
+  --c-trilho-brilho:rgba(241,232,216,.08);
+  --c-costura:rgba(217,164,65,.35);
+  --c-placa:rgba(28,23,20,.92);
+  --c-av-borda:#1C1714;
+  --c-anel-vazio:rgba(241,232,216,.14);
+  --c-dealer:#F1E8D8; --c-sobre-dealer:#1C1714;
+  --c-polegar:#F1E8D8;
+
+  /* cartas (a face clássica; os temas da loja sobrescrevem) */
+  --c-carta-face:#FBF6EC;
+  --c-carta-borda:#D9CDB8;
+  --c-naipe-verm:#B3261E; --c-naipe-preto:#1C1714;
+
+  /* fichas: objetos do jogo, iguais nos dois temas */
+  --c-ficha-azul:#2F5D8A; --c-ficha-vermelha:#9E2A2B; --c-ficha-preta:#2B2523; --c-ficha-verde:#3E7A57;
+  --c-ficha-aro:rgba(241,232,216,.85);
+
+  /* sombras */
+  --sombra:0 10px 30px rgba(10,6,4,.55);
+  --sombra-mesa:0 18px 50px rgba(10,6,4,.7);
+  --sombra-carta:0 2px 6px rgba(10,6,4,.5);
+  --sombra-peq:0 2px 6px rgba(10,6,4,.6);
+
+  --f:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --w-cond:88%; --w-exp:118%;
+  --t-12:12px; --t-14:14px; --t-16:16px; --t-19:19px; --t-23:23px; --t-28:28px; --t-40:40px;
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px; --s-6:32px; --s-7:48px;
+  --r-carta:6px; --r-badge:4px; --r-botao:10px; --r-painel:14px; --r-folha:20px;
+  --toque:44px;
+  --z-assento:10; --z-aposta:20; --z-centro:30; --z-painel:40; --z-cabecalho:50;
+
+  --ruido:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------- TEMA CLARO: "salão de dia" ---------- */
+[data-tema="claro"]{
+  color-scheme:light;
+  --c-pagina:#CEC6B7;            /* moldura da prévia */
+  --c-fundo:#DCD5C8;             /* linho cru */
+  --c-superficie:#F1EDE5;        /* papel */
+  --c-superficie-2:#D0C6B5;      /* camurça */
+  --c-superficie-2-hover:#C4B8A4;
+  --c-texto:#2B211B;             /* tinta sépia */
+  --c-texto-2:#4A3E34;
+  --c-texto-3:#5B4D41;
+  --c-linha:rgba(43,33,27,.13);
+  --c-hover-linha:rgba(43,33,27,.035);
+  /* trama de linho: dois fios cruzados quase invisíveis */
+  --textura-fundo:repeating-linear-gradient(0deg,rgba(43,33,27,.016) 0 1px,transparent 1px 3px),repeating-linear-gradient(90deg,rgba(255,252,245,.09) 0 1px,transparent 1px 3px);
+
+  --c-destaque:#C99532;
+  --c-destaque-texto:#7A510C;
+  --c-sobre-destaque:#2B211B;
+  --c-destaque-tinta:rgba(201,149,50,.20);
+  --c-destaque-borda:rgba(122,81,12,.55);
+  --c-foco:#7A510C;
+
+  --c-positivo:#69A87E;
+  --c-positivo-texto:#2B6340;
+  --c-sobre-positivo:#10261A;
+  --c-perigo:#BE4220;
+  --c-perigo-texto:#9E3116;
+  --c-perigo-rotulo:#9E3116;
+  --c-sobre-perigo:#FFFFFF;
+  --c-perigo-tinta:rgba(190,66,32,.07);
+  --c-perigo-borda:rgba(158,49,22,.45);
+
+  /* o feltro não muda; muda o que está em volta dele */
+  --c-trilho-1:#D6BD95; --c-trilho-2:#BB9D71; --c-trilho-3:#A3855D;
+  --c-trilho-brilho:rgba(255,250,240,.45);
+  --c-costura:rgba(110,70,10,.42);
+  --c-placa:#F7F3EC;
+  --c-feltro-texto-2:rgba(241,232,216,.78);  /* .62 do escuro dá 3,8:1; .78 dá 5,1:1 */
+  --c-av-borda:#F1EDE5;
+  --c-anel-vazio:rgba(43,33,27,.14);
+  --c-polegar:#FBF8F2;
+
+  --c-carta-borda:#C4B7A1;
+
+  --sombra:0 1px 0 rgba(255,252,245,.6) inset,0 12px 28px rgba(84,60,36,.16);
+  --sombra-mesa:0 16px 36px rgba(84,58,32,.30);
+  --sombra-carta:0 1px 3px rgba(60,40,25,.28);
+  --sombra-peq:0 1px 3px rgba(60,40,25,.35);
+}
+
+*{box-sizing:border-box}
+html{background:var(--c-pagina);color:var(--c-texto);font-family:var(--f);-webkit-font-smoothing:antialiased}
+body{margin:0}
+button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--c-foco);outline-offset:2px}
+.num{font-stretch:var(--w-cond);font-variant-numeric:tabular-nums;font-weight:700}
+.bc{color:var(--c-destaque-texto)}
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+
+/* ============================================================
+   PÁGINA DA PRÉVIA (moldura, não faz parte do app)
+   ============================================================ */
+.pv{max-width:1344px;margin:0 auto;padding:var(--s-7) var(--s-5)}
+.pv-tema{display:flex;align-items:center;gap:var(--s-3);margin-bottom:var(--s-5);font-size:var(--t-14);color:var(--c-texto-2)}
+.pv-tema .segmento{margin:0}
+.pv-intro{display:grid;grid-template-columns:1.1fr 1fr;gap:var(--s-6);align-items:end;margin-bottom:var(--s-7)}
+.pv-intro h1{font-stretch:var(--w-exp);font-weight:800;font-size:var(--t-40);line-height:1.05;letter-spacing:-.02em;margin:0 0 var(--s-3);text-wrap:balance}
+.pv-intro p{color:var(--c-texto-2);font-size:var(--t-16);line-height:1.55;max-width:58ch;margin:0;text-wrap:pretty}
+.paleta{display:grid;grid-template-columns:repeat(7,1fr);gap:var(--s-2)}
+.sw{border-radius:var(--r-botao);overflow:hidden;background:var(--c-superficie);font-size:var(--t-12)}
+.sw i{display:block;height:56px;box-shadow:inset 0 -1px 0 var(--c-linha)}
+.sw span{display:block;padding:6px 8px 2px;font-weight:600}
+.sw code{display:block;padding:0 8px 8px;color:var(--c-texto-3);font-family:inherit;font-stretch:var(--w-cond)}
+.tipo{grid-column:1/-1;display:flex;gap:var(--s-6);align-items:baseline;flex-wrap:wrap;border-top:1px solid var(--c-linha);padding-top:var(--s-4);color:var(--c-texto-2);font-size:var(--t-14)}
+.tipo b{color:var(--c-texto)}
+.pv-sec > h2{font-size:var(--t-19);font-weight:600;margin:0 0 var(--s-1)}
+.pv .leg{color:var(--c-texto-2);font-size:var(--t-14);margin:0 0 var(--s-4);max-width:70ch;line-height:1.5}
+.pv-sec{margin-bottom:var(--s-7)}
+.fones{display:flex;gap:var(--s-6);flex-wrap:wrap}
+.fone-col{width:390px}
+.fone-col h3{font-size:var(--t-14);font-weight:600;color:var(--c-texto-2);margin:0 0 var(--s-2)}
+.fone{width:390px;height:844px;border-radius:36px;border:1px solid var(--c-linha);overflow:hidden;position:relative;background:var(--textura-fundo),var(--c-fundo);display:flex;flex-direction:column;box-shadow:var(--sombra)}
+.tela-wrap{overflow-x:auto;padding-bottom:var(--s-2)}
+.tela{width:1280px;height:720px;border-radius:var(--r-painel);border:1px solid var(--c-linha);overflow:hidden;position:relative;background:var(--textura-fundo),var(--c-fundo);box-shadow:var(--sombra)}
+@media (max-width:1360px){ .pv-intro{grid-template-columns:1fr} }
+@media (max-width:440px){
+  .pv{padding:0}
+  .pv-tema,.pv-intro,.pv-sec > h2,.pv .leg,.fone-col h3{padding-left:var(--s-4);padding-right:var(--s-4)}
+  .pv-tema{padding-top:var(--s-4)}
+  .pv-intro{padding-top:var(--s-4)}
+  .paleta{grid-template-columns:repeat(4,1fr)}
+  .fones{gap:var(--s-6)}
+  .fone-col{width:100%}
+  .fone{width:100%;border-radius:0;border-left:0;border-right:0}
+  .tela-wrap{padding:0 var(--s-4)}
+}
+
+/* ============================================================
+   COMPONENTES DO JOGO
+   ============================================================ */
+/* Cartas (face clássica; os temas da loja trocam fundo/borda/naipes) */
+.carta{--w:46px;width:var(--w);height:calc(var(--w)*1.4);border-radius:var(--r-carta);background:var(--c-carta-face);border:1px solid var(--c-carta-borda);position:relative;box-shadow:var(--sombra-carta);color:var(--c-naipe-preto);flex-shrink:0}
+.carta.v{color:var(--c-naipe-verm)}
+.carta b em{display:block;font-style:normal;font-size:.72em;margin-top:2px;text-align:center}
+.carta b{position:absolute;top:3px;left:5px;font-size:calc(var(--w)*.34);font-weight:800;font-stretch:var(--w-cond);line-height:1}
+.carta i{position:absolute;right:4px;bottom:2px;font-style:normal;font-size:calc(var(--w)*.56);line-height:1}
+.carta.vazia{background:transparent;border:1px dashed var(--c-carta-vazia);box-shadow:none}
+.carta.verso{background:repeating-linear-gradient(45deg,var(--c-feltro) 0 3px,var(--c-feltro-fundo) 3px 6px);border:1.5px solid var(--c-verso-borda)}
+
+/* Mesa: trilho + costura de latão + feltro vinho */
+.mesa{position:absolute;border-radius:999px;padding:12px;background:radial-gradient(120% 90% at 50% 0%,var(--c-trilho-1) 0%,var(--c-trilho-2) 55%,var(--c-trilho-3) 100%);box-shadow:var(--sombra-mesa),inset 0 1px 0 var(--c-trilho-brilho)}
+.mesa::before{content:"";position:absolute;inset:5px;border-radius:999px;border:1.5px dashed var(--c-costura);pointer-events:none}
+.feltro{width:100%;height:100%;border-radius:999px;background:var(--ruido),radial-gradient(80% 70% at 50% 42%,var(--c-feltro-luz) 0%,var(--c-feltro) 48%,var(--c-feltro-fundo) 100%);box-shadow:inset 0 0 40px var(--c-feltro-sombra);display:flex;align-items:center;justify-content:center}
+.centro{display:flex;flex-direction:column;align-items:center;gap:var(--s-2);z-index:var(--z-centro)}
+.fase{font-size:var(--t-12);font-weight:600;color:var(--c-feltro-texto-2)}
+.pote{display:flex;align-items:center;gap:6px;padding:4px 12px 4px 6px;border-radius:999px;background:var(--c-feltro-vidro)}
+.pote .num{font-size:var(--t-19);color:var(--c-feltro-destaque)}
+.comunitarias{display:flex;gap:4px}
+
+/* Ficha */
+.ficha{width:16px;height:16px;border-radius:50%;background:var(--cf,var(--c-ficha-azul));box-shadow:inset 0 0 0 2px var(--cf,var(--c-ficha-azul)),inset 0 0 0 4px var(--c-ficha-aro);flex-shrink:0}
+.ficha.f-vermelha{--cf:var(--c-ficha-vermelha)}.ficha.f-preta{--cf:var(--c-ficha-preta)}.ficha.f-verde{--cf:var(--c-ficha-verde)}
+
+/* Assento */
+.assento{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;z-index:var(--z-assento)}
+.av-anel{--p:0;padding:3px;border-radius:50%;background:transparent;position:relative}
+.av-anel.turno{background:conic-gradient(var(--c-destaque) calc(var(--p)*1%),var(--c-anel-vazio) 0)}
+.av{--a:44px;width:var(--a);height:var(--a);border-radius:50%;overflow:hidden;background:var(--c-superficie-2);border:2px solid var(--c-av-borda);display:grid;place-items:center;font-weight:700;font-size:15px;color:var(--c-texto-2)}
+.av img{width:100%;height:100%;object-fit:cover;display:block}
+.placa{margin-top:-6px;position:relative;z-index:1;min-width:70px;padding:3px 8px 4px;border-radius:8px;background:var(--c-placa);border:1px solid var(--c-linha);text-align:center;line-height:1.2}
+.placa .nm{display:block;font-size:var(--t-12);font-weight:600;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.placa .num{display:block;font-size:var(--t-12);color:var(--c-texto-2);font-weight:600}
+.assento.turno .placa{border-color:var(--c-destaque-borda)}
+.assento.turno .placa .num{color:var(--c-destaque-texto)}
+.assento.desistiu .av-anel,.assento.desistiu .placa{opacity:.55;filter:grayscale(1)}
+.etq{position:absolute;top:-6px;right:-10px;font-size:11px;font-weight:700;padding:1px 5px;border-radius:var(--r-badge);background:var(--c-superficie-2);color:var(--c-texto-2);z-index:2}
+.etq.allin{background:var(--c-perigo);color:var(--c-sobre-perigo)}
+.dealer{position:absolute;width:20px;height:20px;border-radius:50%;background:var(--c-dealer);color:var(--c-sobre-dealer);font-size:11px;font-weight:800;display:grid;place-items:center;box-shadow:var(--sombra-peq);z-index:var(--z-aposta)}
+.mini-versos{position:absolute;display:flex;z-index:0}
+.mini-versos .carta{--w:16px;box-shadow:none}
+.mini-versos .carta+.carta{margin-left:-7px;transform:rotate(8deg)}
+.aposta{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:5px;padding:2px 8px 2px 3px;border-radius:999px;background:var(--c-feltro-vidro-2);color:var(--c-feltro-texto);font-size:var(--t-12);z-index:var(--z-aposta);white-space:nowrap}
+
+/* Topo da mesa */
+.m-top{height:52px;flex-shrink:0;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:var(--s-2);padding:0 var(--s-2) 0 var(--s-1);background:var(--c-superficie);border-bottom:1px solid var(--c-linha);z-index:var(--z-cabecalho)}
+.btn-sair{display:flex;align-items:center;gap:6px;height:var(--toque);padding:0 10px;border-radius:var(--r-botao);color:var(--c-texto-2);font-size:var(--t-14)}
+.btn-sair:hover{background:var(--c-superficie-2)}
+.m-top .info{min-width:0;line-height:1.25}
+.m-top .info b{display:block;font-size:var(--t-14);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m-top .info span{font-size:var(--t-12);color:var(--c-texto-3)}
+.m-top .saldo{text-align:right;line-height:1.2;padding-right:var(--s-2)}
+.m-top .saldo span{display:block;font-size:11px;color:var(--c-texto-3)}
+.m-top .saldo .num{font-size:var(--t-16)}
+
+/* Palco da mesa no celular */
+.m-palco{flex:1;position:relative;min-height:0}
+.m-palco .mesa{left:40px;right:40px;top:30px;bottom:22px}
+
+/* Sua mão (celular) */
+.m-mao{flex-shrink:0;display:flex;align-items:center;gap:var(--s-4);padding:var(--s-2) var(--s-4) var(--s-3)}
+.m-mao .cartas{display:flex;align-items:flex-end;padding-left:4px}
+.m-mao .carta{--w:54px}
+.m-mao .carta:first-child{transform:rotate(-6deg)}
+.m-mao .carta+.carta{margin-left:-14px;transform:rotate(5deg) translateY(-2px)}
+.m-mao .dados{flex:1;min-width:0}
+.m-mao .linha1{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s-2)}
+.m-mao .linha1 b{font-size:var(--t-14);font-weight:600}
+.m-mao .linha1 .num{font-size:var(--t-19)}
+.forca{margin-top:6px}
+.forca .rot{display:flex;justify-content:space-between;font-size:var(--t-12);color:var(--c-texto-2)}
+.forca .rot b{color:var(--c-texto);font-weight:600}
+.barra{height:4px;border-radius:2px;background:var(--c-superficie-2);margin-top:5px;overflow:hidden}
+.barra i{display:block;height:100%;background:var(--c-positivo);border-radius:2px}
+
+/* Painel de ações */
+.painel{flex-shrink:0;background:var(--c-superficie);border-top:1px solid var(--c-linha);padding:0 var(--s-3) calc(var(--s-3) + max(14px, env(safe-area-inset-bottom)));z-index:var(--z-painel)}
+.faixa{display:flex;align-items:center;justify-content:space-between;gap:var(--s-2);margin:0 calc(var(--s-3)*-1) var(--s-3);padding:7px var(--s-4);background:var(--c-destaque);color:var(--c-sobre-destaque);font-size:var(--t-14);font-weight:700}
+.faixa .num{font-size:var(--t-16)}
+.faixa.espera{background:var(--c-superficie-2);color:var(--c-texto-2);font-weight:500}
+.faixa.espera b{color:var(--c-texto);font-weight:600}
+.atalhos{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.atalho{min-height:var(--toque);border-radius:var(--r-botao);background:var(--c-superficie-2);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15;font-size:var(--t-12);color:var(--c-texto-2)}
+.atalho:disabled{opacity:.4;cursor:default}
+.atalho .num{font-size:var(--t-14);color:var(--c-texto)}
+.atalho.ativo{background:var(--c-destaque-tinta);box-shadow:inset 0 0 0 1px var(--c-destaque-borda);color:var(--c-destaque-texto)}
+.atalho.ativo .num{color:var(--c-destaque-texto)}
+.atalho.allin{color:var(--c-perigo-rotulo);box-shadow:inset 0 0 0 1px var(--c-perigo-borda);background:var(--c-perigo-tinta)}
+.atalho.allin .num{color:var(--c-perigo-texto)}
+.slider{display:flex;align-items:center;gap:var(--s-3);height:44px;padding-left:12px}
+.slider .trilho{flex:1;height:6px;border-radius:3px;background:var(--c-superficie-2);position:relative}
+.slider .trilho i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--c-destaque)}
+.slider .trilho em{position:absolute;top:50%;width:24px;height:24px;border-radius:50%;background:var(--c-polegar);transform:translate(-50%,-50%);box-shadow:var(--sombra-peq)}
+.slider .valor{min-width:92px;text-align:right;font-size:var(--t-19)}
+.acoes{display:grid;grid-template-columns:1fr 1.25fr 1.25fr;gap:var(--s-2)}
+.acao{min-height:56px;border-radius:var(--r-botao);font-stretch:var(--w-cond);font-weight:700;font-size:var(--t-19);display:flex;align-items:center;justify-content:center;gap:6px;position:relative;transition:transform .12s, filter .12s}
+.acao:active{transform:translateY(1px);filter:brightness(.94)}
+.acao small{font-size:var(--t-14);font-weight:600;font-variant-numeric:tabular-nums}
+.a-fold{background:var(--c-superficie-2);color:var(--c-texto)}
+.a-call{background:var(--c-positivo);color:var(--c-sobre-positivo)}
+.a-raise{background:var(--c-destaque);color:var(--c-sobre-destaque)}
+.acao:disabled{opacity:.4;cursor:default}
+.kbd{position:absolute;top:5px;right:7px;font-size:11px;font-weight:600;font-stretch:100%;opacity:.55}
+
+/* ============================================================
+   LOBBY
+   ============================================================ */
+.marca{display:flex;align-items:center;gap:8px;font-stretch:var(--w-exp);font-weight:800;font-size:var(--t-19);letter-spacing:-.01em}
+.marca .selo{width:28px;height:28px;border-radius:8px;background:var(--c-feltro);border:1.5px dashed var(--c-verso-borda);display:grid;place-items:center;font-size:13px;color:var(--c-feltro-destaque);font-stretch:var(--w-cond)}
+.l-top{height:60px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 var(--s-3) 0 var(--s-4);border-bottom:1px solid var(--c-linha);background:var(--textura-fundo),var(--c-fundo)}
+.l-top .dir{display:flex;align-items:center;gap:var(--s-2)}
+.saldo-pill{display:flex;align-items:center;gap:6px;height:40px;padding:0 6px 0 12px;border-radius:999px;background:var(--c-superficie)}
+.saldo-pill .num{font-size:var(--t-16);color:var(--c-destaque-texto)}
+.saldo-pill .mais{width:28px;height:28px;border-radius:50%;background:var(--c-destaque);color:var(--c-sobre-destaque);display:grid;place-items:center}
+.saldo-pill .mais svg{width:16px;height:16px;stroke-width:2.4}
+.btn-avatar{width:var(--toque);height:var(--toque);border-radius:50%;padding:3px;display:grid;place-items:center}
+.btn-avatar img{width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid var(--c-superficie-2)}
+.l-corpo{flex:1;overflow:hidden;padding:var(--s-4)}
+.l-cab{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--s-3)}
+.l-cab h2{font-stretch:var(--w-exp);font-weight:800;font-size:var(--t-23);margin:0;letter-spacing:-.01em}
+.btn-criar{display:flex;align-items:center;gap:6px;height:40px;padding:0 14px 0 10px;border-radius:var(--r-botao);background:var(--c-destaque);color:var(--c-sobre-destaque);font-weight:700;font-size:var(--t-14)}
+.btn-criar svg{stroke-width:2.4;width:18px;height:18px}
+.segmento{display:inline-flex;padding:3px;border-radius:var(--r-botao);background:var(--c-superficie);margin-bottom:var(--s-3)}
+.segmento button{height:36px;padding:0 14px;border-radius:8px;font-size:var(--t-14);color:var(--c-texto-2);display:flex;align-items:center;gap:6px}
+.segmento button[aria-pressed=true]{background:var(--c-superficie-2);color:var(--c-texto);font-weight:600}
+.segmento .cont{font-size:var(--t-12);color:var(--c-texto-3);font-stretch:var(--w-cond)}
+.lista{display:flex;flex-direction:column}
+.linha-mesa{display:grid;grid-template-columns:72px 1fr auto;align-items:center;gap:var(--s-2);padding:12px 0;border-bottom:1px solid var(--c-linha)}
+.blinds{line-height:1}
+.blinds .num{display:block;font-size:21px;letter-spacing:-.01em;color:var(--c-texto)}
+.blinds span{font-size:11px;color:var(--c-texto-3)}
+.linha-mesa .meio{min-width:0}
+.linha-mesa .nome{display:flex;align-items:center;gap:5px;font-size:var(--t-14);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.linha-mesa .nome svg{width:14px;height:14px;color:var(--c-texto-3)}
+.linha-mesa .meta{display:flex;align-items:center;gap:var(--s-3);margin-top:4px;font-size:var(--t-12);color:var(--c-texto-2)}
+.lugares{display:flex;align-items:center;gap:3px}
+.lugares i{width:7px;height:7px;border-radius:50%;background:var(--c-texto-2)}
+.lugares i.l{background:transparent;box-shadow:inset 0 0 0 1.5px var(--c-texto-3)}
+.lugares em{font-style:normal;margin-left:4px;font-stretch:var(--w-cond);font-variant-numeric:tabular-nums}
+.estado{font-size:11px;font-weight:600;color:var(--c-texto-3)}
+.estado.jogo{color:var(--c-positivo-texto)}
+.btn-entrar{height:40px;padding:0 14px;border-radius:var(--r-botao);background:var(--c-superficie-2);font-weight:600;font-size:var(--t-14)}
+.btn-entrar:hover{background:var(--c-superficie-2-hover)}
+.btn-entrar:disabled{opacity:.4;cursor:default}
+.nav-baixo{height:76px;flex-shrink:0;display:grid;grid-template-columns:repeat(5,1fr);background:var(--c-superficie);border-top:1px solid var(--c-linha);padding-bottom:14px}
+.nav-baixo button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;color:var(--c-texto-3);position:relative}
+.nav-baixo button svg{width:22px;height:22px}
+.nav-baixo button[aria-current=page]{color:var(--c-destaque-texto);font-weight:600}
+.nav-baixo button[aria-current=page]::before{content:"";position:absolute;top:0;width:28px;height:2px;border-radius:0 0 2px 2px;background:var(--c-destaque-texto)}
+
+/* ============================================================
+   DESKTOP
+   ============================================================ */
+.d-top{height:56px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:var(--s-4);padding:0 var(--s-4) 0 var(--s-2);background:var(--c-superficie);border-bottom:1px solid var(--c-linha);position:relative;z-index:var(--z-cabecalho)}
+.d-top .info{display:flex;align-items:baseline;gap:var(--s-4);font-size:var(--t-14);color:var(--c-texto-3)}
+.d-top .info b{color:var(--c-texto);font-size:var(--t-16);font-weight:600}
+.d-top .saldo{display:flex;align-items:baseline;gap:8px;font-size:var(--t-12);color:var(--c-texto-3)}
+.d-top .saldo .num{font-size:var(--t-19)}
+.tela .assento .av{--a:56px}
+.tela .placa{min-width:88px}
+.tela .placa .nm,.tela .placa .num{font-size:var(--t-14)}
+.tela .mini-versos .carta{--w:22px}
+.d-painel{position:absolute;right:16px;bottom:16px;width:400px;border-radius:var(--r-painel);overflow:hidden;background:var(--c-superficie);border:1px solid var(--c-linha);box-shadow:var(--sombra);padding:0 var(--s-3) var(--s-3);z-index:var(--z-painel)}
+.d-painel .faixa{margin-bottom:var(--s-3)}
+.d-painel .acao{min-height:52px;font-size:var(--t-16)}
+.d-painel .atalho{min-height:40px}
+.info-acoes{display:flex;justify-content:space-between;margin-top:var(--s-3);font-size:var(--t-12);color:var(--c-texto-3)}
+.info-acoes b{color:var(--c-texto-2);font-weight:600;font-stretch:var(--w-cond);font-variant-numeric:tabular-nums}
+.d-forca{position:absolute;left:16px;bottom:16px;width:300px;padding:var(--s-3) var(--s-4);border-radius:var(--r-painel);background:var(--c-superficie);border:1px solid var(--c-linha);z-index:var(--z-painel)}
+.d-forca .t{font-size:var(--t-12);color:var(--c-texto-3)}
+.d-forca .m{font-size:var(--t-19);font-weight:600;margin:2px 0 0}
+
+.d-nav{display:flex;gap:2px;height:100%}
+.d-nav button{display:flex;align-items:center;gap:8px;padding:0 14px;font-size:var(--t-14);font-weight:500;color:var(--c-texto-2);position:relative;height:100%}
+.d-nav button:hover{color:var(--c-texto)}
+.d-nav button[aria-current=page]{color:var(--c-destaque-texto);font-weight:600}
+.d-nav button[aria-current=page]::after{content:"";position:absolute;left:14px;right:14px;bottom:-1px;height:2px;background:var(--c-destaque-texto)}
+.dl-top{height:64px;display:flex;align-items:center;gap:var(--s-6);padding:0 var(--s-5);border-bottom:1px solid var(--c-linha)}
+.dl-top .dir{margin-left:auto;display:flex;align-items:center;gap:var(--s-3)}
+.dl-saldo{display:flex;align-items:center;gap:var(--s-3);padding-left:var(--s-4);height:44px;border-radius:var(--r-botao);background:var(--c-superficie)}
+.dl-saldo .num{font-size:var(--t-19)}
+.dl-saldo .lbl{font-size:11px;color:var(--c-texto-3);display:block;line-height:1}
+.dl-saldo button{height:44px;padding:0 14px;border-radius:0 var(--r-botao) var(--r-botao) 0;background:var(--c-destaque-tinta);color:var(--c-destaque-texto);font-weight:600;font-size:var(--t-14);border-left:1px solid var(--c-linha)}
+.dl-perfil{display:flex;align-items:center;gap:10px;height:44px;padding:0 8px 0 4px;border-radius:var(--r-botao)}
+.dl-perfil:hover{background:var(--c-superficie)}
+.dl-perfil img{width:36px;height:36px;border-radius:50%;object-fit:cover}
+.dl-perfil .txt{line-height:1.2;text-align:left}
+.dl-perfil .txt b{display:block;font-size:var(--t-14);font-weight:600}
+.dl-perfil .txt span{font-size:var(--t-12);color:var(--c-texto-3)}
+.menu{position:absolute;top:60px;right:24px;width:220px;padding:6px;border-radius:var(--r-painel);background:var(--c-superficie);border:1px solid var(--c-linha);box-shadow:var(--sombra);z-index:60}
+.menu button{width:100%;display:flex;align-items:center;gap:10px;height:42px;padding:0 10px;border-radius:8px;font-size:var(--t-14);text-align:left}
+.menu button:hover,.menu button.foco{background:var(--c-superficie-2)}
+.menu hr{border:0;border-top:1px solid var(--c-linha);margin:6px 4px}
+.menu .perigo{color:var(--c-perigo-texto)}
+.dl-corpo{display:grid;grid-template-columns:1fr 320px;height:calc(100% - 64px)}
+.dl-main{padding:var(--s-5);overflow:hidden}
+.dl-main .l-cab{margin-bottom:var(--s-4)}
+.dl-main .l-cab .esq{display:flex;align-items:center;gap:var(--s-5)}
+.dl-main .segmento{margin:0}
+table.mesas{width:100%;border-collapse:collapse;font-size:var(--t-14)}
+table.mesas th{text-align:left;font-weight:500;font-size:var(--t-12);color:var(--c-texto-3);padding:0 var(--s-3) var(--s-2);border-bottom:1px solid var(--c-linha)}
+table.mesas td{padding:12px var(--s-3);border-bottom:1px solid var(--c-linha);vertical-align:middle}
+table.mesas tr:hover td{background:var(--c-hover-linha)}
+table.mesas td.n{font-stretch:var(--w-cond);font-variant-numeric:tabular-nums;font-weight:600}
+table.mesas td.bl{font-size:var(--t-19);font-stretch:var(--w-cond);font-variant-numeric:tabular-nums;font-weight:700;width:90px}
+table.mesas td:last-child,table.mesas th:last-child{text-align:right}
+table.mesas .nome{display:flex;align-items:center;gap:6px;font-weight:600}
+table.mesas .nome svg{width:15px;height:15px;color:var(--c-texto-3)}
+.dl-lado{border-left:1px solid var(--c-linha);padding:var(--s-5);background:linear-gradient(180deg,var(--c-superficie),var(--c-fundo) 70%)}
+.dl-lado h3{font-size:var(--t-16);font-weight:600;margin:0 0 var(--s-1)}
+.dl-lado .sub{font-size:var(--t-12);color:var(--c-texto-3);margin:0 0 var(--s-4)}
+.rk{display:grid;grid-template-columns:24px 32px 1fr auto;align-items:center;gap:10px;padding:8px 0;font-size:var(--t-14)}
+.rk .pos{font-stretch:var(--w-cond);font-weight:700;color:var(--c-texto-3);text-align:right;font-variant-numeric:tabular-nums}
+.rk img,.rk .mono{width:32px;height:32px;border-radius:50%;object-fit:cover}
+.rk .mono{background:var(--c-superficie-2);display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--c-texto-2)}
+.rk .nm b{display:block;font-weight:600;line-height:1.2}
+.rk .nm span{font-size:var(--t-12);color:var(--c-texto-3)}
+.rk .pts{font-stretch:var(--w-cond);font-weight:700;font-variant-numeric:tabular-nums}
+.rk.eu{margin:4px -10px;padding:8px 10px;border-radius:var(--r-botao);background:var(--c-destaque-tinta)}
+.rk.eu .pos{color:var(--c-destaque-texto)}
+.rk.top .pos{color:var(--c-destaque-texto)}
+
+@media (prefers-reduced-motion:no-preference){
+  .av-anel.turno{animation:anel 3s linear infinite}
+  @keyframes anel{from{--p:100}to{--p:0}}
+}
+@property --p{syntax:'<number>';inherits:false;initial-value:0}
+</style>
+</head>
+<body>
+
+<!-- Ícones SVG próprios (traço 1,75) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-mesas" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="6"/><rect x="7" y="9.5" width="10" height="5" rx="2.5"/></symbol>
+  <symbol id="i-torneio" viewBox="0 0 24 24"><path d="M3 5h5v4H3M3 15h5v4H3M8 7h3v10H8M11 12h4M15 9h6v6h-6z"/></symbol>
+  <symbol id="i-ranking" viewBox="0 0 24 24"><path d="M4 20V13h5v7M9 20V8h6v12M15 20v-5h5v5M3 20h18"/></symbol>
+  <symbol id="i-loja" viewBox="0 0 24 24"><path d="M3.5 12.5 11 5h8v8l-7.5 7.5a1.5 1.5 0 0 1-2.1 0L3.5 14.6a1.5 1.5 0 0 1 0-2.1z"/><circle cx="15.5" cy="8.5" r="1.3"/></symbol>
+  <symbol id="i-carteira" viewBox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="4" y="8" width="16" height="11" rx="2.5"/><path d="M15 13.5h2.5"/></symbol>
+  <symbol id="i-sair" viewBox="0 0 24 24"><path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4M14 8l-4 4 4 4M10 12h10"/></symbol>
+  <symbol id="i-cadeado" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-desce" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
+  <symbol id="i-perfil" viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.5"/><path d="M5 19.5c1.2-3 4-4.5 7-4.5s5.8 1.5 7 4.5"/></symbol>
+  <symbol id="i-config" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+</svg>
+
+<main class="pv">
+
+  <div class="pv-tema">
+    <span id="rot-tema">Comparar com o tema</span>
+    <div class="segmento" role="group" aria-labelledby="rot-tema">
+      <button type="button" data-tema-alvo="claro" aria-pressed="true">Claro</button>
+      <button type="button" data-tema-alvo="escuro" aria-pressed="false">Escuro</button>
+    </div>
+  </div>
+
+  <section class="pv-intro">
+    <div>
+      <h1>O mesmo salão, de dia</h1>
+      <p>Prévia estática do tema claro do Bitchager para aprovação. Linho cru no fundo, papel nos painéis e madeira clara no trilho da mesa. O feltro vinho continua o mesmo do tema escuro, e o latão segue como único destaque, só para ₿C e para “é a sua vez”. Os botões acima trocam apenas os valores das variáveis de cor.</p>
+    </div>
+    <div class="paleta" aria-label="Paleta">
+      <div class="sw"><i style="background:var(--c-fundo)"></i><span data-claro="Linho" data-escuro="Tabaco">Linho</span><code data-var="--c-fundo"></code></div>
+      <div class="sw"><i style="background:var(--c-superficie)"></i><span data-claro="Papel" data-escuro="Couro">Papel</span><code data-var="--c-superficie"></code></div>
+      <div class="sw"><i style="background:var(--c-feltro)"></i><span data-claro="Vinho" data-escuro="Vinho">Vinho</span><code data-var="--c-feltro"></code></div>
+      <div class="sw"><i style="background:var(--c-texto)"></i><span data-claro="Tinta" data-escuro="Marfim">Tinta</span><code data-var="--c-texto"></code></div>
+      <div class="sw"><i style="background:var(--c-destaque)"></i><span data-claro="Latão" data-escuro="Latão">Latão</span><code data-var="--c-destaque"></code></div>
+      <div class="sw"><i style="background:var(--c-positivo)"></i><span data-claro="Sálvia" data-escuro="Sálvia">Sálvia</span><code data-var="--c-positivo"></code></div>
+      <div class="sw"><i style="background:var(--c-perigo)"></i><span data-claro="Brasa" data-escuro="Brasa">Brasa</span><code data-var="--c-perigo"></code></div>
+    </div>
+    <div class="tipo">
+      <span><b style="font-stretch:118%;font-weight:800;font-size:23px">Archivo expandida</b> marca e títulos</span>
+      <span><b class="num" style="font-size:23px;color:var(--c-destaque-texto)">₿C 12.480</b> condensada para números</span>
+      <span><b style="font-weight:500">Archivo normal</b> para o texto de interface</span>
+    </div>
+  </section>
+
+  <!-- ===================== CELULAR ===================== -->
+  <section class="pv-sec">
+    <h2>Celular, 390px</h2>
+    <p class="leg">Mesa em pé para usar a altura da tela, você fora do feltro com cartas grandes, e as três ações principais na zona do polegar. Fora da sua vez o painel continua legível.</p>
+    <div class="fones">
+
+      <!-- Mesa: sua vez -->
+      <div class="fone-col">
+        <h3>Mesa, sua vez</h3>
+        <div class="fone">
+          <header class="m-top">
+            <button class="btn-sair"><svg class="i" aria-hidden="true"><use href="#i-sair"/></svg>Sair</button>
+            <div class="info"><b>Mesa do Zé</b><span>Blinds 10/20, 6 lugares</span></div>
+            <div class="saldo"><span>Carteira</span><b class="num bc">₿C 8.430</b></div>
+          </header>
+
+          <div class="m-palco">
+            <div class="mesa"><div class="feltro">
+              <div class="centro">
+                <span class="fase">Turn</span>
+                <div class="pote"><i class="ficha f-vermelha"></i><span class="num">₿C 1.240</span></div>
+                <div class="comunitarias">
+                  <div class="carta"><b>A</b><i>♠</i></div>
+                  <div class="carta v"><b>7</b><i>♥</i></div>
+                  <div class="carta"><b>7</b><i>♣</i></div>
+                  <div class="carta v"><b>K</b><i>♦</i></div>
+                  <div class="carta vazia"></div>
+                </div>
+              </div>
+            </div></div>
+
+            <!-- adversários -->
+            <div class="assento" style="left:50%;top:8%">
+              <div class="av-anel"><div class="av"><img src="../public/avata03.png" alt="Carla"></div></div>
+              <div class="placa"><span class="nm">Carla</span><span class="num">₿C 2.880</span></div>
+            </div>
+            <div class="aposta" style="left:50%;top:24%"><i class="ficha"></i><span class="num">120</span></div>
+
+            <div class="assento" style="left:13%;top:28%">
+              <div class="av-anel"><div class="av"><img src="../public/avata05.png" alt="Tião"></div></div>
+              <div class="placa"><span class="nm">Tião</span><span class="num">₿C 960</span></div>
+            </div>
+            <div class="aposta" style="left:27%;top:39%"><i class="ficha"></i><span class="num">120</span></div>
+
+            <div class="assento desistiu" style="left:87%;top:28%">
+              <span class="etq">Fold</span>
+              <div class="av-anel"><div class="av"><img src="../public/avata07.png" alt="Juju"></div></div>
+              <div class="placa"><span class="nm">Juju</span><span class="num">₿C 1.415</span></div>
+            </div>
+
+            <div class="assento" style="left:13%;top:70%">
+              <div class="av-anel"><div class="av">BL</div></div>
+              <div class="placa"><span class="nm">Bot Lúcia</span><span class="num">₿C 3.050</span></div>
+            </div>
+            <div class="dealer" style="left:23%;top:80%">D</div>
+
+            <div class="assento" style="left:87%;top:70%">
+              <span class="etq allin">All-in</span>
+              <div class="av-anel"><div class="av"><img src="../public/avata02.png" alt="Dudu"></div></div>
+              <div class="placa"><span class="nm">Dudu</span><span class="num">₿C 0</span></div>
+            </div>
+            <div class="aposta" style="left:66%;top:69%"><i class="ficha f-preta"></i><span class="num">640</span></div>
+          </div>
+
+          <div class="m-mao">
+            <div class="cartas">
+              <div class="carta v"><b>A<em>♥</em></b><i>♥</i></div>
+              <div class="carta"><b>Q<em>♣</em></b><i>♣</i></div>
+            </div>
+            <div class="dados">
+              <div class="linha1"><b>Você</b><span class="num bc">₿C 4.300</span></div>
+              <div class="forca">
+                <div class="rot"><b>Dois pares, ases e setes</b><span class="num" style="font-weight:600">68%</span></div>
+                <div class="barra"><i style="width:68%"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="painel">
+            <div class="faixa"><span>Sua vez</span><span class="num">14 s</span></div>
+            <div class="atalhos">
+              <button class="atalho">Mín<span class="num">240</span></button>
+              <button class="atalho ativo">½ pote<span class="num">620</span></button>
+              <button class="atalho">Pote<span class="num">1.240</span></button>
+              <button class="atalho allin">All-in<span class="num">4.300</span></button>
+            </div>
+            <div class="slider" role="presentation">
+              <div class="trilho"><i style="width:14%"></i><em style="left:14%"></em></div>
+              <span class="valor num bc">₿C 620</span>
+            </div>
+            <div class="acoes">
+              <button class="acao a-fold">Fold</button>
+              <button class="acao a-call">Call <small>₿C 120</small></button>
+              <button class="acao a-raise">Raise <small>₿C 620</small></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mesa: vez de outro -->
+      <div class="fone-col">
+        <h3>Mesa, vez de outro jogador</h3>
+        <div class="fone">
+          <header class="m-top">
+            <button class="btn-sair"><svg class="i" aria-hidden="true"><use href="#i-sair"/></svg>Sair</button>
+            <div class="info"><b>Mesa do Zé</b><span>Blinds 10/20, 6 lugares</span></div>
+            <div class="saldo"><span>Carteira</span><b class="num bc">₿C 8.430</b></div>
+          </header>
+
+          <div class="m-palco">
+            <div class="mesa"><div class="feltro">
+              <div class="centro">
+                <span class="fase">Flop</span>
+                <div class="pote"><i class="ficha f-verde"></i><span class="num">₿C 380</span></div>
+                <div class="comunitarias">
+                  <div class="carta"><b>A</b><i>♠</i></div>
+                  <div class="carta v"><b>7</b><i>♥</i></div>
+                  <div class="carta"><b>7</b><i>♣</i></div>
+                  <div class="carta vazia"></div>
+                  <div class="carta vazia"></div>
+                </div>
+              </div>
+            </div></div>
+
+            <div class="assento turno" style="left:50%;top:8%">
+              <div class="av-anel turno" style="--p:58"><div class="av"><img src="../public/avata03.png" alt="Carla"></div></div>
+              <div class="placa"><span class="nm">Carla</span><span class="num">₿C 3.000</span></div>
+            </div>
+            <div class="assento" style="left:13%;top:28%">
+              <div class="av-anel"><div class="av"><img src="../public/avata05.png" alt="Tião"></div></div>
+              <div class="placa"><span class="nm">Tião</span><span class="num">₿C 1.080</span></div>
+            </div>
+            <div class="assento desistiu" style="left:87%;top:28%">
+              <span class="etq">Fold</span>
+              <div class="av-anel"><div class="av"><img src="../public/avata07.png" alt="Juju"></div></div>
+              <div class="placa"><span class="nm">Juju</span><span class="num">₿C 1.415</span></div>
+            </div>
+            <div class="assento" style="left:13%;top:70%">
+              <div class="av-anel"><div class="av">BL</div></div>
+              <div class="placa"><span class="nm">Bot Lúcia</span><span class="num">₿C 3.050</span></div>
+            </div>
+            <div class="dealer" style="left:23%;top:80%">D</div>
+            <div class="assento" style="left:87%;top:70%">
+              <div class="av-anel"><div class="av"><img src="../public/avata02.png" alt="Dudu"></div></div>
+              <div class="placa"><span class="nm">Dudu</span><span class="num">₿C 640</span></div>
+            </div>
+          </div>
+
+          <div class="m-mao">
+            <div class="cartas">
+              <div class="carta v"><b>A<em>♥</em></b><i>♥</i></div>
+              <div class="carta"><b>Q<em>♣</em></b><i>♣</i></div>
+            </div>
+            <div class="dados">
+              <div class="linha1"><b>Você</b><span class="num bc">₿C 4.420</span></div>
+              <div class="forca">
+                <div class="rot"><b>Dois pares, ases e setes</b><span class="num" style="font-weight:600">71%</span></div>
+                <div class="barra"><i style="width:71%"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="painel">
+            <div class="faixa espera"><span>Vez de <b>Carla</b></span><span class="num">26 s</span></div>
+            <div class="atalhos">
+              <button class="atalho" disabled>Mín<span class="num">40</span></button>
+              <button class="atalho" disabled>½ pote<span class="num">190</span></button>
+              <button class="atalho" disabled>Pote<span class="num">380</span></button>
+              <button class="atalho allin" disabled>All-in<span class="num">4.420</span></button>
+            </div>
+            <div class="slider" role="presentation" style="opacity:.4">
+              <div class="trilho"><i style="width:0"></i><em style="left:0"></em></div>
+              <span class="valor num">₿C 40</span>
+            </div>
+            <div class="acoes">
+              <button class="acao a-fold" disabled>Fold</button>
+              <button class="acao a-call" disabled>Check</button>
+              <button class="acao a-raise" disabled>Raise <small>₿C 40</small></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lobby -->
+      <div class="fone-col">
+        <h3>Lobby, aba Mesas</h3>
+        <div class="fone">
+          <header class="l-top">
+            <div class="marca"><span class="selo">₿C</span><span translate="no">Bitchager</span></div>
+            <div class="dir">
+              <button class="saldo-pill" aria-label="Abrir carteira, saldo ₿C 12.480"><span class="num">₿C 12.480</span><span class="mais"><svg class="i" aria-hidden="true"><use href="#i-mais"/></svg></span></button>
+              <button class="btn-avatar" aria-label="Perfil, configurações e sair"><img src="../public/avata01.png" alt=""></button>
+            </div>
+          </header>
+          <div class="l-corpo">
+            <div class="l-cab">
+              <h2>Mesas</h2>
+              <button class="btn-criar"><svg class="i" aria-hidden="true"><use href="#i-mais"/></svg>Criar mesa</button>
+            </div>
+            <div class="segmento" role="group" aria-label="Tipo de mesa">
+              <button aria-pressed="true">Públicas <span class="cont">7</span></button>
+              <button aria-pressed="false"><svg class="i" aria-hidden="true" style="width:15px;height:15px"><use href="#i-cadeado"/></svg>Privadas <span class="cont">2</span></button>
+            </div>
+            <div class="lista">
+              <div class="linha-mesa">
+                <div class="blinds"><span class="num">10/20</span><span>blinds</span></div>
+                <div class="meio"><div class="nome">Mesa do Zé</div>
+                  <div class="meta"><span>Buy-in <b class="num bc">₿C 1.000</b></span>
+                    <span class="lugares"><i></i><i></i><i></i><i></i><i></i><i class="l"></i><em>5/6</em></span></div></div>
+                <div style="text-align:right"><div class="estado jogo">Em jogo</div><button class="btn-entrar">Entrar</button></div>
+              </div>
+              <div class="linha-mesa">
+                <div class="blinds"><span class="num">5/10</span><span>blinds</span></div>
+                <div class="meio"><div class="nome">Iniciantes da madrugada</div>
+                  <div class="meta"><span>Buy-in <b class="num bc">₿C 500</b></span>
+                    <span class="lugares"><i></i><i></i><i class="l"></i><i class="l"></i><i class="l"></i><i class="l"></i><em>2/6</em></span></div></div>
+                <div style="text-align:right"><div class="estado">Aguardando</div><button class="btn-entrar">Entrar</button></div>
+              </div>
+              <div class="linha-mesa">
+                <div class="blinds"><span class="num">50/100</span><span>blinds</span></div>
+                <div class="meio"><div class="nome">High roller do Tião</div>
+                  <div class="meta"><span>Buy-in <b class="num bc">₿C 5.000</b></span>
+                    <span class="lugares"><i></i><i></i><i></i><i></i><i></i><i></i><em>6/6</em></span></div></div>
+                <div style="text-align:right"><div class="estado">Cheia</div><button class="btn-entrar" disabled>Entrar</button></div>
+              </div>
+              <div class="linha-mesa">
+                <div class="blinds"><span class="num">25/50</span><span>blinds</span></div>
+                <div class="meio"><div class="nome">Sexta sem limite</div>
+                  <div class="meta"><span>Buy-in <b class="num bc">₿C 2.500</b></span>
+                    <span class="lugares"><i></i><i></i><i></i><i class="l"></i><i class="l"></i><i class="l"></i><em>3/6</em></span></div></div>
+                <div style="text-align:right"><div class="estado jogo">Em jogo</div><button class="btn-entrar">Entrar</button></div>
+              </div>
+              <div class="linha-mesa">
+                <div class="blinds"><span class="num">10/20</span><span>blinds</span></div>
+                <div class="meio"><div class="nome">Treino com bots</div>
+                  <div class="meta"><span>Buy-in <b class="num bc">₿C 1.000</b></span>
+                    <span class="lugares"><i></i><i></i><i></i><i></i><i class="l"></i><i class="l"></i><em>4/6</em></span></div></div>
+                <div style="text-align:right"><div class="estado jogo">Em jogo</div><button class="btn-entrar">Entrar</button></div>
+              </div>
+            </div>
+          </div>
+          <nav class="nav-baixo" aria-label="Seções">
+            <button aria-current="page"><svg class="i" aria-hidden="true"><use href="#i-mesas"/></svg>Mesas</button>
+            <button><svg class="i" aria-hidden="true"><use href="#i-torneio"/></svg>Torneio</button>
+            <button><svg class="i" aria-hidden="true"><use href="#i-ranking"/></svg>Ranking</button>
+            <button><svg class="i" aria-hidden="true"><use href="#i-loja"/></svg>Loja</button>
+            <button><svg class="i" aria-hidden="true"><use href="#i-carteira"/></svg>Carteira</button>
+          </nav>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===================== DESKTOP: MESA ===================== -->
+  <section class="pv-sec">
+    <h2>Mesa no desktop</h2>
+    <p class="leg">Oval deitada com até 9 lugares. Painel de ações no canto com os atalhos de teclado que já existem (F, C, R, A e as setas para ajustar o raise).</p>
+    <div class="tela-wrap"><div class="tela">
+      <header class="d-top">
+        <button class="btn-sair"><svg class="i" aria-hidden="true"><use href="#i-sair"/></svg>Sair da mesa</button>
+        <div class="info"><b>Mesa do Zé</b><span>Blinds 10/20</span><span>6 jogadores</span></div>
+        <div class="saldo"><span>Carteira</span><b class="num bc">₿C 8.430</b></div>
+      </header>
+
+      <div class="mesa" style="left:230px;width:820px;top:104px;height:388px"><div class="feltro">
+        <div class="centro">
+          <span class="fase" style="font-size:14px">Turn</span>
+          <div class="pote"><i class="ficha f-vermelha"></i><span class="num" style="font-size:23px">₿C 1.240</span></div>
+          <div class="comunitarias" style="gap:6px">
+            <div class="carta" style="--w:62px"><b>A</b><i>♠</i></div>
+            <div class="carta v" style="--w:62px"><b>7</b><i>♥</i></div>
+            <div class="carta" style="--w:62px"><b>7</b><i>♣</i></div>
+            <div class="carta v" style="--w:62px"><b>K</b><i>♦</i></div>
+            <div class="carta vazia" style="--w:62px"></div>
+          </div>
+        </div>
+      </div></div>
+
+      <div class="assento" style="left:640px;top:112px">
+        <div class="mini-versos" style="right:-30px;top:14px"><div class="carta verso"></div><div class="carta verso"></div></div>
+        <div class="av-anel"><div class="av"><img src="../public/avata03.png" alt="Carla"></div></div>
+        <div class="placa"><span class="nm">Carla</span><span class="num">₿C 2.880</span></div>
+      </div>
+      <div class="aposta" style="left:640px;top:182px"><i class="ficha"></i><span class="num">120</span></div>
+
+      <div class="assento" style="left:302px;top:210px">
+        <div class="mini-versos" style="right:-30px;top:14px"><div class="carta verso"></div><div class="carta verso"></div></div>
+        <div class="av-anel"><div class="av"><img src="../public/avata05.png" alt="Tião"></div></div>
+        <div class="placa"><span class="nm">Tião</span><span class="num">₿C 960</span></div>
+      </div>
+      <div class="aposta" style="left:404px;top:246px"><i class="ficha"></i><span class="num">120</span></div>
+
+      <div class="assento desistiu" style="left:978px;top:210px">
+        <span class="etq">Fold</span>
+        <div class="av-anel"><div class="av"><img src="../public/avata07.png" alt="Juju"></div></div>
+        <div class="placa"><span class="nm">Juju</span><span class="num">₿C 1.415</span></div>
+      </div>
+
+      <div class="assento" style="left:302px;top:390px">
+        <div class="mini-versos" style="right:-30px;top:14px"><div class="carta verso"></div><div class="carta verso"></div></div>
+        <div class="av-anel"><div class="av" style="font-size:18px">BL</div></div>
+        <div class="placa"><span class="nm">Bot Lúcia</span><span class="num">₿C 3.050</span></div>
+      </div>
+      <div class="dealer" style="left:382px;top:414px">D</div>
+
+      <div class="assento" style="left:978px;top:390px">
+        <span class="etq allin">All-in</span>
+        <div class="mini-versos" style="left:-30px;top:14px"><div class="carta verso"></div><div class="carta verso"></div></div>
+        <div class="av-anel"><div class="av"><img src="../public/avata02.png" alt="Dudu"></div></div>
+        <div class="placa"><span class="nm">Dudu</span><span class="num">₿C 0</span></div>
+      </div>
+      <div class="aposta" style="left:872px;top:372px"><i class="ficha f-preta"></i><span class="num">640</span></div>
+
+      <!-- você -->
+      <div class="assento turno" style="left:640px;top:528px">
+        <div style="display:flex;align-items:flex-end;gap:12px">
+          <div style="display:flex;margin-bottom:6px">
+            <div class="carta v" style="--w:58px;transform:rotate(-6deg)"><b>A<em>♥</em></b><i>♥</i></div>
+            <div class="carta" style="--w:58px;margin-left:-14px;transform:rotate(5deg)"><b>Q<em>♣</em></b><i>♣</i></div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center">
+            <div class="av-anel turno" style="--p:31"><div class="av"><img src="../public/avata01.png" alt="Você"></div></div>
+            <div class="placa"><span class="nm">Você</span><span class="num">₿C 4.300</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-forca">
+        <div class="t">Sua mão</div>
+        <p class="m">Dois pares, ases e setes</p>
+        <div class="forca"><div class="rot"><span>Chance contra 4 adversários</span><b class="num">68%</b></div><div class="barra"><i style="width:68%"></i></div></div>
+      </div>
+
+      <div class="d-painel">
+        <div class="faixa"><span>Sua vez</span><span class="num">14 s</span></div>
+        <div class="atalhos">
+          <button class="atalho">Mín<span class="num">240</span></button>
+          <button class="atalho ativo">½ pote<span class="num">620</span></button>
+          <button class="atalho">Pote<span class="num">1.240</span></button>
+          <button class="atalho allin">All-in <span class="num">4.300</span></button>
+        </div>
+        <div class="slider"><span style="font-size:11px;color:var(--c-texto-3)">← →</span>
+          <div class="trilho"><i style="width:14%"></i><em style="left:14%"></em></div>
+          <span class="valor num bc">₿C 620</span>
+        </div>
+        <div class="acoes">
+          <button class="acao a-fold">Fold<span class="kbd">F</span></button>
+          <button class="acao a-call">Call <small>₿C 120</small><span class="kbd">C</span></button>
+          <button class="acao a-raise">Raise <small>₿C 620</small><span class="kbd">R</span></button>
+        </div>
+        <div class="info-acoes"><span>Fichas <b>₿C 4.300</b></span><span>Para pagar <b>₿C 120</b></span><span>All-in <b>A</b></span></div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ===================== DESKTOP: LOBBY ===================== -->
+  <section class="pv-sec">
+    <h2>Lobby no desktop</h2>
+    <p class="leg">As cinco seções sempre visíveis no topo, saldo com “Comprar ₿C” e o menu do avatar com Perfil, Configurações e Sair (aberto aqui para mostrar). Ranking fixo na lateral, como hoje.</p>
+    <div class="tela-wrap"><div class="tela">
+      <header class="dl-top">
+        <div class="marca"><span class="selo">₿C</span><span translate="no">Bitchager</span></div>
+        <nav class="d-nav" aria-label="Seções">
+          <button aria-current="page"><svg class="i" aria-hidden="true"><use href="#i-mesas"/></svg>Mesas</button>
+          <button><svg class="i" aria-hidden="true"><use href="#i-torneio"/></svg>Torneio</button>
+          <button><svg class="i" aria-hidden="true"><use href="#i-ranking"/></svg>Ranking</button>
+          <button><svg class="i" aria-hidden="true"><use href="#i-loja"/></svg>Loja</button>
+          <button><svg class="i" aria-hidden="true"><use href="#i-carteira"/></svg>Carteira</button>
+        </nav>
+        <div class="dir">
+          <div class="dl-saldo"><div><span class="lbl">Saldo</span><b class="num bc">₿C 12.480</b></div><button>Comprar ₿C</button></div>
+          <button class="dl-perfil" aria-expanded="true"><img src="../public/avata01.png" alt=""><span class="txt"><b>Rafa Mendes</b><span>Avançado, 2.140 pts</span></span><svg class="i" aria-hidden="true" style="width:16px;height:16px;color:var(--c-texto-3)"><use href="#i-desce"/></svg></button>
+        </div>
+      </header>
+      <div class="menu" role="menu">
+        <button class="foco" role="menuitem"><svg class="i" aria-hidden="true"><use href="#i-perfil"/></svg>Perfil</button>
+        <button role="menuitem"><svg class="i" aria-hidden="true"><use href="#i-config"/></svg>Configurações</button>
+        <hr>
+        <button class="perigo" role="menuitem"><svg class="i" aria-hidden="true"><use href="#i-sair"/></svg>Sair da conta</button>
+      </div>
+      <div class="dl-corpo">
+        <div class="dl-main">
+          <div class="l-cab">
+            <div class="esq">
+              <h2>Mesas</h2>
+              <div class="segmento" role="group" aria-label="Tipo de mesa">
+                <button aria-pressed="true">Públicas <span class="cont">7</span></button>
+                <button aria-pressed="false"><svg class="i" aria-hidden="true" style="width:15px;height:15px"><use href="#i-cadeado"/></svg>Privadas <span class="cont">2</span></button>
+              </div>
+            </div>
+            <button class="btn-criar"><svg class="i" aria-hidden="true"><use href="#i-mais"/></svg>Criar mesa</button>
+          </div>
+          <table class="mesas">
+            <thead><tr><th>Blinds</th><th>Mesa</th><th>Buy-in</th><th>Lugares</th><th>Estado</th><th></th></tr></thead>
+            <tbody>
+              <tr><td class="bl">10/20</td><td><span class="nome">Mesa do Zé</span></td><td class="n bc">₿C 1.000</td><td><span class="lugares"><i></i><i></i><i></i><i></i><i></i><i class="l"></i><em>5/6</em></span></td><td><span class="estado jogo">Em jogo</span></td><td><button class="btn-entrar">Entrar</button></td></tr>
+              <tr><td class="bl">5/10</td><td><span class="nome">Iniciantes da madrugada</span></td><td class="n bc">₿C 500</td><td><span class="lugares"><i></i><i></i><i class="l"></i><i class="l"></i><i class="l"></i><i class="l"></i><em>2/6</em></span></td><td><span class="estado">Aguardando</span></td><td><button class="btn-entrar">Entrar</button></td></tr>
+              <tr><td class="bl">50/100</td><td><span class="nome">High roller do Tião</span></td><td class="n bc">₿C 5.000</td><td><span class="lugares"><i></i><i></i><i></i><i></i><i></i><i></i><em>6/6</em></span></td><td><span class="estado">Cheia</span></td><td><button class="btn-entrar" disabled>Entrar</button></td></tr>
+              <tr><td class="bl">25/50</td><td><span class="nome">Sexta sem limite</span></td><td class="n bc">₿C 2.500</td><td><span class="lugares"><i></i><i></i><i></i><i class="l"></i><i class="l"></i><i class="l"></i><em>3/6</em></span></td><td><span class="estado jogo">Em jogo</span></td><td><button class="btn-entrar">Entrar</button></td></tr>
+              <tr><td class="bl">10/20</td><td><span class="nome">Treino com bots</span></td><td class="n bc">₿C 1.000</td><td><span class="lugares"><i></i><i></i><i></i><i></i><i class="l"></i><i class="l"></i><em>4/6</em></span></td><td><span class="estado jogo">Em jogo</span></td><td><button class="btn-entrar">Entrar</button></td></tr>
+              <tr><td class="bl">100/200</td><td><span class="nome">Mesa da firma</span></td><td class="n bc">₿C 10.000</td><td><span class="lugares"><i></i><i class="l"></i><i class="l"></i><i class="l"></i><i class="l"></i><i class="l"></i><i class="l"></i><i class="l"></i><i class="l"></i><em>1/9</em></span></td><td><span class="estado">Aguardando</span></td><td><button class="btn-entrar">Entrar</button></td></tr>
+              <tr><td class="bl">5/10</td><td><span class="nome">Só pra treinar o river</span></td><td class="n bc">₿C 500</td><td><span class="lugares"><i></i><i></i><i></i><i class="l"></i><i class="l"></i><i class="l"></i><em>3/6</em></span></td><td><span class="estado jogo">Em jogo</span></td><td><button class="btn-entrar">Entrar</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <aside class="dl-lado">
+          <h3>Ranking</h3>
+          <p class="sub">Atualiza a cada minuto</p>
+          <div class="rk top"><span class="pos">1</span><img src="../public/avata04.png" alt=""><span class="nm"><b>Marcão</b><span>Lendário</span></span><span class="pts">12.904</span></div>
+          <div class="rk top"><span class="pos">2</span><img src="../public/avata06.png" alt=""><span class="nm"><b>Bia Lacerda</b><span>Mestre</span></span><span class="pts">7.318</span></div>
+          <div class="rk top"><span class="pos">3</span><img src="../public/avata08.png" alt=""><span class="nm"><b>Dudu_AA</b><span>Mestre</span></span><span class="pts">5.462</span></div>
+          <div class="rk"><span class="pos">4</span><img src="../public/avata09.png" alt=""><span class="nm"><b>Fernandinha</b><span>Avançado</span></span><span class="pts">3.977</span></div>
+          <div class="rk"><span class="pos">5</span><span class="mono">TS</span><span class="nm"><b>Tião Souza</b><span>Avançado</span></span><span class="pts">2.851</span></div>
+          <div class="rk eu"><span class="pos">6</span><img src="../public/avata01.png" alt=""><span class="nm"><b>Você</b><span>Avançado</span></span><span class="pts">2.140</span></div>
+          <div class="rk"><span class="pos">7</span><img src="../public/avata10.png" alt=""><span class="nm"><b>Carla B.</b><span>Intermediário</span></span><span class="pts">1.706</span></div>
+          <div class="rk"><span class="pos">8</span><span class="mono">GR</span><span class="nm"><b>Gui Rocha</b><span>Intermediário</span></span><span class="pts">988</span></div>
+        </aside>
+      </div>
+    </div></div>
+  </section>
+
+</main>
+<script>
+(function(){
+  var raiz=document.documentElement, meta=document.querySelector('meta[name=theme-color]');
+  function aplicar(t){
+    if(t==='claro') raiz.setAttribute('data-tema','claro'); else raiz.removeAttribute('data-tema');
+    document.querySelectorAll('[data-tema-alvo]').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.temaAlvo===t))});
+    document.querySelectorAll('.sw span').forEach(function(s){s.textContent=s.dataset[t]});
+    var cs=getComputedStyle(raiz);
+    document.querySelectorAll('.sw code').forEach(function(c){c.textContent=cs.getPropertyValue(c.dataset.var).trim()});
+    meta.setAttribute('content',cs.getPropertyValue('--c-fundo').trim());
+  }
+  document.querySelectorAll('[data-tema-alvo]').forEach(function(b){b.addEventListener('click',function(){aplicar(b.dataset.temaAlvo)})});
+  var q=new URLSearchParams(location.search).get('tema');
+  aplicar(q==='escuro'?'escuro':'claro');
+})();
+</script>
+</body>
+</html>

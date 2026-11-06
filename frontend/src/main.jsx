@@ -27,7 +27,10 @@
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import './styles/tema.css';
+import { iniciarTemaVisual } from './core/temaVisual.js';
 import App from './App.jsx';
+import ErrorBoundary from './ErrorBoundary.jsx';
 
 // ================================================================
 // ESTILOS GLOBAIS INLINE
@@ -63,9 +66,9 @@ const estilosGlobais = `
   }
 
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #0a0f1e;
-    color: #F8FAFC;
+    font-family: var(--fonte);
+    background: var(--cor-fundo);
+    color: var(--cor-texto);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
@@ -94,11 +97,11 @@ const estilosGlobais = `
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--cor-linha-forte);
     border-radius: 2px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.25);
+    background: var(--cor-texto-3);
   }
 
   /* Animação de fadeIn usada em vários componentes */
@@ -169,82 +172,7 @@ const estilosGlobais = `
   }
   .carta-revelada { animation: virarCarta 0.4s ease forwards; }
 
-  /* Lobby/index.jsx, Header.jsx e Loja/index.jsx — mesmo padrão: essas
-     telas inteiras montam/desmontam ao trocar Lobby <-> Game, então um
-     <style> preso a elas corre o mesmo risco de tela preta. */
-  .lobby-pagina   { max-width: 480px; }
-  .lobby-body     { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-  .lobby-esquerda { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-  .lobby-direita  { display: none; }
-  .lobby-conteudo {
-    flex: 1; overflow-y: auto;
-    padding: 12px 14px 100px;
-    -webkit-overflow-scrolling: touch;
-  }
-  .lobby-rodape {
-    position: fixed; bottom: 0;
-    left: 50%; transform: translateX(-50%);
-    width: 100%; max-width: 480px;
-    padding: 10px 14px max(14px, env(safe-area-inset-bottom));
-    background: linear-gradient(to top, #0a0f1e 70%, transparent);
-    z-index: 100; box-sizing: border-box;
-  }
-  /* Sub-filtro mesas */
-  .sub-filtro-btn {
-    flex: 1; padding: 7px 4px;
-    border-radius: 7px; cursor: pointer;
-    font-size: 12px; font-family: inherit;
-    transition: all 0.15s;
-    -webkit-tap-highlight-color: transparent;
-  }
-  @media (min-width: 768px) {
-    .lobby-pagina   { max-width: 1200px !important; }
-    .lobby-body     { flex-direction: row; }
-    .lobby-esquerda { flex: 1; border-right: 1px solid rgba(255,255,255,0.06); min-width: 0; }
-    .lobby-direita  { display: flex; flex-direction: column; width: 320px; flex-shrink: 0; background: #0d1424; }
-    .lobby-conteudo { padding: 16px 20px 100px; }
-    .lobby-rodape   { max-width: 1200px; padding: 12px 20px max(16px, env(safe-area-inset-bottom)); }
-  }
-  @media (min-width: 1024px) {
-    .lobby-direita { width: 380px; }
-  }
-
-  .header-inner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 14px;
-    gap: 10px;
-    max-width: 1200px;
-    margin: 0 auto;
-    box-sizing: border-box;
-    width: 100%;
-  }
-  .header-nome {
-    font-size: 15px;
-    font-weight: 600;
-    color: #F8FAFC;
-    margin: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 140px;
-  }
-  .header-rank-texto { font-size: 11px; margin: 2px 0 0; }
-  .header-saldo-valor {
-    font-size: 17px;
-    font-weight: 700;
-    color: #F59E0B;
-    line-height: 1;
-    white-space: nowrap;
-  }
-  @media (min-width: 768px) {
-    .header-inner { padding: 14px 32px; }
-    .header-nome  { font-size: 18px; max-width: 300px; }
-    .header-rank-texto   { font-size: 13px; }
-    .header-saldo-valor  { font-size: 22px; }
-  }
-
+  /* Lobby e cabeçalho: ver styles/tema.css. Loja/index.jsx continua aqui. */
   .loja-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
   .loja-corpo { display: flex; flex-direction: column; gap: 14px; }
   @media (min-width: 768px) {
@@ -253,204 +181,10 @@ const estilosGlobais = `
     .loja-col { flex: 1; display: block !important; }
   }
 
-  /* Layout da tela de jogo (era um <style> dentro do componente Game) */
-  .game-pagina { max-width: 100vw; }
-  @media (min-width: 900px) {
-    .game-pagina {
-      max-width:  920px;
-      margin:     0 auto;
-      border-left:  1px solid rgba(255,255,255,0.06);
-      border-right: 1px solid rgba(255,255,255,0.06);
-    }
-  }
-
-  /* Slider personalizado (usado no ActionBar e ModalCriarMesa) */
-  input[type="range"] {
-    -webkit-appearance: none;
-    appearance: none;
-    height: 4px;
-    border-radius: 2px;
-    background: rgba(255, 255, 255, 0.15);
-    outline: none;
-    cursor: pointer;
-  }
-
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #7C3AED;
-    cursor: pointer;
-    box-shadow: 0 0 6px rgba(124, 58, 237, 0.5);
-    transition: transform 0.1s;
-  }
-
-  input[type="range"]::-webkit-slider-thumb:active {
-    transform: scale(1.2);
-  }
-
-  input[type="range"]::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
-    border: none;
-    border-radius: 50%;
-    background: #7C3AED;
-    cursor: pointer;
-  }
-
-  /* ================================================================
-     ActionBar.jsx e HandStrength.jsx (movidos de <style> dentro do
-     componente — ambos entram/saem do DOM a cada fold/all-in/mão nova,
-     o mesmo padrão de risco de tela preta descrito acima).
-     ================================================================ */
-
-  .ab-root { font-family: sans-serif; }
-
-  .ab-bar {
-    background: #0d1424;
-    border-top: 1px solid rgba(255,255,255,0.07);
-    padding: 10px 16px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  /* Linha do slider: label + display + track + atalhos */
-  .ab-raise-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .ab-raise-label {
-    font-size: 10px;
-    color: rgba(255,255,255,0.30);
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    flex-shrink: 0;
-    width: 32px;
-  }
-  .ab-raise-val {
-    font-size: 13px;
-    font-weight: 600;
-    color: #f8fafc;
-    flex-shrink: 0;
-    min-width: 96px;
-    text-align: center;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 6px;
-    padding: 4px 8px;
-    transition: color 0.15s, border-color 0.15s;
-  }
-  .ab-raise-val.allin { color: #f87171; border-color: rgba(248,113,113,0.30); }
-  .ab-slider { flex: 1; accent-color: #a855f7; cursor: pointer; height: 4px; }
-  .ab-slider:disabled { opacity: 0.3; cursor: default; }
-
-  /* Atalhos rápidos de aposta */
-  .ab-shortcuts { display: flex; gap: 5px; flex-shrink: 0; }
-  .ab-sc {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.09);
-    border-radius: 5px;
-    color: rgba(255,255,255,0.42);
-    font-size: 11px;
-    padding: 3px 7px;
-    cursor: pointer;
-    transition: background 0.1s, color 0.1s;
-    font-family: inherit;
-    line-height: 1.6;
-    text-align: center;
-  }
-  .ab-sc:hover { background: rgba(255,255,255,0.09); color: #f8fafc; }
-  .ab-sc span  { display: block; font-size: 9px; opacity: 0.5; }
-
-  /* Linha de botões */
-  .ab-btns {
-    display: grid;
-    grid-template-columns: 1fr 1.4fr 1fr 86px;
-    gap: 7px;
-  }
-  .ab-btn {
-    border-radius: 9px;
-    border: 1px solid;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    padding: 9px 6px;
-    transition: transform 0.08s, opacity 0.08s, background 0.12s;
-    font-family: inherit;
-    min-height: 50px;
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
-    outline: none;
-  }
-  .ab-btn:active   { transform: scale(0.96); opacity: 0.80; }
-  .ab-btn:disabled { opacity: 0.25; cursor: default; pointer-events: none; }
-  .ab-btn .lbl  { font-size: 14px; font-weight: 600; white-space: nowrap; }
-  .ab-btn .hkey {
-    font-size: 10px; opacity: 0.40;
-    background: rgba(255,255,255,0.07);
-    border-radius: 3px; padding: 0px 5px;
-    letter-spacing: 0.04em;
-  }
-
-  .btn-fold   { color:#f87171; background:rgba(248,113,113,0.08); border-color:rgba(248,113,113,0.22); }
-  .btn-fold:hover   { background:rgba(248,113,113,0.16); }
-  .btn-check  { color:#4ade80; background:rgba(74,222,128,0.09); border-color:rgba(74,222,128,0.26); }
-  .btn-check:hover  { background:rgba(74,222,128,0.17); }
-  .btn-call   { color:#60a5fa; background:rgba(96,165,250,0.09); border-color:rgba(96,165,250,0.26); }
-  .btn-call:hover   { background:rgba(96,165,250,0.17); }
-  .btn-raise  { color:#c084fc; background:rgba(192,132,252,0.09); border-color:rgba(192,132,252,0.24); }
-  .btn-raise:hover  { background:rgba(192,132,252,0.17); }
-  .btn-allin  { color:#f87171; background:rgba(248,113,113,0.09); border-color:rgba(248,113,113,0.24); }
-  .btn-allin:hover  { background:rgba(248,113,113,0.17); }
-
-  /* Linha de info */
-  .ab-info {
-    display: flex;
-    gap: 0;
-    font-size: 11px;
-    color: rgba(255,255,255,0.30);
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .ab-info-item { display: flex; gap: 4px; align-items: center; }
-  .ab-info-item b { color: rgba(255,255,255,0.58); font-weight: 500; }
-
-  .ab-turn-badge {
-    display: inline-flex; align-items: center; gap: 5px;
-    font-size: 11px; color: #f59e0b;
-    background: rgba(245,158,11,0.10);
-    border: 1px solid rgba(245,158,11,0.22);
-    border-radius: 20px; padding: 2px 9px; font-weight: 600;
-  }
-  .ab-dot {
-    width: 5px; height: 5px; border-radius: 50%;
-    background: #f59e0b; flex-shrink: 0;
-    animation: ab-pulse 1.4s ease-in-out infinite;
-  }
-  @keyframes ab-pulse { 0%,100%{opacity:1} 50%{opacity:0.2} }
-
-  .ab-disabled { opacity: 0.28; pointer-events: none; }
-
-  /* Mobile: botões maiores */
-  @media (max-width: 520px) {
-    .ab-btns { grid-template-columns: 1fr 1.4fr 1fr 72px; gap: 6px; }
-    .ab-btn  { min-height: 54px; }
-    .ab-shortcuts { display: none; }
-    .ab-hkeys { display: none; }
-  }
+  /* Tela de jogo, slider e ActionBar: ver styles/tema.css */
 
   @keyframes hs-pop   { from{transform:scale(0.85);opacity:0} to{transform:scale(1);opacity:1} }
   @keyframes hs-pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-  .hs-root { font-family: sans-serif; }
   .hs-ring-fill {
     fill: none; stroke-width: 5; stroke-linecap: round;
     transition: stroke-dashoffset 0.7s cubic-bezier(.4,0,.2,1), stroke 0.4s;
@@ -485,8 +219,12 @@ document.head.appendChild(styleTag);
 // Em produção é removido — zero impacto no usuário final.
 // ================================================================
 
+iniciarTemaVisual();
+
 createRoot(document.getElementById('root')).render(
     <StrictMode>
-        <App />
+        <ErrorBoundary>
+            <App />
+        </ErrorBoundary>
     </StrictMode>
 );

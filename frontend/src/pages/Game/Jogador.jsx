@@ -1,15 +1,33 @@
+/* ================================================================
+   ARQUIVO: frontend/src/pages/Game/Jogador.jsx
+
+   Assento de um jogador na mesa: avatar (com anel do temporizador),
+   plaquinha com primeiro nome e fichas, etiquetas Fold/All-in, botão
+   do dealer e SB/BB, e as cartas do jogador.
+
+   A ficha de aposta da rodada NÃO fica aqui: o Mesa.jsx desenha entre o
+   assento e o centro da mesa, para não cobrir avatar e cartas.
+
+   Cartas:
+     → fechadas (outros jogadores): versos pequenos ao lado do avatar
+     → abertas de outro jogador (showdown): em leque sobre o avatar
+     → as suas: ao lado do avatar (no celular em retrato ficam
+       escondidas aqui e aparecem grandes embaixo da mesa — ocultarCartas)
+   O baralho exibido é o do DONO das cartas (jogador.tema), então o tema
+   comprado na loja aparece para os adversários também.
+================================================================ */
+
 import Temporizador from './Temporizador';
-import { getTema }  from '../../core/temas';
-import { corPorValor } from '../../core/chipCores';
-import ChipPoker    from '../../components/ChipPoker';
+import { parsearCarta } from '../../core/temas';
+import { CartaFace, CartaVerso } from '../../components/Carta';
 
 function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
 
-function parsearCarta(codigo) {
-    if (!codigo || codigo === 'XX') return null;
-    const naipe = codigo.slice(-1);   // Unicode: '♥' '♦' '♠' '♣' — não aplicar toLowerCase
-    const valor = codigo.slice(0, -1);
-    return { codigo, valor, naipe };
+function iniciais(nome = '') {
+    const partes = String(nome).trim().split(/\s+/).filter(Boolean);
+    if (partes.length === 0) return '?';
+    if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+    return (partes[0][0] + partes[1][0]).toUpperCase();
 }
 
 export default function Jogador({
@@ -22,270 +40,108 @@ export default function Jogador({
     ehBB           = false,
     tempoMs        = 45000,
     expiraEm       = null,   // prazo absoluto do servidor (mesa.turnoExpiraEm)
-    avatarSz       = 58,     // escala responsiva vinda do Mesa.jsx
+    avatarSz       = 48,     // escala responsiva vinda do Mesa.jsx
     tema           = 'classico',
-    compacto       = false,  // tela pequena: cartas ao lado do avatar em vez de embaixo
+    ocultarCartas  = false,  // celular em retrato: suas cartas aparecem embaixo da mesa
+    treino         = false,  // mesa de treino: fichas sem o símbolo ₿C
 }) {
     if (!jogador) return null;
 
-    const foldado   = jogador.status === 'fold' || jogador.status === 'FOLD';
-    const allIn     = jogador.status === 'all-in' || jogador.status === 'ALL-IN';
-    const apostaVal = jogador.apostaRodada || jogador.aposta || 0;
-
-    // Dimensões escaladas proporcionalmente ao avatarSz
-    const cardW      = Math.round(avatarSz * 0.55);  // ex: 58→32px (era 0.47)
-    const cardH      = Math.round(cardW * 1.40);
-    const cardFv     = Math.max(8,  Math.round(cardW * 0.36));
-    const cardFn     = Math.max(10, Math.round(cardW * 0.50));
-    const nomeFont   = Math.max(9,  Math.round(avatarSz * 0.18));
-    const saldoFont  = Math.max(8,  Math.round(avatarSz * 0.16));
-    const chipFont   = Math.max(8,  Math.round(avatarSz * 0.15));
-    const badgeFont  = Math.max(6,  Math.round(avatarSz * 0.13));
+    const foldado = jogador.status === 'fold' || jogador.status === 'FOLD';
+    const allIn   = jogador.status === 'all-in' || jogador.status === 'ALL-IN';
 
     const cartas = souEu && cartasPrivadas.length > 0
         ? cartasPrivadas
         : (jogador.cartas || []);
 
-    // Baralho comprado é do DONO das cartas, não de quem está olhando —
-    // assim o tema fica visível pros adversários também, não só pra você.
+    // Baralho comprado é do DONO das cartas, não de quem está olhando.
     const temaCartas = jogador.tema || tema;
 
+    const parseadas  = cartas.map(parsearCarta);
+    const temAbertas = parseadas.some(Boolean);
+    const fonte      = avatarSz >= 56 ? 14 : 12;
+    const nome       = souEu ? 'Você' : (jogador.nome?.split(' ')[0] || 'Jogador');
+
+    const classes = ['assento'];
+    if (ehVez)   classes.push('turno');
+    if (foldado) classes.push('desistiu');
+    if (souEu)   classes.push('eu');
+
+    const larguraVerso  = Math.max(14, Math.round(avatarSz * 0.36));
+    const larguraAberta = Math.max(26, Math.round(avatarSz * 0.62));
+    const larguraMinha  = Math.max(34, Math.round(avatarSz * 0.92));
+
     return (
-        <div style={{
-            display:       'flex',
-            flexDirection: 'column',
-            alignItems:    'center',
-            gap:           Math.round(avatarSz * 0.07) + 'px',
-            position:      'relative',
-            opacity:        foldado ? 0.38 : 1,
-        }}>
+        <div className={classes.join(' ')} style={{ fontSize: fonte + 'px' }}>
 
-            {/* Chip de aposta flutuante acima do avatar */}
-            {apostaVal > 0 && !foldado && (
-                <div style={{
-                    position:     'absolute',
-                    top:          -(Math.round(avatarSz * 0.38)) + 'px',
-                    left:         '50%',
-                    transform:    'translateX(-50%)',
-                    display:      'flex',
-                    alignItems:   'center',
-                    gap:          '4px',
-                    background:   'rgba(8,12,24,0.75)',
-                    border:       '1px solid rgba(255,255,255,0.18)',
-                    borderRadius: '20px',
-                    padding:      '2px 8px 2px 4px',
-                    whiteSpace:   'nowrap',
-                    zIndex:       6,
-                    boxShadow:    '0 2px 8px rgba(0,0,0,0.5)',
-                }}>
-                    <ChipPoker size={Math.max(14, Math.round(avatarSz * 0.28))} {...corPorValor(apostaVal)} />
-                    <span style={{ fontSize: chipFont+'px', fontWeight:'800', color:'#fff', letterSpacing:'0.02em' }}>
-                        ₿C {fmt(apostaVal)}
-                    </span>
-                </div>
-            )}
-
-            {/* Avatar + cartas — lado a lado em tela pequena, empilhado normalmente */}
-            <div style={{
-                display:       'flex',
-                flexDirection: compacto ? 'row' : 'column',
-                alignItems:    'center',
-                gap:           Math.round(avatarSz * 0.1) + 'px',
-            }}>
-
-            {/* Avatar + ring de turno */}
-            <div style={{
-                position:     'relative',
-                width:        avatarSz + 'px',
-                height:       avatarSz + 'px',
-                borderRadius: '50%',
-                flexShrink:   0,
-                transition:   'box-shadow 0.3s',
-                boxShadow: ehVez
-                    ? `0 0 0 ${Math.round(avatarSz*0.05)}px #F59E0B, 0 0 20px rgba(245,158,11,0.55)`
-                    : souEu
-                        ? `0 0 0 ${Math.round(avatarSz*0.04)}px #7C3AED, 0 0 12px rgba(124,58,237,0.4)`
-                        : `0 0 0 ${Math.round(avatarSz*0.03)}px rgba(255,255,255,0.12)`,
-            }}>
-                {/* Face do avatar */}
-                <div style={{
-                    width:          '100%',
-                    height:         '100%',
-                    borderRadius:   '50%',
-                    background:     'linear-gradient(135deg,#1f2937,#111827)',
-                    display:        'flex',
-                    alignItems:     'center',
-                    justifyContent: 'center',
-                    overflow:       'hidden',
-                    position:       'relative',
-                    zIndex:         1,
-                }}>
+            <div className="assento-avatar" style={{ width: avatarSz + 'px', height: avatarSz + 'px' }}>
+                <div className="assento-rosto" style={{ fontSize: Math.round(avatarSz * 0.34) + 'px' }}>
                     {jogador.avatar ? (
                         <img
                             src={jogador.avatar}
-                            alt={jogador.nome}
-                            style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:'50%' }}
-                            onError={e => { e.target.onerror=null; e.target.style.display='none'; }}
+                            alt=""
+                            width={avatarSz}
+                            height={avatarSz}
+                            onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }}
                         />
                     ) : (
-                        <span style={{ fontSize: Math.round(avatarSz * 0.40) + 'px', lineHeight:1 }}>
-                            {jogador.bot ? '🤖' : '🧑'}
-                        </span>
+                        <span aria-hidden="true">{iniciais(jogador.nome)}</span>
                     )}
                 </div>
 
-                {/* Anel de tempo */}
                 <Temporizador totalMs={tempoMs} expiraEm={expiraEm} ativo={ehVez} tamanho={avatarSz} />
 
-                {/* Badges ALL-IN / FOLD */}
-                {allIn && (
-                    <div style={{
-                        position:'absolute', bottom:'-4px', left:'50%',
-                        transform:'translateX(-50%)',
-                        background:'#EF4444', color:'#fff',
-                        fontSize: badgeFont+'px', fontWeight:'900',
-                        padding:`1px ${Math.round(badgeFont*0.6)}px`,
-                        borderRadius:'4px', zIndex:5, whiteSpace:'nowrap',
-                        letterSpacing:'0.05em',
-                    }}>ALL-IN</div>
+                {/* Cartas fechadas de outro jogador: versos ao lado do avatar */}
+                {!souEu && cartas.length > 0 && !temAbertas && !foldado && (
+                    <div className="assento-cartas versos" style={{ right: -Math.round(larguraVerso * 0.9) + 'px' }}>
+                        {parseadas.map((_, i) => <CartaVerso key={i} largura={larguraVerso} tema={temaCartas} />)}
+                    </div>
                 )}
-                {foldado && (
+
+                {/* Cartas abertas de outro jogador (showdown): leque sobre o avatar */}
+                {!souEu && temAbertas && (
+                    <div style={{ position: 'absolute', left: '50%', bottom: '55%', transform: 'translateX(-50%)', display: 'flex', gap: '2px', zIndex: 4 }}>
+                        {parseadas.map((c, i) => c
+                            ? <CartaFace key={i} carta={c} largura={larguraAberta} tema={temaCartas} indice />
+                            : <CartaVerso key={i} largura={larguraAberta} tema={temaCartas} />)}
+                    </div>
+                )}
+
+                {/* Suas cartas (desktop / paisagem): ao lado esquerdo do avatar */}
+                {souEu && !ocultarCartas && cartas.length > 0 && (
                     <div style={{
-                        position:'absolute', bottom:'-4px', left:'50%',
-                        transform:'translateX(-50%)',
-                        background:'#6B7280', color:'#fff',
-                        fontSize: badgeFont+'px', fontWeight:'900',
-                        padding:`1px ${Math.round(badgeFont*0.6)}px`,
-                        borderRadius:'4px', zIndex:5, whiteSpace:'nowrap',
-                        letterSpacing:'0.05em',
-                    }}>FOLD</div>
+                        position: 'absolute', top: '50%', right: '100%', marginRight: '10px',
+                        transform: 'translateY(-50%)', display: 'flex', alignItems: 'flex-end', zIndex: 4,
+                    }}>
+                        {parseadas.map((c, i) => (
+                            <div key={i} style={{
+                                marginLeft: i > 0 ? -Math.round(larguraMinha * 0.25) + 'px' : 0,
+                                transform: `rotate(${i === 0 ? -6 : 5}deg)`,
+                            }}>
+                                {c
+                                    ? <CartaFace carta={c} largura={larguraMinha} tema={temaCartas} indice />
+                                    : <CartaVerso largura={larguraMinha} tema={temaCartas} />}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {allIn   && <span className="assento-etq allin">All-in</span>}
+                {foldado && <span className="assento-etq">Fold</span>}
+
+                {(ehDealer || ehSB || ehBB) && (
+                    <div className="assento-posicoes">
+                        {ehDealer && <span className="assento-dealer" title="Dealer">D</span>}
+                        {ehSB     && <span className="assento-blind" title="Small blind">SB</span>}
+                        {ehBB     && <span className="assento-blind" title="Big blind">BB</span>}
+                    </div>
                 )}
             </div>
 
-            {/* Cartas mini */}
-            {cartas.length > 0 && (
-                <div style={{ display:'flex', gap: Math.round(cardW*0.12)+'px' }}>
-                    {cartas.map((c, i) => {
-                        const carta = parsearCarta(c);
-                        return carta
-                            ? <CartaMini key={i} carta={carta} w={cardW} h={cardH} fv={cardFv} fn={cardFn} tema={temaCartas} />
-                            : <CartaVerso key={i} w={cardW} h={cardH} tema={temaCartas} />;
-                    })}
-                </div>
-            )}
-
-            {/* Painel nome + saldo */}
-            <div style={{
-                background:     'rgba(8,12,24,0.88)',
-                border:         `1px solid ${ehVez ? 'rgba(245,158,11,0.4)' : souEu ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                borderRadius:   '8px',
-                padding:        `2px ${Math.round(avatarSz * 0.17)}px`,
-                display:        'flex',
-                flexDirection:  'column',
-                alignItems:     'center',
-                gap:            '1px',
-                minWidth:       compacto ? undefined : Math.round(avatarSz * 1.22) + 'px',
-                backdropFilter: 'blur(6px)',
-            }}>
-                <span style={{
-                    fontSize:     nomeFont+'px',
-                    fontWeight:   700,
-                    color:        souEu ? '#A78BFA' : '#F0F0F0',
-                    maxWidth:     Math.round(avatarSz * 1.4) + 'px',
-                    overflow:     'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace:   'nowrap',
-                    lineHeight:   1.2,
-                }}>
-                    {jogador.nome?.split(' ')[0] || 'Jogador'}
-                </span>
-                <span style={{ fontSize:saldoFont+'px', fontWeight:'600', color:'#38BDF8', lineHeight:1.2 }}>
-                    ₿C {fmt(jogador.saldo)}
-                </span>
+            <div className="assento-placa" style={{ maxWidth: Math.round(avatarSz * 1.9) + 'px' }}>
+                <span className="nm">{nome}</span>
+                <span className="stk num">{treino ? fmt(jogador.saldo) : `₿C ${fmt(jogador.saldo)}`}</span>
             </div>
-
-            </div>
-
-            {/* Badges D / SB / BB */}
-            {(ehDealer || ehSB || ehBB) && (
-                <div style={{ display:'flex', gap:'3px', flexWrap:'wrap', justifyContent:'center' }}>
-                    {ehDealer && <BadgePos texto="D"  cor="#F59E0B" fs={badgeFont} />}
-                    {ehSB     && <BadgePos texto="SB" cor="#3B82F6" fs={badgeFont} />}
-                    {ehBB     && <BadgePos texto="BB" cor="#8B5CF6" fs={badgeFont} />}
-                </div>
-            )}
-
         </div>
-    );
-}
-
-function BadgePos({ texto, cor, fs }) {
-    return (
-        <div style={{
-            fontSize:     fs+'px',
-            fontWeight:   800,
-            color:        '#fff',
-            padding:      `1px ${Math.round(fs*0.6)}px`,
-            borderRadius: '4px',
-            lineHeight:   '1.4',
-            background:   cor,
-            boxShadow:    `0 0 8px ${cor}80`,
-            letterSpacing:'0.03em',
-        }}>
-            {texto}
-        </div>
-    );
-}
-
-function CartaMini({ carta, w, h, fv, fn, tema = 'classico' }) {
-    const t       = getTema(tema);
-    const cor     = t.naipes[carta.naipe]?.cor || '#111827';
-    const fundo   = t.frente.fundo  || '#FFFFFF';
-    const borda   = t.frente.borda  || '#D1D5DB';
-    const premium = !!t.premium;
-    const raio    = Math.max(t.frente.raio || 8, Math.round(w * 0.13));
-    return (
-        <div style={{
-            width:          w+'px',
-            height:         h+'px',
-            background:     fundo,
-            borderRadius:   raio+'px',
-            border:         premium ? `2px solid ${borda}` : `1px solid ${borda}`,
-            display:        'flex',
-            flexDirection:  'column',
-            alignItems:     'center',
-            justifyContent: 'center',
-            boxShadow:      premium
-                ? `0 2px 8px rgba(0,0,0,0.6), inset 0 0 0 1.5px ${fundo}, inset 0 0 0 2.5px ${borda}80`
-                : '0 2px 8px rgba(0,0,0,0.6)',
-            flexShrink:     0,
-            gap:            '1px',
-        }}>
-            <span style={{ fontSize:fv+'px', fontWeight:'900', color:cor, lineHeight:1 }}>
-                {carta.valor}
-            </span>
-            <span style={{ fontSize:fn+'px', color:cor, lineHeight:1 }}>
-                {carta.naipe}
-            </span>
-        </div>
-    );
-}
-
-function CartaVerso({ w, h, tema = 'classico' }) {
-    const t       = getTema(tema);
-    const fundo   = t.verso.fundo   || '#1E3A8A';
-    const premium = !!t.premium;
-    return (
-        <div style={{
-            width:        w+'px',
-            height:       h+'px',
-            background:   `linear-gradient(135deg, ${fundo}, ${t.verso.detalhe || fundo})`,
-            borderRadius: Math.round(w*0.13)+'px',
-            border:       premium ? `1.5px solid rgba(255,255,255,0.45)` : '1px solid rgba(255,255,255,0.25)',
-            boxShadow:    premium
-                ? `0 2px 8px rgba(0,0,0,0.6), inset 0 0 0 2px ${t.verso.detalhe || fundo}`
-                : '0 2px 8px rgba(0,0,0,0.6)',
-            flexShrink:   0,
-        }} />
     );
 }

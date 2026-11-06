@@ -30,13 +30,13 @@ import Cadastro from './Cadastro';
 import CriarPin from './CriarPin';
 
 
-export default function Auth({ onAutenticado, socket }) {
+export default function Auth({ onAutenticado, socket, usuarioSemPin = null }) {
 
     // Controla qual tela mostrar: 'login' | 'cadastro' | 'criarPin'
-    const [tela, setTela] = useState('login');
+    const [tela, setTela] = useState(usuarioSemPin ? 'criarPin' : 'login');
 
     // Guarda o usuário recém-cadastrado enquanto cria o PIN
-    const [usuarioPendente, setUsuarioPendente] = useState(null);
+    const [usuarioPendente, setUsuarioPendente] = useState(usuarioSemPin);
 
 
     // ----------------------------------------------------------------
@@ -54,7 +54,7 @@ export default function Auth({ onAutenticado, socket }) {
     // Agora sim o jogador entra no Lobby.
     // ----------------------------------------------------------------
     function handlePinCriado() {
-        onAutenticado(usuarioPendente);
+        onAutenticado({ ...usuarioPendente, temPin: true });
         setUsuarioPendente(null);
     }
 
@@ -122,7 +122,7 @@ export default function Auth({ onAutenticado, socket }) {
 // ================================================================
 
 function Etapa({ numero, label, concluida, ativa }) {
-    const cor = concluida ? '#22C55E' : ativa ? '#7C3AED' : 'rgba(255,255,255,0.15)';
+    const cor = concluida ? 'var(--cor-positivo-texto)' : ativa ? 'var(--cor-destaque)' : 'var(--cor-linha-forte)';
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
             <div style={{
@@ -139,7 +139,7 @@ function Etapa({ numero, label, concluida, ativa }) {
             }}>
                 {concluida ? '✓' : numero}
             </div>
-            <span style={{ fontSize: '10px', color: ativa ? '#A78BFA' : 'rgba(255,255,255,0.30)' }}>
+            <span style={{ fontSize: '10px', color: ativa ? 'var(--cor-destaque-texto)' : 'var(--cor-texto-3)' }}>
                 {label}
             </span>
         </div>
@@ -155,13 +155,13 @@ const estilos = {
 
     pagina: {
         minHeight:      '100vh',
-        background:     '#0a0f1e',
+        background:     'var(--cor-fundo)',
         display:        'flex',
         flexDirection:  'column',
         alignItems:     'center',
         justifyContent: 'center',
         padding:        '20px 16px',
-        fontFamily:     'sans-serif',
+        fontFamily:     'var(--fonte)',
         gap:            '20px',
     },
 
@@ -180,14 +180,14 @@ const estilos = {
     logoTitulo: {
         fontSize:      '28px',
         fontWeight:    '800',
-        color:         '#F8FAFC',
+        color:         'var(--cor-texto)',
         margin:        0,
         letterSpacing: '-0.02em',
     },
 
     logoSubtitulo: {
         fontSize:   '12px',
-        color:      '#D97706',
+        color:      'var(--cor-destaque-texto)',
         margin:     0,
         fontWeight: '500',
     },
@@ -202,26 +202,26 @@ const estilos = {
     etapaLinha: {
         width:      '40px',
         height:     '1px',
-        background: 'rgba(255,255,255,0.10)',
+        background: 'var(--cor-linha)',
     },
 
     card: {
         width:        '100%',
         maxWidth:     '400px',
-        background:   '#111827',
-        border:       '1px solid rgba(255,255,255,0.08)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '16px',
         overflow:     'hidden',
     },
 
     rodape: {
         fontSize:  '11px',
-        color:     'rgba(255,255,255,0.25)',
+        color:     'var(--cor-texto-3)',
         textAlign: 'center',
     },
 
     link: {
-        color:  '#7C3AED',
+        color:  'var(--cor-destaque)',
         cursor: 'pointer',
     },
 };

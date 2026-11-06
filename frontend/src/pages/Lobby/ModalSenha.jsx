@@ -100,8 +100,8 @@ export default function ModalSenha({ onConfirmar, onFechar }) {
                         style={{
                             ...estilos.input,
                             borderColor: erro
-                                ? 'rgba(239,68,68,0.5)'
-                                : 'rgba(255,255,255,0.1)',
+                                ? 'var(--cor-perigo-linha)'
+                                : 'var(--cor-linha)',
                         }}
                     />
 
@@ -146,7 +146,7 @@ const estilos = {
     overlay: {
         position:   'fixed',
         inset:      0,
-        background: 'rgba(0,0,0,0.7)',
+        background: 'var(--cor-veu)',
         zIndex:     300,
         backdropFilter: 'blur(2px)',
     },
@@ -159,9 +159,9 @@ const estilos = {
         transform:     'translate(-50%, -50%)',
         width:         'calc(100% - 40px)',
         maxWidth:      '340px',
-        background:    '#111827',
+        background:    'var(--cor-superficie)',
         borderRadius:  '16px',
-        border:        '1px solid rgba(255,255,255,0.08)',
+        border:        '1px solid var(--cor-linha)',
         zIndex:        301,
         padding:       '24px 20px 20px',
         display:       'flex',
@@ -174,8 +174,8 @@ const estilos = {
         width:          '56px',
         height:         '56px',
         borderRadius:   '50%',
-        background:     'rgba(59,130,246,0.1)',
-        border:         '1px solid rgba(59,130,246,0.2)',
+        background:     'color-mix(in srgb, var(--cor-info) 10%, transparent)',
+        border:         '1px solid color-mix(in srgb, var(--cor-info) 20%, transparent)',
         display:        'flex',
         alignItems:     'center',
         justifyContent: 'center',
@@ -189,14 +189,14 @@ const estilos = {
     titulo: {
         fontSize:   '17px',
         fontWeight: '700',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         margin:     0,
         textAlign:  'center',
     },
 
     subtitulo: {
         fontSize:  '13px',
-        color:     'rgba(255,255,255,0.4)',
+        color:     'var(--cor-texto-3)',
         margin:    0,
         textAlign: 'center',
         lineHeight: 1.4,
@@ -212,10 +212,10 @@ const estilos = {
     input: {
         width:        '100%',
         padding:      '11px 40px 11px 12px',
-        background:   'rgba(255,255,255,0.05)',
-        border:       '1px solid rgba(255,255,255,0.1)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '8px',
-        color:        '#F8FAFC',
+        color:        'var(--cor-texto)',
         fontSize:     '15px',
         outline:      'none',
         boxSizing:    'border-box',
@@ -240,7 +240,7 @@ const estilos = {
 
     erro: {
         fontSize:  '12px',
-        color:     '#FCA5A5',
+        color:     'var(--cor-perigo-texto)',
         margin:    '-4px 0 0',
         alignSelf: 'flex-start',
     },
@@ -256,10 +256,10 @@ const estilos = {
 
     btnCancelar: {
         padding:      '11px',
-        background:   'rgba(255,255,255,0.06)',
-        border:       '1px solid rgba(255,255,255,0.1)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '8px',
-        color:        'rgba(255,255,255,0.6)',
+        color:        'var(--cor-texto-2)',
         fontSize:     '14px',
         fontWeight:   '500',
         cursor:       'pointer',
@@ -268,10 +268,10 @@ const estilos = {
 
     btnEntrar: {
         padding:      '11px',
-        background:   'linear-gradient(135deg, #3B82F6, #2563EB)',
+        background:   'var(--cor-destaque)',
         border:       'none',
         borderRadius: '8px',
-        color:        'white',
+        color:        'var(--cor-texto-inverso)',
         fontSize:     '14px',
         fontWeight:   '600',
         cursor:       'pointer',

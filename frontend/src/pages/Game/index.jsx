@@ -3,6 +3,9 @@ import InfoMesa   from './InfoMesa';
 import Mesa       from './Mesa';
 import ActionBar  from '../../components/ActionBar';
 import HandStrength from '../../components/HandStrength';
+import Icone        from '../../components/Icone';
+import { CartaFace, CartaVerso } from '../../components/Carta';
+import { parsearCarta } from '../../core/temas';
 
 export default function Game({ socket, usuario, mesaId, onSair }) {
 
@@ -13,6 +16,9 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
     const [saldoBonus,   setSaldoBonus  ] = useState(usuario?.saldoBonus || 0);
     const [notifGanho,   setNotifGanho  ] = useState(null);
     const [linkCopiado,  setLinkCopiado ] = useState(false);
+    const [confirmarSaida, setConfirmarSaida] = useState(false);
+    const [recomprando,    setRecomprando   ] = useState(false);
+    const recomprandoRef = useRef(false);
 
     const timerRef   = useRef(null);
     const ganhoRef   = useRef(null);
@@ -82,7 +88,29 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
 
     const handleAcao    = useCallback((a, v=0) => socket?.emit('acao', { acao: a, valor: v }), [socket]);
     const handleIniciar = useCallback(()       => socket?.emit('iniciar_rodada'), [socket]);
-    const handleRebuy    = useCallback((valor) => socket?.emit('rebuy', { valor }), [socket]);
+    const handleRebuy    = useCallback((valor) => {
+        // Uma recompra por vez (o servidor também recusa operação duplicada)
+        if (recomprandoRef.current) return;
+        recomprandoRef.current = true;
+        setRecomprando(true);
+        socket?.emit('rebuy', { valor });
+    }, [socket]);
+
+    // Libera o botão quando o servidor responde (estado/saldo/erro) ou após 8 s
+    useEffect(() => {
+        if (!recomprando || !socket) return undefined;
+        const liberar = () => { recomprandoRef.current = false; setRecomprando(false); };
+        const t = setTimeout(liberar, 8000);
+        socket.once('estado_mesa', liberar);
+        socket.once('wallet:saldo_atualizado', liberar);
+        socket.once('erro', liberar);
+        return () => {
+            clearTimeout(t);
+            socket.off('estado_mesa', liberar);
+            socket.off('wallet:saldo_atualizado', liberar);
+            socket.off('erro', liberar);
+        };
+    }, [recomprando, socket]);
     const handleSair    = useCallback(()       => { socket?.emit('sair_mesa'); onSair?.(); }, [socket, onSair]);
 
     const handleCompartilhar = useCallback(() => {
@@ -95,9 +123,9 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
     }, []);
 
     if (!mesa) return (
-        <div style={css.loading}>
-            <div style={css.spinner} />
-            <p style={css.loadingTxt}>Entrando na mesa...</p>
+        <div className="jogo-carregando" role="status">
+            <div className="roda" />
+            <p>Entrando na mesa…</p>
         </div>
     );
 
@@ -118,21 +146,41 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
     const buyInMesa          = mesa.valorBuyIn || 1000;
     const temSaldoParaRebuy  = (saldoReal + saldoBonus) >= buyInMesa;
 
-    return (
-        <div style={css.pagina} className="game-pagina">
+    // Só exibição
+    const nomeDaVez    = mesa.turno && !ehMinhaVez ? (mesa.jogadores?.[mesa.turno]?.nome?.split(' ')[0] || '') : '';
+    const minhasParse  = minhasCartas.map(parsearCarta);
+    const temaMinhas   = euSou?.tema || usuario?.tema || 'classico';
+    const mostrarMao   = jogoAtivo && euSou;
+    const treino       = mesa?.treino === true;   // fichas sem valor: sem ₿C
+    const moeda        = (n) => (treino ? fmt(n) : `₿C ${fmt(n)}`);
 
-            {/* ── Header flutuante ───────────────────── */}
-            <div style={css.header}>
-                <button onClick={handleSair} style={css.btnSair}>← Sair</button>
+    // Sair no meio de uma mão em que você ainda está jogando pede confirmação;
+    // fora disso (entre mãos, já desistiu, sem cartas) sai direto.
+    const participandoDaMao = jogoAtivo && !!euSou && !foldado
+        && ((euSou?.cartas?.length > 0) || temCartas);
+    const pedirSaida = () => {
+        if (participandoDaMao) setConfirmarSaida(true);
+        else handleSair();
+    };
+
+    return (
+        <div className="jogo">
+
+            {/* ── Topo ───────────────────────────────── */}
+            <header className="jogo-topo">
+                <button type="button" onClick={pedirSaida} className="btn-sair-mesa">
+                    <Icone nome="sair" />
+                    Sair
+                </button>
                 <InfoMesa mesa={mesa} />
-                <div style={css.saldoBox}>
-                    <span style={css.saldoLabel}>Saldo</span>
-                    <span style={css.saldoValor}>₿C {saldoReal.toLocaleString('pt-BR')}</span>
+                <div className="saldo">
+                    <span>Carteira</span>
+                    <b className="num">₿C {saldoReal.toLocaleString('pt-BR')}</b>
                 </div>
-            </div>
+            </header>
 
             {/* ── Mesa (área principal) ──────────────── */}
-            <div style={css.mesaArea}>
+            <main className="jogo-mesa-area">
                 <Mesa
                     mesa={mesa}
                     meuUid={meuUid}
@@ -140,123 +188,138 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
                     meuAvatar={usuario?.avatar || ''}
                     tema={usuario?.tema || 'classico'}
                 />
-            </div>
+            </main>
 
-            {/* ── Painel inferior flutuante ─────────── */}
-            <div style={css.painel}>
+            <div className="jogo-rodape">
 
-                {/* Sem fichas na mesa: recompra (se tiver saldo real+bônus) ou sair.
-                    Não mostra enquanto ainda está esperando o resultado de uma
-                    mão ativa (all-in com cartas na mesa) — só entre mãos. */}
-                {euSou && fichasMesa <= 0 && !aguardandoResultado && (
-                    <div style={css.semFichas}>
-                        <p style={css.semFichasTexto}>
-                            Sem fichas nesta mesa
-                            {!temSaldoParaRebuy && ' — saldo insuficiente pra recomprar'}.
-                        </p>
-                        <div style={css.semFichasAcoes}>
-                            {temSaldoParaRebuy && (
-                                <button
-                                    onClick={() => handleRebuy(buyInMesa)}
-                                    style={css.btnRebuy}
-                                >
-                                    💰 Comprar ₿C {buyInMesa.toLocaleString('pt-BR')}
-                                </button>
+                {/* ── Sua mão: cartas grandes (celular) + força da mão ── */}
+                {mostrarMao && (
+                    <div className="jogo-mao-desk">
+                        <div className="jogo-mao">
+                            {minhasParse.length > 0 && (
+                                <div className="cartas">
+                                    {minhasParse.map((c, i) => c
+                                        ? <CartaFace key={i} carta={c} largura={54} tema={temaMinhas} indice />
+                                        : <CartaVerso key={i} largura={54} tema={temaMinhas} />)}
+                                </div>
                             )}
-                            <button onClick={handleSair} style={css.btnSairMesa}>
-                                ← Sair da mesa
+                            <div className="dados">
+                                <div className="linha1">
+                                    <b>{foldado ? 'Você desistiu' : 'Você'}</b>
+                                    <span className="num">{moeda(fichasMesa)}</span>
+                                </div>
+                                {!foldado && temCartas && (
+                                    <HandStrength
+                                        cartasMao={minhasCartas}
+                                        cartasMesa={mesa.cartasComunitarias || []}
+                                        visivel={true}
+                                        nOponentes={Math.max(1, jogadoresArray.length - 1)}
+                                        compact={true}
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Painel de ações ─────────────────────── */}
+                <section className="jogo-painel" aria-label="Ações">
+
+                    {/* Sem fichas na mesa: recompra (se tiver saldo real+bônus) ou sair.
+                        Não mostra enquanto ainda está esperando o resultado de uma
+                        mão ativa (all-in com cartas na mesa) — só entre mãos. */}
+                    {euSou && fichasMesa <= 0 && !aguardandoResultado && (
+                        <div className="jogo-semfichas">
+                            <p>
+                                Sem fichas nesta mesa
+                                {!temSaldoParaRebuy && ' — saldo insuficiente pra recomprar'}.
+                            </p>
+                            <div className="linha">
+                                {temSaldoParaRebuy && (
+                                    <button type="button" onClick={() => handleRebuy(buyInMesa)} className="btn btn-principal" disabled={recomprando} aria-busy={recomprando || undefined}>
+                                        {treino ? `Recomprar ${fmt(buyInMesa)} fichas` : `Comprar ₿C ${buyInMesa.toLocaleString('pt-BR')}`}
+                                    </button>
+                                )}
+                                <button type="button" onClick={handleSair} className="btn btn-neutro">
+                                    <Icone nome="sair" tamanho={18} />
+                                    Sair da mesa
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* AGUARDANDO: botão iniciar (host) ou mensagem */}
+                    {mesa.fase === 'AGUARDANDO' && (
+                        <div className="jogo-painel-acoes">
+                            {souHost ? (
+                                <button
+                                    type="button"
+                                    onClick={handleIniciar}
+                                    disabled={jogadoresArray.length < 2}
+                                    className="btn btn-principal"
+                                    style={{ minHeight: '52px', fontSize: 'var(--t-16)' }}
+                                >
+                                    {jogadoresArray.length < 2
+                                        ? `Aguardando jogadores (${jogadoresArray.length}/2)`
+                                        : <><Icone nome="play" tamanho={18} />Iniciar jogo ({jogadoresArray.length} jogadores)</>}
+                                </button>
+                            ) : (
+                                <div className="jogo-painel-msg">
+                                    <span className="ponto-pulsante" />
+                                    Aguardando o host iniciar a partida…
+                                </div>
+                            )}
+                            <button type="button" onClick={handleCompartilhar} className="btn btn-neutro" style={{ minHeight: '44px' }}>
+                                <Icone nome={linkCopiado ? 'check' : 'link'} tamanho={18} />
+                                {linkCopiado ? 'Link copiado' : 'Convidar amigos pra mesa'}
                             </button>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {/* Linha compacta: força da mão + fichas */}
-                {jogoAtivo && euSou && (
-                    <div style={css.infoRow}>
-                        {!foldado && temCartas ? (
-                            <HandStrength
-                                cartasMao={minhasCartas}
-                                cartasMesa={mesa.cartasComunitarias || []}
-                                visivel={true}
-                                nOponentes={Math.max(1, jogadoresArray.length - 1)}
-                                compact={true}
-                            />
-                        ) : <span />}
-                        <div style={css.fichasInfo}>
-                            <span style={css.fichasLabel}>Fichas</span>
-                            <span style={css.fichasVal}>₿C {fichasMesa.toLocaleString('pt-BR')}</span>
+                    {/* ActionBar — some quando não há mais decisão a tomar
+                        (já desistiu ou já está all-in nesta mão) */}
+                    {jogoAtivo && euSou && !foldado && !emAllIn && (
+                        <ActionBar
+                            ehMinhaVez={ehMinhaVez}
+                            saldoAtual={fichasMesa}
+                            apostaRodada={euSou.apostaRodada || 0}
+                            maiorAposta={mesa.maiorAposta || 0}
+                            bigBlind={mesa.bigBlind || 20}
+                            pote={mesa.pote || 0}
+                            expiraEm={mesa.turnoExpiraEm || null}
+                            nomeDaVez={nomeDaVez}
+                            treino={treino}
+                            onAcao={handleAcao}
+                        />
+                    )}
+
+                    {/* Aguardando o showdown enquanto all-in/fold — só com mão ativa */}
+                    {aguardandoResultado && (
+                        <div className="jogo-painel-msg">
+                            <span className="ponto-pulsante" />
+                            {emAllIn ? 'Você está all-in — aguardando o resultado da mão…' : 'Você desistiu desta mão.'}
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {/* AGUARDANDO: botão iniciar (host) ou mensagem */}
-                {mesa.fase === 'AGUARDANDO' && souHost && (
-                    <button
-                        onClick={handleIniciar}
-                        disabled={jogadoresArray.length < 2}
-                        style={{
-                            ...css.btnIniciar,
-                            opacity: jogadoresArray.length < 2 ? 0.5 : 1,
-                            cursor:  jogadoresArray.length < 2 ? 'not-allowed' : 'pointer',
-                        }}
-                    >
-                        {jogadoresArray.length < 2
-                            ? `Aguardando jogadores (${jogadoresArray.length}/2)`
-                            : `▶ Iniciar Jogo  (${jogadoresArray.length} jogadores)`}
-                    </button>
-                )}
-
-                {mesa.fase === 'AGUARDANDO' && !souHost && (
-                    <div style={css.aguardando}>
-                        <span style={css.pulseDot} />
-                        Aguardando o host iniciar a partida...
-                    </div>
-                )}
-
-                {mesa.fase === 'AGUARDANDO' && (
-                    <button onClick={handleCompartilhar} style={css.btnCompartilhar}>
-                        {linkCopiado ? '✓ Link copiado!' : '🔗 Convidar amigos pra mesa'}
-                    </button>
-                )}
-
-                {/* ActionBar — some quando não há mais decisão a tomar
-                    (já desistiu ou já está all-in nesta mão) */}
-                {jogoAtivo && euSou && !foldado && !emAllIn && (
-                    <ActionBar
-                        ehMinhaVez={ehMinhaVez}
-                        saldoAtual={fichasMesa}
-                        apostaRodada={euSou.apostaRodada || 0}
-                        maiorAposta={mesa.maiorAposta || 0}
-                        bigBlind={mesa.bigBlind || 20}
-                        pote={mesa.pote || 0}
-                        onAcao={handleAcao}
-                    />
-                )}
-
-                {/* Aguardando o showdown enquanto all-in/fold — só com mão ativa */}
-                {aguardandoResultado && (
-                    <div style={css.aguardando}>
-                        <span style={css.pulseDot} />
-                        {emAllIn ? 'Você está All-in — aguardando o resultado da mão...' : 'Você desistiu desta mão.'}
-                    </div>
-                )}
-
-                {/* SHOWDOWN */}
-                {mesa.fase === 'SHOWDOWN' && mesa.resultadoMao && (
-                    <ResultadoRodada resultado={mesa.resultadoMao} meuUid={meuUid} />
-                )}
-
+                    {/* SHOWDOWN */}
+                    {mesa.fase === 'SHOWDOWN' && mesa.resultadoMao && (
+                        <ResultadoRodada resultado={mesa.resultadoMao} meuUid={meuUid} treino={treino} />
+                    )}
+                </section>
             </div>
 
             {/* ── Notificações ──────────────────────── */}
-            {notificacao && (
-                <div style={css.notif}>{notificacao}</div>
-            )}
+            <div aria-live="polite">
+                {notificacao && <div className="jogo-aviso">{notificacao}</div>}
+            </div>
+            {notifGanho && <NotifResultado notif={notifGanho} treino={treino} />}
 
-            {notifGanho && (
-                <NotifResultado notif={notifGanho} />
+            {confirmarSaida && (
+                <ConfirmarSaida
+                    onFicar={() => setConfirmarSaida(false)}
+                    onSair={() => { setConfirmarSaida(false); handleSair(); }}
+                />
             )}
-
         </div>
     );
 }
@@ -264,181 +327,41 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
 function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
 
 // ── Painel de resultado da rodada (dentro do painel inferior) ──────
-function ResultadoRodada({ resultado, meuUid }) {
+function ResultadoRodada({ resultado, meuUid, treino = false }) {
     const isWin = resultado.vencedores.some(v => v.uid === meuUid);
-
     return (
-        <div style={cssRes.container}>
-            {/* Rótulo da fase */}
-            <div style={cssRes.label}>
-                {isWin ? '— Você ganhou esta rodada —' : '— Fim da rodada —'}
+        <div className="resultado">
+            <div className="resultado-titulo">
+                {isWin ? 'Você ganhou esta rodada' : 'Fim da rodada'}
             </div>
-
-            {/* Lista de vencedores */}
             {resultado.vencedores.map(v => (
-                <div key={v.uid} style={{
-                    ...cssRes.vencedor,
-                    borderColor: v.uid === meuUid
-                        ? 'rgba(245,158,11,0.5)'
-                        : 'rgba(255,255,255,0.08)',
-                }}>
-                    {/* Nome */}
-                    <span style={{
-                        ...cssRes.nome,
-                        color: v.uid === meuUid ? '#F59E0B' : '#E2E8F0',
-                    }}>
-                        {v.uid === meuUid ? 'Você' : v.nome}
-                    </span>
-
-                    {/* Mão (só no showdown) */}
-                    {v.mao && (
-                        <span style={cssRes.mao}>{v.mao}</span>
-                    )}
-
-                    {/* Prêmio */}
-                    <span style={cssRes.premio}>
-                        +₿C {fmt(v.premio)}
-                    </span>
+                <div key={v.uid} className={`resultado-linha${v.uid === meuUid ? ' eu' : ''}`}>
+                    <span className="nm">{v.uid === meuUid ? 'Você' : v.nome}</span>
+                    {v.mao && <span className="mao">{v.mao}</span>}
+                    <span className="premio num">+{treino ? fmt(v.premio) : `₿C ${fmt(v.premio)}`}</span>
                 </div>
             ))}
-
-            {/* Tipo de vitória */}
             {resultado.tipo === 'wo' && (
-                <p style={cssRes.detalhe}>Todos os adversários desistiram</p>
+                <p className="resultado-detalhe">Todos os adversários desistiram</p>
             )}
         </div>
     );
 }
 
-const cssRes = {
-    container: {
-        padding:        '10px 12px 6px',
-        display:        'flex',
-        flexDirection:  'column',
-        gap:            '6px',
-        borderTop:      '1px solid rgba(255,255,255,0.06)',
-    },
-    label: {
-        fontSize:      '10px',
-        color:         'rgba(255,255,255,0.30)',
-        textAlign:     'center',
-        textTransform: 'uppercase',
-        letterSpacing: '0.08em',
-        fontWeight:    500,
-    },
-    vencedor: {
-        display:        'flex',
-        alignItems:     'center',
-        gap:            '8px',
-        background:     'rgba(255,255,255,0.03)',
-        border:         '1px solid',
-        borderRadius:   '10px',
-        padding:        '7px 12px',
-    },
-    nome: {
-        fontWeight:   700,
-        fontSize:     '14px',
-        flex:         1,
-        whiteSpace:   'nowrap',
-        overflow:     'hidden',
-        textOverflow: 'ellipsis',
-    },
-    mao: {
-        fontSize:      '11px',
-        color:         'rgba(167,139,250,0.85)',
-        background:    'rgba(124,58,237,0.12)',
-        border:        '1px solid rgba(124,58,237,0.25)',
-        borderRadius:  '6px',
-        padding:       '2px 7px',
-        whiteSpace:    'nowrap',
-        flexShrink:    0,
-    },
-    premio: {
-        fontSize:   '14px',
-        fontWeight: 700,
-        color:      '#22C55E',
-        whiteSpace: 'nowrap',
-        flexShrink: 0,
-    },
-    detalhe: {
-        fontSize:  '11px',
-        color:     'rgba(255,255,255,0.25)',
-        textAlign: 'center',
-        margin:    0,
-        fontStyle: 'italic',
-    },
-};
-
 // ── Notificação flutuante de vitória/derrota ───────────────────────
-function NotifResultado({ notif }) {
-    const isWin   = notif.tipo === 'ganho';
-    const res     = notif.resultado;
-    const meuUid  = notif.meuUid;
-    const minha   = res?.vencedores?.find(v => v.uid === meuUid);
+function NotifResultado({ notif, treino = false }) {
+    const isWin  = notif.tipo === 'ganho';
+    const res    = notif.resultado;
+    const meuUid = notif.meuUid;
+    const minha  = res?.vencedores?.find(v => v.uid === meuUid);
 
     return (
-        <div style={{
-            position:       'fixed',
-            top:            '72px',
-            left:           '50%',
-            transform:      'translateX(-50%)',
-            background:     isWin ? 'rgba(15,60,30,0.92)' : 'rgba(60,15,15,0.92)',
-            border:         isWin ? '1px solid rgba(34,197,94,0.45)' : '1px solid rgba(239,68,68,0.35)',
-            borderRadius:   '16px',
-            padding:        '14px 20px',
-            display:        'flex',
-            flexDirection:  'column',
-            alignItems:     'center',
-            gap:            '5px',
-            zIndex:         201,
-            maxWidth:       '300px',
-            width:          'calc(100% - 48px)',
-            backdropFilter: 'blur(16px)',
-            boxShadow:      isWin
-                ? '0 8px 32px rgba(34,197,94,0.25)'
-                : '0 8px 32px rgba(239,68,68,0.18)',
-            animation: isWin
-                ? 'winIn 0.4s ease, winGlow 2s ease-in-out infinite'
-                : 'winIn 0.4s ease',
-        }}>
-            <span style={{ fontSize:'28px', lineHeight:1 }}>
-                {isWin ? '🏆' : '💸'}
-            </span>
-
-            <div style={{
-                fontSize:   '17px',
-                fontWeight: 800,
-                color:      isWin ? '#4ADE80' : '#FCA5A5',
-                textAlign:  'center',
-            }}>
-                {isWin ? 'Você ganhou!' : 'Boa sorte na próxima!'}
-            </div>
-
-            {minha?.mao && (
-                <div style={{
-                    fontSize:     '12px',
-                    color:        'rgba(167,139,250,0.9)',
-                    background:   'rgba(124,58,237,0.15)',
-                    border:       '1px solid rgba(124,58,237,0.30)',
-                    borderRadius: '8px',
-                    padding:      '3px 10px',
-                }}>
-                    {minha.mao}
-                </div>
-            )}
-
-            {minha?.premio > 0 && (
-                <div style={{
-                    fontSize:   '15px',
-                    fontWeight: 700,
-                    color:      '#22C55E',
-                }}>
-                    +₿C {fmt(minha.premio)}
-                </div>
-            )}
-
+        <div className={`jogo-resultado${isWin ? ' ganho' : ''}`} role="status">
+            <div className="titulo">{isWin ? 'Você ganhou' : 'Não foi desta vez'}</div>
+            {minha?.mao && <div className="mao">{minha.mao}</div>}
+            {minha?.premio > 0 && <div className="premio num">+{treino ? `${fmt(minha.premio)} fichas` : `₿C ${fmt(minha.premio)}`}</div>}
             {!isWin && res?.vencedores?.[0] && (
-                <div style={{ fontSize:'11px', color:'rgba(255,255,255,0.38)', textAlign:'center' }}>
+                <div className="quem">
                     {res.vencedores[0].nome}
                     {res.vencedores[0].mao ? ` — ${res.vencedores[0].mao}` : ''}
                 </div>
@@ -447,213 +370,39 @@ function NotifResultado({ notif }) {
     );
 }
 
-const css = {
-    pagina: {
-        height:        '100dvh',
-        background:    'radial-gradient(ellipse at 50% 30%, #0e1a2e 0%, #080d1a 60%, #050810 100%)',
-        display:       'flex',
-        flexDirection: 'column',
-        fontFamily:    'sans-serif',
-        color:         '#F8FAFC',
-        overflow:      'hidden',
-        position:      'relative',
-    },
-    loading: {
-        height:'100dvh', display:'flex', flexDirection:'column',
-        alignItems:'center', justifyContent:'center',
-        background:'#080d1a', gap:'16px',
-    },
-    spinner: {
-        width:'36px', height:'36px',
-        border:'3px solid rgba(255,255,255,0.08)',
-        borderTop:'3px solid #7C3AED',
-        borderRadius:'50%', animation:'spin 0.8s linear infinite',
-    },
-    loadingTxt: { color:'rgba(255,255,255,0.4)', fontSize:'14px', margin:0 },
+// ── Confirmação de saída no meio da mão ────────────────────────────
+function ConfirmarSaida({ onFicar, onSair }) {
+    const ficarRef = useRef(null);
+    useEffect(() => {
+        ficarRef.current?.focus();
+        const onKey = (e) => { if (e.key === 'Escape') onFicar(); };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [onFicar]);
 
-    // Header: linha fina no topo
-    header: {
-        display:       'flex',
-        alignItems:    'center',
-        background:    'rgba(8,13,26,0.80)',
-        borderBottom:  '1px solid rgba(255,255,255,0.06)',
-        backdropFilter:'blur(8px)',
-        flexShrink:    0,
-        zIndex:        10,
-    },
-    btnSair: {
-        background:   'transparent',
-        border:       'none',
-        borderRight:  '1px solid rgba(255,255,255,0.06)',
-        color:        'rgba(255,255,255,0.45)',
-        fontSize:     '13px',
-        padding:      '10px 14px',
-        cursor:       'pointer',
-        fontFamily:   'inherit',
-        flexShrink:   0,
-        whiteSpace:   'nowrap',
-    },
-    saldoBox: {
-        display:       'flex',
-        flexDirection: 'column',
-        alignItems:    'flex-end',
-        justifyContent:'center',
-        padding:       '6px 12px',
-        borderLeft:    '1px solid rgba(255,255,255,0.06)',
-        flexShrink:    0,
-        gap:           '1px',
-    },
-    saldoLabel: {
-        fontSize:'9px', color:'rgba(245,158,11,0.55)',
-        textTransform:'uppercase', letterSpacing:'0.07em', fontWeight:'600',
-    },
-    saldoValor: { fontSize:'13px', fontWeight:'700', color:'#F59E0B' },
-
-    // Mesa: ocupa todo o espaço disponível; overflow:visible para que
-    // os jogadores na borda da oval não sejam cortados
-    mesaArea: {
-        flex:           1,
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        overflow:       'visible',
-        padding:        '52px 12px',
-        minHeight:      0,
-    },
-
-    // Painel de ações na base
-    painel: {
-        flexShrink:    0,
-        background:    'rgba(8,13,26,0.90)',
-        borderTop:     '1px solid rgba(255,255,255,0.06)',
-        backdropFilter:'blur(10px)',
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '4px',
-        paddingBottom: 'env(safe-area-inset-bottom)',
-    },
-
-    // Linha compacta: hand strength + fichas
-    infoRow: {
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'space-between',
-        padding:        '5px 12px 2px',
-        gap:            '8px',
-        minHeight:      '32px',
-    },
-    fichasInfo: {
-        display:       'flex',
-        alignItems:    'center',
-        gap:           '5px',
-        flexShrink:    0,
-    },
-    fichasLabel: {
-        fontSize:'10px', color:'rgba(167,139,250,0.55)',
-        textTransform:'uppercase', letterSpacing:'0.05em',
-    },
-    fichasVal: {
-        fontSize:'13px', fontWeight:'700', color:'#A78BFA',
-    },
-
-    btnIniciar: {
-        margin:       '8px 12px',
-        padding:      '14px',
-        background:   'linear-gradient(135deg,#22C55E,#16A34A)',
-        border:       'none',
-        borderRadius: '12px',
-        color:        '#fff',
-        fontSize:     '15px',
-        fontWeight:   '700',
-        fontFamily:   'inherit',
-        letterSpacing:'0.02em',
-        boxShadow:    '0 4px 20px rgba(34,197,94,0.35)',
-    },
-    aguardando: {
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        gap:            '8px',
-        fontSize:       '13px',
-        color:          'rgba(255,255,255,0.38)',
-        padding:        '14px 0',
-    },
-    pulseDot: {
-        display:'inline-block', width:'7px', height:'7px',
-        borderRadius:'50%', background:'#F59E0B',
-        animation:'pulse 1.4s ease-in-out infinite', flexShrink:0,
-    },
-    semFichas: {
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'center',
-        gap:            '6px',
-        padding:        '8px 12px',
-    },
-    semFichasTexto: {
-        fontSize: '12px',
-        color:    'rgba(255,255,255,0.55)',
-        margin:   0,
-    },
-    semFichasAcoes: {
-        display: 'flex',
-        gap:     '8px',
-    },
-    btnRebuy: {
-        padding:      '9px 16px',
-        background:   'linear-gradient(135deg,#F59E0B,#D97706)',
-        border:       'none',
-        borderRadius: '10px',
-        color:        '#fff',
-        fontSize:     '13px',
-        fontWeight:   '700',
-        fontFamily:   'inherit',
-        cursor:       'pointer',
-        boxShadow:    '0 2px 12px rgba(245,158,11,0.3)',
-        WebkitTapHighlightColor: 'transparent',
-    },
-    btnSairMesa: {
-        padding:      '9px 16px',
-        background:   'rgba(255,255,255,0.06)',
-        border:       '1px solid rgba(255,255,255,0.15)',
-        borderRadius: '10px',
-        color:        'rgba(255,255,255,0.65)',
-        fontSize:     '13px',
-        fontWeight:   '600',
-        fontFamily:   'inherit',
-        cursor:       'pointer',
-        WebkitTapHighlightColor: 'transparent',
-    },
-    btnCompartilhar: {
-        margin:       '0 12px 8px',
-        padding:      '10px',
-        background:   'rgba(124,58,237,0.15)',
-        border:       '1px solid rgba(124,58,237,0.35)',
-        borderRadius: '10px',
-        color:        '#A78BFA',
-        fontSize:     '13px',
-        fontWeight:   '600',
-        fontFamily:   'inherit',
-        cursor:       'pointer',
-        WebkitTapHighlightColor: 'transparent',
-    },
-    notif: {
-        position:     'fixed',
-        top:          '64px',
-        left:         '50%',
-        transform:    'translateX(-50%)',
-        background:   'rgba(21,128,61,0.18)',
-        border:       '1px solid rgba(34,197,94,0.45)',
-        borderRadius: '12px',
-        padding:      '10px 22px',
-        color:        '#4ADE80',
-        fontSize:     '13px',
-        fontWeight:   '600',
-        zIndex:       200,
-        textAlign:    'center',
-        maxWidth:     '320px',
-        animation:    'slideUp 0.3s ease',
-        whiteSpace:   'nowrap',
-        backdropFilter: 'blur(8px)',
-    },
-};
+    return (
+        <div className="dialogo-veu" onClick={onFicar}>
+            <div
+                className="dialogo"
+                role="alertdialog"
+                aria-modal="true"
+                aria-labelledby="dialogo-sair-titulo"
+                aria-describedby="dialogo-sair-texto"
+                onClick={e => e.stopPropagation()}
+            >
+                <h2 id="dialogo-sair-titulo">Sair no meio da mão?</h2>
+                <p id="dialogo-sair-texto">
+                    Você está jogando esta mão. Se sair agora, desiste dela e o que já apostou fica no pote.
+                </p>
+                <div className="dialogo-acoes">
+                    <button type="button" ref={ficarRef} className="btn btn-neutro" onClick={onFicar}>
+                        Continuar na mesa
+                    </button>
+                    <button type="button" className="btn btn-perigo-contorno" onClick={onSair}>
+                        Sair da mesa
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}

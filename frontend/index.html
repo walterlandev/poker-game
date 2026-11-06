@@ -1,13 +1,29 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR" translate="no" data-tema="escuro">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <meta name="google" content="notranslate" />
+    <meta name="theme-color" content="#1C1714" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap" />
+    <title>Bitchager</title>
+    <script>
+      // Aplica o tema visual antes do primeiro render (sem piscar). Ver src/core/temaVisual.js
+      (function () {
+        var p = 'sistema';
+        try { p = localStorage.getItem('bitchager:tema') || 'sistema'; } catch (e) {}
+        var t = p === 'claro' || p === 'escuro' ? p
+          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'claro' : 'escuro');
+        document.documentElement.setAttribute('data-tema', t);
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', t === 'claro' ? '#DCD5C8' : '#1C1714');
+      })();
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root" translate="no" class="notranslate"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

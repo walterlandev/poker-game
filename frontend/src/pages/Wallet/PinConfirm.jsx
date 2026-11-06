@@ -136,10 +136,10 @@ export default function PinConfirm({ titulo, descricao, onConfirmar, onCancelar 
                         style={{
                             ...estilos.input,
                             borderColor: erro
-                                ? 'rgba(239,68,68,0.5)'
+                                ? 'var(--cor-perigo-linha)'
                                 : pinValido
-                                    ? 'rgba(245,158,11,0.4)'
-                                    : 'rgba(255,255,255,0.12)',
+                                    ? 'var(--cor-destaque-linha)'
+                                    : 'var(--cor-linha)',
                         }}
                     />
                     <button
@@ -164,9 +164,9 @@ export default function PinConfirm({ titulo, descricao, onConfirmar, onCancelar 
                     style={{
                         ...estilos.btnConfirmar,
                         background: pinValido
-                            ? 'linear-gradient(135deg, #D97706, #F59E0B)'
-                            : 'rgba(255,255,255,0.06)',
-                        color:  pinValido ? '#fff' : 'rgba(255,255,255,0.25)',
+                            ? 'var(--cor-destaque)'
+                            : 'var(--cor-superficie)',
+                        color:  pinValido ? '#fff' : 'var(--cor-texto-3)',
                         cursor: pinValido ? 'pointer' : 'not-allowed',
                     }}
                 >
@@ -198,7 +198,7 @@ const estilos = {
     overlay: {
         position:       'fixed',
         inset:          0,
-        background:     'rgba(0,0,0,0.80)',
+        background:     'var(--cor-veu)',
         display:        'flex',
         alignItems:     'center',
         justifyContent: 'center',
@@ -208,8 +208,8 @@ const estilos = {
     },
 
     modal: {
-        background:    '#0F172A',
-        border:        '1px solid rgba(255,255,255,0.10)',
+        background:    'var(--cor-superficie)',
+        border:        '1px solid var(--cor-linha)',
         borderRadius:  '20px',
         padding:       '28px 24px',
         maxWidth:      '340px',
@@ -218,15 +218,15 @@ const estilos = {
         flexDirection: 'column',
         alignItems:    'center',
         gap:           '16px',
-        boxShadow:     '0 0 60px rgba(0,0,0,0.5)',
+        boxShadow:     '0 0 60px var(--cor-veu)',
     },
 
     iconeBox: {
         width:          '56px',
         height:         '56px',
         borderRadius:   '50%',
-        background:     'rgba(245,158,11,0.10)',
-        border:         '1px solid rgba(245,158,11,0.25)',
+        background:     'var(--cor-destaque-suave)',
+        border:         '1px solid var(--cor-destaque-linha)',
         display:        'flex',
         alignItems:     'center',
         justifyContent: 'center',
@@ -245,13 +245,13 @@ const estilos = {
     titulo: {
         fontSize:   '17px',
         fontWeight: '700',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         margin:     0,
     },
 
     descricao: {
         fontSize:   '13px',
-        color:      'rgba(255,255,255,0.45)',
+        color:      'var(--cor-texto-3)',
         margin:     0,
         lineHeight: 1.4,
     },
@@ -265,10 +265,10 @@ const estilos = {
     input: {
         width:        '100%',
         padding:      '13px 44px 13px 16px',
-        background:   'rgba(255,255,255,0.06)',
-        border:       '1px solid rgba(255,255,255,0.12)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '12px',
-        color:        '#F8FAFC',
+        color:        'var(--cor-texto)',
         fontSize:     '16px',
         fontFamily:   'inherit',
         outline:      'none',
@@ -293,14 +293,14 @@ const estilos = {
 
     erroTexto: {
         fontSize:  '12px',
-        color:     '#FCA5A5',
+        color:     'var(--cor-perigo-texto)',
         margin:    0,
         textAlign: 'center',
     },
 
     tentativasTexto: {
         fontSize:  '11px',
-        color:     '#F59E0B',
+        color:     'var(--cor-destaque-texto)',
         margin:    0,
         textAlign: 'center',
     },
@@ -321,9 +321,9 @@ const estilos = {
         width:        '100%',
         padding:      '11px',
         background:   'transparent',
-        border:       '1px solid rgba(255,255,255,0.10)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '10px',
-        color:        'rgba(255,255,255,0.40)',
+        color:        'var(--cor-texto-3)',
         fontSize:     '13px',
         cursor:       'pointer',
         fontFamily:   'inherit',
@@ -333,7 +333,7 @@ const estilos = {
 
     avisoSeguranca: {
         fontSize:  '10px',
-        color:     'rgba(255,255,255,0.18)',
+        color:     'var(--cor-linha-forte)',
         margin:    0,
         textAlign: 'center',
     },

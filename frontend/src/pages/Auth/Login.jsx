@@ -350,13 +350,13 @@ const estilos = {
     titulo: {
         fontSize:   '22px',
         fontWeight: '700',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         margin:     0,
     },
 
     subtitulo: {
         fontSize:  '13px',
-        color:     'rgba(255,255,255,0.4)',
+        color:     'var(--cor-texto-3)',
         margin:    '4px 0 0',
     },
 
@@ -366,7 +366,7 @@ const estilos = {
         background:     '#FFFFFF',
         border:         'none',
         borderRadius:   '10px',
-        color:          '#1a1a1a',
+        color:          'var(--cor-superficie)',
         fontSize:       '14px',
         fontWeight:     '500',
         cursor:         'pointer',
@@ -387,12 +387,12 @@ const estilos = {
     linhaDivisor: {
         flex:       1,
         height:     '1px',
-        background: 'rgba(255,255,255,0.08)',
+        background: 'var(--cor-linha)',
     },
 
     textoDivisor: {
         fontSize:   '12px',
-        color:      'rgba(255,255,255,0.25)',
+        color:      'var(--cor-texto-3)',
         flexShrink: 0,
     },
 
@@ -411,7 +411,7 @@ const estilos = {
     label: {
         fontSize:      '12px',
         fontWeight:    '500',
-        color:         'rgba(255,255,255,0.5)',
+        color:         'var(--cor-texto-2)',
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
     },
@@ -423,10 +423,10 @@ const estilos = {
     input: {
         width:        '100%',
         padding:      '11px 12px',
-        background:   'rgba(255,255,255,0.06)',
-        border:       '1px solid rgba(255,255,255,0.1)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '8px',
-        color:        '#F8FAFC',
+        color:        'var(--cor-texto)',
         fontSize:     '14px',
         outline:      'none',
         boxSizing:    'border-box',
@@ -449,29 +449,29 @@ const estilos = {
 
     erro: {
         padding:      '10px 12px',
-        background:   'rgba(239,68,68,0.1)',
-        border:       '1px solid rgba(239,68,68,0.3)',
+        background:   'var(--cor-perigo-suave)',
+        border:       '1px solid var(--cor-perigo-linha)',
         borderRadius: '8px',
         fontSize:     '13px',
-        color:        '#FCA5A5',
+        color:        'var(--cor-perigo-texto)',
     },
 
     sucesso: {
         padding:      '10px 12px',
-        background:   'rgba(34,197,94,0.1)',
-        border:       '1px solid rgba(34,197,94,0.3)',
+        background:   'var(--cor-positivo-suave)',
+        border:       '1px solid var(--cor-positivo)',
         borderRadius: '8px',
         fontSize:     '13px',
-        color:        '#4ADE80',
+        color:        'var(--cor-positivo-texto)',
     },
 
     btnEntrar: {
         width:        '100%',
         padding:      '12px',
-        background:   'linear-gradient(135deg, #7C3AED, #4F46E5)',
+        background:   'var(--cor-destaque)',
         border:       'none',
         borderRadius: '10px',
-        color:        'white',
+        color:        'var(--cor-texto-inverso)',
         fontSize:     '15px',
         fontWeight:   '600',
         cursor:       'pointer',
@@ -482,7 +482,7 @@ const estilos = {
 
     linkCadastro: {
         fontSize:  '13px',
-        color:     'rgba(255,255,255,0.4)',
+        color:     'var(--cor-texto-3)',
         textAlign: 'center',
         margin:    0,
     },
@@ -490,7 +490,7 @@ const estilos = {
     btnLink: {
         background: 'none',
         border:     'none',
-        color:      '#7C3AED',
+        color:      'var(--cor-destaque)',
         fontSize:   '13px',
         fontWeight: '600',
         cursor:     'pointer',

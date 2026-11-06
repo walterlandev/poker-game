@@ -1,253 +1,123 @@
 /* ================================================================
    ARQUIVO: frontend/src/pages/Lobby/Header.jsx
 
-   CONCEITO GERAL:
-   Cabeçalho do Lobby com avatar, rank, saldo ₿C e menu.
+   Cabeçalho do lobby: marca, navegação (desktop; no celular a mesma
+   navegação vira barra fixa embaixo), saldo ₿C e menu do avatar.
 
-   MUDANÇAS DESTA VERSÃO:
-   → Item "Perfil" agora chama onAbrirPerfil (modal real)
-   → Item "Configurações" agora chama onAbrirConfiguracoes (real)
-   → Avatar usa imagens locais (/avata01.png...) com fallback DiceBear
+     → saldo: abre a Carteira; o "+" / "Comprar ₿C" abre a Loja
+     → avatar: menu com Perfil, Configurações e Sair
 
    PROPS:
-     usuario              → { uid, nome, avatar, saldo, rankPontos }
+     usuario              → { uid, nome, avatar, saldo, saldoBonus, rankPontos }
+     navegacao            → elemento <Tabs /> já montado pelo Lobby
      onAbrirLoja          → abre a loja para comprar ₿C
      onAbrirCarteira      → abre a carteira do jogador
      onAbrirPerfil        → abre o modal de perfil
-     onAbrirConfiguracoes → abre o modal de configurações (NOVO)
+     onAbrirConfiguracoes → abre o modal de configurações
      onLogout             → desloga o jogador
 ================================================================ */
 
-import { useState } from 'react';
-
-const SIMBOLO_BC = '₿C';
+import { useState, useEffect } from 'react';
+import Icone from '../../components/Icone';
 
 function calcularRank(rankPontos = 0) {
-    if (rankPontos >= 10000) return { nome: 'Lendário',      cor: '#F59E0B', emoji: '👑' };
-    if (rankPontos >= 5000)  return { nome: 'Mestre',        cor: '#A855F7', emoji: '💎' };
-    if (rankPontos >= 2000)  return { nome: 'Avançado',      cor: '#3B82F6', emoji: '⚡' };
-    if (rankPontos >= 500)   return { nome: 'Intermediário', cor: '#22C55E', emoji: '🎯' };
-    return                          { nome: 'Iniciante',     cor: '#6B7280', emoji: '🃏' };
+    if (rankPontos >= 10000) return 'Lendário';
+    if (rankPontos >= 5000)  return 'Mestre';
+    if (rankPontos >= 2000)  return 'Avançado';
+    if (rankPontos >= 500)   return 'Intermediário';
+    return 'Iniciante';
 }
 
 function formatarSaldo(valor = 0) {
     return Number(valor).toLocaleString('pt-BR');
 }
 
-export default function Header({ usuario, onAbrirLoja, onAbrirCarteira, onAbrirPerfil, onAbrirConfiguracoes, onLogout }) {
-
+export default function Header({ usuario, navegacao, onAbrirLoja, onAbrirCarteira, onAbrirPerfil, onAbrirConfiguracoes, onLogout }) {
     const [menuAberto, setMenuAberto] = useState(false);
-    const rank = calcularRank(usuario?.rankPontos);
+    const rank   = calcularRank(usuario?.rankPontos);
+    const saldo  = formatarSaldo((usuario?.saldo || 0) + (usuario?.saldoBonus || 0));
     const avatarFallback = `https://api.dicebear.com/7.x/avataaars/svg?seed=${usuario?.uid || 'default'}`;
 
+    // Esc fecha o menu
+    useEffect(() => {
+        if (!menuAberto) return undefined;
+        const onKey = (e) => { if (e.key === 'Escape') setMenuAberto(false); };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [menuAberto]);
+
+    const escolher = (fn) => () => { fn?.(); setMenuAberto(false); };
+
     return (
-        <header style={estilos.header}>
-
-            <div style={estilos.linhaDecoracao} />
-
-            <div className="header-inner">
-
-                {/* Avatar + Info */}
-                <div style={estilos.ladoEsquerdo}>
-                    <div style={estilos.avatarContainer}>
-                        <div style={{
-                            ...estilos.avatarAnel,
-                            background: `conic-gradient(${rank.cor} 0%, ${rank.cor}40 100%)`,
-                        }}>
-                            <img
-                                src={usuario?.avatar || avatarFallback}
-                                alt={usuario?.nome || 'Jogador'}
-                                style={estilos.avatarImg}
-                                onError={e => { e.target.onerror = null; e.target.src = avatarFallback; }}
-                            />
-                        </div>
-                        <div style={{ ...estilos.rankBadge, background: rank.cor }}>
-                            <span style={{ fontSize: '10px' }}>{rank.emoji}</span>
-                        </div>
-                    </div>
-
-                    <div style={estilos.infoJogador}>
-                        <p className="header-nome">{usuario?.nome || 'Jogador'}</p>
-                        <p className="header-rank-texto" style={{ color: rank.cor }}>
-                            {rank.nome} · {usuario?.rankPontos || 0} pts
-                        </p>
-                    </div>
-                </div>
-
-                {/* Saldo + Menu */}
-                <div style={estilos.ladoDireito}>
-
-                    <button onClick={onAbrirLoja} style={estilos.cardSaldo}>
-                        <div style={estilos.saldoLinha}>
-                            <span style={estilos.simboloBC}>{SIMBOLO_BC}</span>
-                            <span className="header-saldo-valor">
-                                {formatarSaldo((usuario?.saldo || 0) + (usuario?.saldoBonus || 0))}
-                            </span>
-                        </div>
-                        <div style={estilos.saldoRodape}>
-                            <span style={estilos.labelSaldo}>Bitchager</span>
-                            <span style={estilos.btnComprar}>+ Comprar</span>
-                        </div>
-                    </button>
-
-                    <div style={{ position: 'relative' }}>
-                        <button
-                            onClick={() => setMenuAberto(m => !m)}
-                            style={estilos.btnMenu}
-                            aria-label="Menu de opções"
-                        >
-                            <span style={estilos.pontosMenu}>⋮</span>
-                        </button>
-
-                        {menuAberto && (
-                            <MenuDropdown
-                                onAbrirCarteira={()      => { onAbrirCarteira?.();      setMenuAberto(false); }}
-                                onAbrirPerfil={()        => { onAbrirPerfil?.();        setMenuAberto(false); }}
-                                onAbrirConfiguracoes={() => { onAbrirConfiguracoes?.(); setMenuAberto(false); }}
-                                onLogout={()             => { onLogout?.();             setMenuAberto(false); }}
-                                onFechar={()             => setMenuAberto(false)}
-                            />
-                        )}
-                    </div>
-
-                </div>
+        <header className="lobby-topo">
+            <div className="marca" translate="no">
+                <span className="marca-selo num" aria-hidden="true">₿C</span>
+                <span className="marca-nome">Bitchager</span>
             </div>
 
-            <div style={estilos.linhaSeparadora} />
+            {navegacao}
+
+            <div className="lobby-topo-dir">
+                <div className="saldo-grupo">
+                    <button type="button" className="saldo-btn" onClick={onAbrirCarteira} aria-label={`Abrir carteira, saldo ₿C ${saldo}`}>
+                        <span className="rot">Saldo</span>
+                        <b className="num cor-bc">₿C {saldo}</b>
+                    </button>
+                    <button type="button" className="comprar-btn" onClick={onAbrirLoja} aria-label="Comprar ₿C">
+                        <Icone nome="mais" tamanho={16} />
+                        <span className="txt">Comprar ₿C</span>
+                    </button>
+                </div>
+
+                <div className="perfil-menu">
+                    <button
+                        type="button"
+                        className="perfil-btn"
+                        onClick={() => setMenuAberto(m => !m)}
+                        aria-expanded={menuAberto}
+                        aria-haspopup="menu"
+                        aria-label="Perfil, configurações e sair"
+                    >
+                        <img
+                            src={usuario?.avatar || avatarFallback}
+                            alt=""
+                            width={36}
+                            height={36}
+                            onError={e => { e.target.onerror = null; e.target.src = avatarFallback; }}
+                        />
+                        <span className="txt">
+                            <b>{usuario?.nome || 'Jogador'}</b>
+                            <span>{rank}, <span className="num">{formatarSaldo(usuario?.rankPontos || 0)}</span> pts</span>
+                        </span>
+                        <Icone nome="desce" tamanho={16} className="seta" />
+                    </button>
+
+                    {menuAberto && (
+                        <>
+                            <div className="menu-veu" onClick={() => setMenuAberto(false)} />
+                            <div className="menu-suspenso" role="menu">
+                                <div className="menu-cab">
+                                    <b>{usuario?.nome || 'Jogador'}</b>
+                                    <span>{rank}, {formatarSaldo(usuario?.rankPontos || 0)} pts</span>
+                                </div>
+                                <button type="button" role="menuitem" onClick={escolher(onAbrirPerfil)}>
+                                    <Icone nome="perfil" />Perfil
+                                </button>
+                                <button type="button" role="menuitem" onClick={escolher(onAbrirCarteira)}>
+                                    <Icone nome="carteira" />Minha carteira
+                                </button>
+                                <button type="button" role="menuitem" onClick={escolher(onAbrirConfiguracoes)}>
+                                    <Icone nome="config" />Configurações
+                                </button>
+                                <hr />
+                                <button type="button" role="menuitem" className="perigo" onClick={escolher(onLogout)}>
+                                    <Icone nome="sair" />Sair da conta
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
         </header>
     );
 }
-
-function MenuDropdown({ onAbrirCarteira, onAbrirPerfil, onAbrirConfiguracoes, onLogout, onFechar }) {
-
-    const itens = [
-        {
-            label:   'Minha Carteira ₿C',
-            icone:   '💰',
-            acao:    onAbrirCarteira,
-            emBreve: false,
-            perigo:  false,
-        },
-        {
-            label:   'Perfil',
-            icone:   '👤',
-            acao:    onAbrirPerfil,
-            emBreve: false,
-            perigo:  false,
-        },
-        {
-            label:   'Configurações',
-            icone:   '⚙️',
-            acao:    onAbrirConfiguracoes,
-            emBreve: false,
-            perigo:  false,
-        },
-        {
-            label:   'Sair',
-            icone:   '🚪',
-            acao:    onLogout,
-            emBreve: false,
-            perigo:  true,
-        },
-    ];
-
-    return (
-        <>
-            <div onClick={onFechar} style={estilos.overlay} />
-            <div style={estilos.dropdown}>
-                {itens.map(item => (
-                    <button
-                        key={item.label}
-                        onClick={item.acao}
-                        style={{
-                            ...estilos.itemDropdown,
-                            color:   item.perigo ? '#EF4444' : '#F8FAFC',
-                            opacity: item.emBreve ? 0.6 : 1,
-                        }}
-                    >
-                        <span style={{ fontSize: '16px' }}>{item.icone}</span>
-                        <span style={{ flex: 1, textAlign: 'left' }}>{item.label}</span>
-                        {item.emBreve && (
-                            <span style={estilos.badgeEmBreve}>em breve</span>
-                        )}
-                    </button>
-                ))}
-            </div>
-        </>
-    );
-}
-
-const estilos = {
-    header: {
-        position:'relative', background:'#0d1424',
-        paddingTop:'max(0px, env(safe-area-inset-top))',
-        zIndex:100, width:'100%',
-    },
-    linhaDecoracao: {
-        height:'2px',
-        background:'linear-gradient(90deg, transparent, #D97706, #F59E0B, #D97706, transparent)',
-    },
-    ladoEsquerdo: { display:'flex', alignItems:'center', gap:'10px', flex:1, minWidth:0 },
-    avatarContainer: { position:'relative', flexShrink:0 },
-    avatarAnel: {
-        width:'48px', height:'48px', borderRadius:'50%', padding:'2px',
-        display:'flex', alignItems:'center', justifyContent:'center',
-    },
-    avatarImg: {
-        width:'44px', height:'44px', borderRadius:'50%',
-        objectFit:'cover', border:'2px solid #0d1424',
-    },
-    rankBadge: {
-        position:'absolute', bottom:'-2px', right:'-2px',
-        width:'18px', height:'18px', borderRadius:'50%',
-        border:'2px solid #0d1424',
-        display:'flex', alignItems:'center', justifyContent:'center',
-    },
-    infoJogador: { minWidth:0 },
-    ladoDireito: { display:'flex', alignItems:'center', gap:'8px', flexShrink:0 },
-    cardSaldo: {
-        background:'rgba(217,119,6,0.1)', border:'1px solid rgba(217,119,6,0.3)',
-        borderRadius:'10px', padding:'6px 10px', cursor:'pointer',
-        textAlign:'right', outline:'none', transition:'background 0.15s',
-        minWidth:'90px', WebkitTapHighlightColor:'transparent', fontFamily:'sans-serif',
-    },
-    saldoLinha: { display:'flex', alignItems:'baseline', gap:'4px', justifyContent:'flex-end' },
-    simboloBC: { fontSize:'11px', color:'#D97706', fontWeight:'700' },
-    saldoRodape: {
-        display:'flex', alignItems:'center', justifyContent:'space-between',
-        gap:'6px', marginTop:'2px',
-    },
-    labelSaldo: { fontSize:'9px', color:'rgba(217,119,6,0.6)', letterSpacing:'0.04em' },
-    btnComprar: {
-        fontSize:'9px', color:'#D97706', background:'rgba(217,119,6,0.15)',
-        borderRadius:'4px', padding:'1px 4px', fontWeight:'600',
-    },
-    btnMenu: {
-        background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)',
-        borderRadius:'8px', width:'34px', height:'34px',
-        display:'flex', alignItems:'center', justifyContent:'center',
-        cursor:'pointer', color:'#F8FAFC', outline:'none',
-        WebkitTapHighlightColor:'transparent',
-    },
-    pontosMenu: { fontSize:'20px', lineHeight:1, marginTop:'-2px' },
-    overlay: { position:'fixed', inset:0, zIndex:199 },
-    dropdown: {
-        position:'absolute', top:'38px', right:0,
-        background:'#1a2235', border:'1px solid rgba(255,255,255,0.1)',
-        borderRadius:'10px', overflow:'hidden', zIndex:200,
-        minWidth:'200px', boxShadow:'0 8px 24px rgba(0,0,0,0.4)',
-    },
-    itemDropdown: {
-        width:'100%', padding:'12px 14px', background:'none', border:'none',
-        display:'flex', alignItems:'center', gap:'10px', cursor:'pointer',
-        fontSize:'14px', borderBottom:'1px solid rgba(255,255,255,0.05)',
-        WebkitTapHighlightColor:'transparent', transition:'background 0.1s',
-        fontFamily:'sans-serif',
-    },
-    badgeEmBreve: {
-        fontSize:'9px', color:'rgba(255,255,255,0.3)',
-        background:'rgba(255,255,255,0.06)', borderRadius:'4px',
-        padding:'1px 5px', fontWeight:'500', letterSpacing:'0.04em', whiteSpace:'nowrap',
-    },
-    linhaSeparadora: { height:'1px', background:'rgba(255,255,255,0.05)' },
-};

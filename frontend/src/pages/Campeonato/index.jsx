@@ -17,6 +17,7 @@ export default function Campeonato({ usuario, socket, onEntrarMesa, conviteTorne
     const [torneioAtual, setTorneioAtual] = useState(null);
     const [modalCriar,   setModalCriar  ] = useState(false);
     const [carregando,   setCarregando  ] = useState(false);
+    const [rebuyEnviando, setRebuyEnviando] = useState(false);
     const [erro,         setErro        ] = useState(null);
     const [rebuyInfo,    setRebuyInfo   ] = useState(null);  // modal rebuy
 
@@ -46,7 +47,10 @@ export default function Campeonato({ usuario, socket, onEntrarMesa, conviteTorne
             if (dados.elegiveisUids?.includes(usuario?.uid)) setRebuyInfo(dados);
         };
 
-        const onRebuyConfirmado = () => setRebuyInfo(null);
+        const onRebuyConfirmado = () => { setRebuyInfo(null); setRebuyEnviando(false); };
+        // Torneio cancelado por falta de jogadores: volta para a lista de torneios
+        // (a mensagem é mostrada pelo App, em qualquer tela)
+        const onCancelado = () => { setTorneioAtual(null); setRebuyInfo(null); };
 
         const onCriado = ({ torneioId }) => {
             socket.emit('pedir_estado_torneio', { torneioId });
@@ -62,6 +66,7 @@ export default function Campeonato({ usuario, socket, onEntrarMesa, conviteTorne
         socket.on('torneio:rebuy_confirmado', onRebuyConfirmado);
         socket.on('torneio:criado',           onCriado);
         socket.on('torneio:entrou',           onEntrou);
+        socket.on('torneio:cancelado_sem_jogadores', onCancelado);
 
         socket.emit('listar_torneios');
 
@@ -73,6 +78,7 @@ export default function Campeonato({ usuario, socket, onEntrarMesa, conviteTorne
             socket.off('torneio:rebuy_confirmado', onRebuyConfirmado);
             socket.off('torneio:criado',           onCriado);
             socket.off('torneio:entrou',           onEntrou);
+            socket.off('torneio:cancelado_sem_jogadores', onCancelado);
         };
     }, [socket, usuario, onEntrarMesa]);
 
@@ -90,7 +96,7 @@ export default function Campeonato({ usuario, socket, onEntrarMesa, conviteTorne
     // Handlers
     // ----------------------------------------------------------------
     function handleEntrar(torneioId) {
-        if (!socket) return;
+        if (!socket || carregando) return;
         setErro(null);
         setCarregando(true);
         socket.emit('entrar_torneio', { torneioId });
@@ -107,7 +113,9 @@ export default function Campeonato({ usuario, socket, onEntrarMesa, conviteTorne
     }
 
     function handleRebuy() {
-        if (!rebuyInfo || !socket) return;
+        if (!rebuyInfo || !socket || rebuyEnviando) return;
+        setRebuyEnviando(true);
+        setTimeout(() => setRebuyEnviando(false), 8000);
         socket.emit('torneio_rebuy', { torneioId: rebuyInfo.torneioId });
     }
 
@@ -218,9 +226,9 @@ function EstadoTorneio({ torneio, meuUid, souHost, possoRebuy, onIniciar, onRebu
     const minhaEntrada   = torneio.jogadores?.[meuUid];
 
     const statusCor = {
-        aberto:       '#F59E0B',
-        em_andamento: '#22C55E',
-        finalizado:   '#A78BFA',
+        aberto:       'var(--cor-destaque-texto)',
+        em_andamento: 'var(--cor-positivo-texto)',
+        finalizado:   'var(--cor-destaque-texto)',
     }[torneio.status] || '#fff';
 
     const statusLabel = {
@@ -251,19 +259,19 @@ function EstadoTorneio({ torneio, meuUid, souHost, possoRebuy, onIniciar, onRebu
             {torneio.status === 'aberto' && (
                 <div style={css.conviteRow}>
                     <div style={{ flex:1 }}>
-                        <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.35)', textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                        <span style={{ fontSize:'10px', color:'var(--cor-texto-3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>
                             Código de convite
                         </span>
-                        <div style={{ fontSize:'14px', fontFamily:'monospace', color:'#F59E0B', fontWeight:700 }}>
+                        <div style={{ fontSize:'14px', fontFamily:'monospace', color:'var(--cor-destaque-texto)', fontWeight:700 }}>
                             {torneio.id}
                         </div>
                     </div>
                     <button
                         style={{
                             ...css.btnCompartilhar,
-                            background: copiado ? 'rgba(34,197,94,0.18)' : 'rgba(124,58,237,0.18)',
-                            borderColor: copiado ? 'rgba(34,197,94,0.40)' : 'rgba(124,58,237,0.35)',
-                            color: copiado ? '#86EFAC' : '#A78BFA',
+                            background: copiado ? 'var(--cor-positivo-suave)' : 'var(--cor-destaque-suave)',
+                            borderColor: copiado ? 'var(--cor-positivo)' : 'var(--cor-destaque-linha)',
+                            color: copiado ? 'var(--cor-positivo-texto)' : 'var(--cor-destaque-texto)',
                         }}
                         onClick={copiarLink}
                     >
@@ -275,11 +283,11 @@ function EstadoTorneio({ torneio, meuUid, souHost, possoRebuy, onIniciar, onRebu
             <div style={css.torneioStats}>
                 <Stat label="Jogadores" valor={`${totalJogadores}/${torneio.maxJogadores}`} />
                 <Stat label="Buy-In"    valor={`₿C ${fmt(torneio.buyIn)}`} />
-                <Stat label="Fichas"    valor={fmt(torneio.fichasIniciais)} corValor="#22C55E" />
+                <Stat label="Fichas"    valor={fmt(torneio.fichasIniciais)} corValor="var(--cor-positivo-texto)" />
                 <Stat label="Por Mesa"  valor={torneio.jogadoresPorMesa} />
                 {torneio.rodadaAtual > 0 && <Stat label="Rodada" valor={torneio.rodadaAtual + 1} />}
                 {torneio.rebuyAtivo && (
-                    <Stat label="Rebuy" valor={`${torneio.rebuyMinRestantes}min`} corValor="#F87171" />
+                    <Stat label="Rebuy" valor={`${torneio.rebuyMinRestantes}min`} corValor="var(--cor-perigo-texto)" />
                 )}
             </div>
 
@@ -288,14 +296,14 @@ function EstadoTorneio({ torneio, meuUid, souHost, possoRebuy, onIniciar, onRebu
                 <div style={{
                     ...css.minhaSituacao,
                     background:  minhaEntrada.status === 'eliminado' || minhaEntrada.status === 'rebuy_disponivel'
-                        ? 'rgba(239,68,68,0.10)' : 'rgba(34,197,94,0.08)',
+                        ? 'var(--cor-perigo-suave)' : 'var(--cor-positivo-suave)',
                     borderColor: minhaEntrada.status === 'eliminado' || minhaEntrada.status === 'rebuy_disponivel'
-                        ? 'rgba(239,68,68,0.30)' : 'rgba(34,197,94,0.25)',
+                        ? 'var(--cor-perigo-linha)' : 'var(--cor-positivo-suave)',
                 }}>
                     <span style={{
                         fontSize:'11px', fontWeight:600, flex:1,
                         color: (minhaEntrada.status === 'eliminado' || minhaEntrada.status === 'rebuy_disponivel')
-                            ? '#FCA5A5' : '#86EFAC',
+                            ? 'var(--cor-perigo-texto)' : 'var(--cor-positivo-texto)',
                     }}>
                         {minhaEntrada.status === 'eliminado'         ? '❌ Você foi eliminado'
                          : minhaEntrada.status === 'rebuy_disponivel' ? '⚡ Rebuy disponível!'
@@ -305,7 +313,7 @@ function EstadoTorneio({ torneio, meuUid, souHost, possoRebuy, onIniciar, onRebu
                          : '⏳ Aguardando início'}
                     </span>
                     {minhaEntrada.rebuys > 0 && (
-                        <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.35)' }}>
+                        <span style={{ fontSize:'10px', color:'var(--cor-texto-3)' }}>
                             {minhaEntrada.rebuys}× rebuy
                         </span>
                     )}
@@ -359,13 +367,13 @@ function EstadoTorneio({ torneio, meuUid, souHost, possoRebuy, onIniciar, onRebu
                             }
                             <span style={{
                                 fontSize:   '12px',
-                                color:      j.uid === meuUid ? '#A78BFA' : '#E2E8F0',
+                                color:      j.uid === meuUid ? 'var(--cor-destaque-texto)' : 'var(--cor-texto)',
                                 fontWeight: j.uid === meuUid ? 700 : 400,
                                 flex:       1,
                             }}>
                                 {j.nome}
                                 {j.rebuys > 0 && (
-                                    <span style={{ fontSize:'9px', color:'#F87171', marginLeft:'4px' }}>
+                                    <span style={{ fontSize:'9px', color:'var(--cor-perigo-texto)', marginLeft:'4px' }}>
                                         ({j.rebuys}R)
                                     </span>
                                 )}
@@ -373,13 +381,13 @@ function EstadoTorneio({ torneio, meuUid, souHost, possoRebuy, onIniciar, onRebu
                             <span style={{
                                 fontSize:'10px',
                                 color: {
-                                    vencedor:          '#F59E0B',
-                                    eliminado:         '#EF4444',
-                                    jogando:           '#22C55E',
-                                    rebuy_disponivel:  '#F87171',
+                                    vencedor:          'var(--cor-destaque-texto)',
+                                    eliminado:         'var(--cor-perigo-texto)',
+                                    jogando:           'var(--cor-positivo-texto)',
+                                    rebuy_disponivel:  'var(--cor-perigo-texto)',
                                     rebuy_pago:        '#6EE7B7',
-                                    aguardando:        'rgba(255,255,255,0.35)',
-                                }[j.status] || 'rgba(255,255,255,0.35)',
+                                    aguardando:        'var(--cor-texto-3)',
+                                }[j.status] || 'var(--cor-texto-3)',
                             }}>
                                 {j.status?.replace('_', ' ')}
                             </span>
@@ -411,12 +419,12 @@ function ModalRebuy({ info, usuario, onRebuy, onRecusar }) {
 
     return (
         <div style={cssModal.overlay}>
-            <div style={{ ...cssModal.caixa, border:'1px solid rgba(248,113,113,0.40)' }}>
+            <div style={{ ...cssModal.caixa, border:'1px solid var(--cor-perigo-linha)' }}>
                 <div style={{ textAlign:'center', fontSize:'32px' }}>💥</div>
-                <p style={{ margin:0, fontWeight:700, fontSize:'16px', textAlign:'center', color:'#F8FAFC' }}>
+                <p style={{ margin:0, fontWeight:700, fontSize:'16px', textAlign:'center', color:'var(--cor-texto)' }}>
                     Você foi eliminado!
                 </p>
-                <p style={{ margin:0, fontSize:'13px', color:'rgba(255,255,255,0.55)', textAlign:'center' }}>
+                <p style={{ margin:0, fontSize:'13px', color:'var(--cor-texto-2)', textAlign:'center' }}>
                     Quer fazer rebuy e continuar no torneio?
                 </p>
 
@@ -427,8 +435,8 @@ function ModalRebuy({ info, usuario, onRebuy, onRecusar }) {
                     <StatRebuy label="Período restante" valor={`${info.periodoRestante}min`} />
                 </div>
 
-                <div style={{ textAlign:'center', fontSize:'12px', color:'rgba(255,255,255,0.40)' }}>
-                    Tempo para decidir: <b style={{ color:'#F87171' }}>{seg}s</b>
+                <div style={{ textAlign:'center', fontSize:'12px', color:'var(--cor-texto-3)' }}>
+                    Tempo para decidir: <b style={{ color:'var(--cor-perigo-texto)' }}>{seg}s</b>
                 </div>
 
                 <div style={{ display:'flex', gap:'10px' }}>
@@ -446,9 +454,9 @@ function ModalRebuy({ info, usuario, onRebuy, onRecusar }) {
 
 function StatRebuy({ label, valor }) {
     return (
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', background:'rgba(255,255,255,0.05)', borderRadius:'8px', padding:'8px 14px', gap:'2px' }}>
-            <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.40)', textTransform:'uppercase' }}>{label}</span>
-            <span style={{ fontSize:'14px', fontWeight:700, color:'#F8FAFC' }}>{valor}</span>
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', background:'var(--cor-superficie)', borderRadius:'8px', padding:'8px 14px', gap:'2px' }}>
+            <span style={{ fontSize:'10px', color:'var(--cor-texto-3)', textTransform:'uppercase' }}>{label}</span>
+            <span style={{ fontSize:'14px', fontWeight:700, color:'var(--cor-texto)' }}>{valor}</span>
         </div>
     );
 }
@@ -466,17 +474,17 @@ function CardTorneio({ torneio, jaEstou, onEntrar, carregando }) {
             <div style={css.cardHeader}>
                 <span style={{ fontSize:'16px' }}>🏆</span>
                 <span style={css.cardNome}>{torneio.nome}</span>
-                <span style={{ ...css.statusBadge, color:'#F59E0B', borderColor:'#F59E0B', fontSize:'9px' }}>
+                <span style={{ ...css.statusBadge, color:'var(--cor-destaque-texto)', borderColor:'var(--cor-destaque-texto)', fontSize:'9px' }}>
                     {torneio.totalJogadores}/{torneio.maxJogadores}
                 </span>
             </div>
 
             <div style={css.cardStats}>
-                <span style={css.cardStat}>Buy-In: <b style={{ color:'#F59E0B' }}>₿C {fmt(torneio.buyIn)}</b></span>
-                <span style={css.cardStat}>Fichas: <b style={{ color:'#22C55E' }}>{fmt(torneio.fichasIniciais)}</b></span>
-                <span style={css.cardStat}>Por mesa: <b style={{ color:'#A78BFA' }}>{torneio.jogadoresPorMesa}</b></span>
+                <span style={css.cardStat}>Buy-In: <b style={{ color:'var(--cor-destaque-texto)' }}>₿C {fmt(torneio.buyIn)}</b></span>
+                <span style={css.cardStat}>Fichas: <b style={{ color:'var(--cor-positivo-texto)' }}>{fmt(torneio.fichasIniciais)}</b></span>
+                <span style={css.cardStat}>Por mesa: <b style={{ color:'var(--cor-destaque-texto)' }}>{torneio.jogadoresPorMesa}</b></span>
                 {torneio.maxRebuys > 0 && (
-                    <span style={css.cardStat}>Rebuy: <b style={{ color:'#F87171' }}>{torneio.maxRebuys}×</b></span>
+                    <span style={css.cardStat}>Rebuy: <b style={{ color:'var(--cor-perigo-texto)' }}>{torneio.maxRebuys}×</b></span>
                 )}
             </div>
 
@@ -485,9 +493,9 @@ function CardTorneio({ torneio, jaEstou, onEntrar, carregando }) {
                     ...css.btnEntrar,
                     opacity:    (carregando || jaEstou || cheio) ? 0.6 : 1,
                     cursor:     (carregando || jaEstou || cheio) ? 'not-allowed' : 'pointer',
-                    background: jaEstou ? 'rgba(34,197,94,0.12)' : 'linear-gradient(135deg,#7C3AED,#4F46E5)',
-                    border:     jaEstou ? '1px solid rgba(34,197,94,0.35)' : 'none',
-                    color:      jaEstou ? '#86EFAC' : '#fff',
+                    background: jaEstou ? 'var(--cor-positivo-suave)' : 'var(--cor-destaque)',
+                    border:     jaEstou ? '1px solid var(--cor-positivo)' : 'none',
+                    color:      jaEstou ? 'var(--cor-positivo-texto)' : '#fff',
                 }}
                 disabled={carregando || jaEstou || cheio}
                 onClick={onEntrar}
@@ -502,7 +510,7 @@ function Stat({ label, valor, corValor }) {
     return (
         <div style={css.stat}>
             <span style={css.statLabel}>{label}</span>
-            <span style={{ ...css.statValor, color: corValor || '#F8FAFC' }}>{valor}</span>
+            <span style={{ ...css.statValor, color: corValor || 'var(--cor-texto)' }}>{valor}</span>
         </div>
     );
 }
@@ -586,9 +594,9 @@ function ModalCriarTorneio({ socket, usuario, onFechar }) {
                                 key={v}
                                 style={{
                                     ...cssModal.btnOpcao,
-                                    background:  buyIn === v ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.05)',
-                                    borderColor: buyIn === v ? 'rgba(245,158,11,0.50)' : 'rgba(255,255,255,0.08)',
-                                    color:       buyIn === v ? '#F59E0B' : 'rgba(255,255,255,0.55)',
+                                    background:  buyIn === v ? 'var(--cor-destaque-suave)' : 'var(--cor-superficie)',
+                                    borderColor: buyIn === v ? 'var(--cor-destaque-linha)' : 'var(--cor-linha)',
+                                    color:       buyIn === v ? 'var(--cor-destaque-texto)' : 'var(--cor-texto-2)',
                                 }}
                                 onClick={() => handleBuyIn(v)}
                             >
@@ -635,7 +643,7 @@ function ModalCriarTorneio({ socket, usuario, onFechar }) {
 
                 {/* Rebuy */}
                 <div style={cssModal.secaoRebuy}>
-                    <span style={{ fontSize:'12px', fontWeight:700, color:'#F87171' }}>Regras de Rebuy</span>
+                    <span style={{ fontSize:'12px', fontWeight:700, color:'var(--cor-perigo-texto)' }}>Regras de Rebuy</span>
                     <p style={cssModal.hint}>Permite que jogadores eliminados paguem o buy-in novamente e re-entrem na próxima rodada</p>
 
                     <div style={{ display:'flex', gap:'12px', flexWrap:'wrap' }}>
@@ -669,10 +677,10 @@ function ModalCriarTorneio({ socket, usuario, onFechar }) {
 
                 {/* Resumo */}
                 <div style={cssModal.resumo}>
-                    <span>Buy-In: <b style={{ color:'#F59E0B' }}>₿C {fmt(buyIn)}</b></span>
-                    <span>Fichas: <b style={{ color:'#22C55E' }}>{fmt(fichasIniciais)}</b></span>
+                    <span>Buy-In: <b style={{ color:'var(--cor-destaque-texto)' }}>₿C {fmt(buyIn)}</b></span>
+                    <span>Fichas: <b style={{ color:'var(--cor-positivo-texto)' }}>{fmt(fichasIniciais)}</b></span>
                     {maxRebuys > 0 && (
-                        <span style={{ fontSize:'11px', color:'rgba(255,255,255,0.50)' }}>
+                        <span style={{ fontSize:'11px', color:'var(--cor-texto-2)' }}>
                             Rebuy: {maxRebuys}× / {rebuyPeriod}min
                         </span>
                     )}
@@ -699,106 +707,106 @@ function ModalCriarTorneio({ socket, usuario, onFechar }) {
 const css = {
     container: { display:'flex', flexDirection:'column', gap:'16px', paddingBottom:'80px' },
     erro: {
-        background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.35)',
-        borderRadius:'10px', padding:'10px 14px', fontSize:'13px', color:'#FCA5A5', cursor:'pointer',
+        background:'var(--cor-perigo-suave)', border:'1px solid var(--cor-perigo-linha)',
+        borderRadius:'10px', padding:'10px 14px', fontSize:'13px', color:'var(--cor-perigo-texto)', cursor:'pointer',
     },
     secao:       { display:'flex', flexDirection:'column', gap:'10px' },
     secaoHeader: { display:'flex', alignItems:'center', justifyContent:'space-between' },
-    secaoTitulo: { fontSize:'14px', fontWeight:600, color:'#F8FAFC' },
+    secaoTitulo: { fontSize:'14px', fontWeight:600, color:'var(--cor-texto)' },
     btnAtualizar: {
-        background:'transparent', border:'1px solid rgba(255,255,255,0.12)',
-        borderRadius:'6px', color:'rgba(255,255,255,0.40)',
+        background:'transparent', border:'1px solid var(--cor-linha)',
+        borderRadius:'6px', color:'var(--cor-texto-3)',
         fontSize:'11px', padding:'4px 10px', cursor:'pointer', fontFamily:'inherit',
     },
     lista: { display:'flex', flexDirection:'column', gap:'8px' },
     vazio: {
         display:'flex', flexDirection:'column', alignItems:'center', gap:'6px',
         padding:'32px 16px',
-        background:'rgba(255,255,255,0.02)', border:'1px dashed rgba(255,255,255,0.08)', borderRadius:'12px',
+        background:'var(--cor-hover-linha)', border:'1px dashed var(--cor-linha)', borderRadius:'12px',
     },
-    vazioTxt: { color:'rgba(255,255,255,0.38)', margin:0, fontSize:'13px' },
-    vazioSub: { color:'rgba(255,255,255,0.20)', margin:0, fontSize:'11px' },
+    vazioTxt: { color:'var(--cor-texto-3)', margin:0, fontSize:'13px' },
+    vazioSub: { color:'var(--cor-linha-forte)', margin:0, fontSize:'11px' },
     rodape: {
         position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)',
         width:'100%', maxWidth:'480px',
         padding:'10px 14px max(14px, env(safe-area-inset-bottom))',
-        background:'linear-gradient(to top, #0a0f1e 70%, transparent)', zIndex:100, boxSizing:'border-box',
+        background:'var(--cor-superficie)', zIndex:100, boxSizing:'border-box',
     },
     btnCriar: {
         width:'100%', padding:'14px',
-        background:'linear-gradient(135deg, #F59E0B, #D97706)',
-        border:'none', borderRadius:'12px', color:'#fff', fontSize:'16px', fontWeight:600,
+        background:'var(--cor-destaque)',
+        border:'none', borderRadius:'12px', color:'var(--cor-texto-inverso)', fontSize:'16px', fontWeight:600,
         cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px',
-        fontFamily:'sans-serif', WebkitTapHighlightColor:'transparent',
+        fontFamily:'var(--fonte)', WebkitTapHighlightColor:'transparent',
     },
     card: {
-        background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)',
+        background:'var(--cor-superficie)', border:'1px solid var(--cor-linha)',
         borderRadius:'12px', padding:'12px 14px', display:'flex', flexDirection:'column', gap:'8px',
     },
     cardHeader: { display:'flex', alignItems:'center', gap:'8px' },
     cardNome: {
-        fontSize:'13px', fontWeight:600, color:'#F8FAFC', flex:1,
+        fontSize:'13px', fontWeight:600, color:'var(--cor-texto)', flex:1,
         overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
     },
     cardStats: { display:'flex', gap:'10px', flexWrap:'wrap' },
-    cardStat:  { fontSize:'11px', color:'rgba(255,255,255,0.40)' },
+    cardStat:  { fontSize:'11px', color:'var(--cor-texto-3)' },
     statusBadge: {
         fontSize:'10px', fontWeight:600, padding:'2px 7px', borderRadius:'10px',
         border:'1px solid', whiteSpace:'nowrap', flexShrink:0,
     },
     btnEntrar: {
         padding:'8px 14px', borderRadius:'8px', fontSize:'13px', fontWeight:600,
-        fontFamily:'sans-serif', WebkitTapHighlightColor:'transparent', alignSelf:'flex-start',
+        fontFamily:'var(--fonte)', WebkitTapHighlightColor:'transparent', alignSelf:'flex-start',
     },
     torneioAtual: {
-        background:'rgba(245,158,11,0.05)', border:'1px solid rgba(245,158,11,0.18)',
+        background:'var(--cor-destaque-suave)', border:'1px solid var(--cor-destaque-suave)',
         borderRadius:'14px', padding:'14px', display:'flex', flexDirection:'column', gap:'10px',
     },
     torneioAtualHeader: { display:'flex', alignItems:'center', gap:'8px' },
-    torneioNome: { fontSize:'14px', fontWeight:700, color:'#F8FAFC', flex:1 },
+    torneioNome: { fontSize:'14px', fontWeight:700, color:'var(--cor-texto)', flex:1 },
     torneioStats: { display:'flex', gap:'8px', flexWrap:'wrap' },
     stat: {
         display:'flex', flexDirection:'column', alignItems:'center',
-        background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)',
+        background:'var(--cor-superficie)', border:'1px solid var(--cor-superficie)',
         borderRadius:'8px', padding:'5px 10px', minWidth:'56px',
     },
-    statLabel: { fontSize:'9px', color:'rgba(255,255,255,0.35)', textTransform:'uppercase', letterSpacing:'0.06em' },
+    statLabel: { fontSize:'9px', color:'var(--cor-texto-3)', textTransform:'uppercase', letterSpacing:'0.06em' },
     statValor: { fontSize:'13px', fontWeight:700 },
     minhaSituacao: {
         padding:'7px 12px', borderRadius:'8px', border:'1px solid', display:'flex', alignItems:'center', gap:'8px',
     },
     campeao: {
-        background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.35)',
+        background:'var(--cor-destaque-suave)', border:'1px solid var(--cor-destaque-linha)',
         borderRadius:'8px', padding:'7px 12px', fontSize:'13px', color:'#FDE68A', textAlign:'center',
     },
     btnIniciar: {
-        padding:'12px', background:'linear-gradient(135deg,#22C55E,#16A34A)',
-        border:'none', borderRadius:'10px', color:'#fff', fontSize:'14px', fontWeight:700,
-        cursor:'pointer', fontFamily:'sans-serif', WebkitTapHighlightColor:'transparent',
+        padding:'12px', background:'var(--cor-positivo)',
+        border:'none', borderRadius:'10px', color:'var(--cor-sobre-positivo)', fontSize:'14px', fontWeight:700,
+        cursor:'pointer', fontFamily:'var(--fonte)', WebkitTapHighlightColor:'transparent',
     },
     btnRebuy: {
-        padding:'12px', background:'linear-gradient(135deg,#EF4444,#B91C1C)',
-        border:'none', borderRadius:'10px', color:'#fff', fontSize:'13px', fontWeight:700,
-        cursor:'pointer', fontFamily:'sans-serif', WebkitTapHighlightColor:'transparent',
+        padding:'12px', background:'var(--cor-perigo)',
+        border:'none', borderRadius:'10px', color:'var(--cor-sobre-positivo)', fontSize:'13px', fontWeight:700,
+        cursor:'pointer', fontFamily:'var(--fonte)', WebkitTapHighlightColor:'transparent',
     },
     avisoRebuy: {
-        background:'rgba(248,113,113,0.08)', border:'1px solid rgba(248,113,113,0.25)',
-        borderRadius:'8px', padding:'8px 12px', fontSize:'12px', color:'#FCA5A5', textAlign:'center',
+        background:'var(--cor-perigo-suave)', border:'1px solid var(--cor-perigo-linha)',
+        borderRadius:'8px', padding:'8px 12px', fontSize:'12px', color:'var(--cor-perigo-texto)', textAlign:'center',
     },
     jogadoresList: { display:'flex', flexDirection:'column', gap:'4px', maxHeight:'200px', overflowY:'auto' },
     jogadorItem: {
         display:'flex', alignItems:'center', gap:'8px',
-        padding:'4px 0', borderBottom:'1px solid rgba(255,255,255,0.04)',
+        padding:'4px 0', borderBottom:'1px solid var(--cor-superficie)',
     },
     conviteRow: {
         display:'flex', alignItems:'center', gap:'10px',
-        background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)',
+        background:'var(--cor-superficie)', border:'1px solid var(--cor-linha)',
         borderRadius:'10px', padding:'10px 14px',
     },
     btnCompartilhar: {
         border:'1px solid', borderRadius:'8px', padding:'6px 12px',
         fontSize:'12px', fontWeight:700, cursor:'pointer',
-        fontFamily:'sans-serif', WebkitTapHighlightColor:'transparent', whiteSpace:'nowrap',
+        fontFamily:'var(--fonte)', WebkitTapHighlightColor:'transparent', whiteSpace:'nowrap',
     },
 };
 
@@ -809,65 +817,65 @@ const cssModal = {
         zIndex:500, backdropFilter:'blur(4px)',
     },
     caixa: {
-        background:'#0d1424', border:'1px solid rgba(245,158,11,0.20)',
+        background:'var(--cor-superficie)', border:'1px solid var(--cor-destaque-suave)',
         borderRadius:'20px 20px 0 0',
         padding:'20px 16px max(20px, env(safe-area-inset-bottom))',
         width:'100%', maxWidth:'480px', display:'flex', flexDirection:'column', gap:'14px',
-        maxHeight:'90vh', overflowY:'auto', fontFamily:'sans-serif', color:'#F8FAFC',
+        maxHeight:'90vh', overflowY:'auto', fontFamily:'var(--fonte)', color:'var(--cor-texto)',
     },
     header: { display:'flex', alignItems:'center', justifyContent:'space-between' },
-    titulo: { fontSize:'16px', fontWeight:700, color:'#F8FAFC' },
+    titulo: { fontSize:'16px', fontWeight:700, color:'var(--cor-texto)' },
     btnFechar: {
-        background:'transparent', border:'none', color:'rgba(255,255,255,0.40)',
+        background:'transparent', border:'none', color:'var(--cor-texto-3)',
         fontSize:'18px', cursor:'pointer', padding:'4px 8px', fontFamily:'inherit',
     },
     erro: {
-        background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.35)',
-        borderRadius:'8px', padding:'8px 12px', fontSize:'12px', color:'#FCA5A5',
+        background:'var(--cor-perigo-suave)', border:'1px solid var(--cor-perigo-linha)',
+        borderRadius:'8px', padding:'8px 12px', fontSize:'12px', color:'var(--cor-perigo-texto)',
     },
     campo: { display:'flex', flexDirection:'column', gap:'6px' },
     label: {
-        fontSize:'12px', fontWeight:600, color:'rgba(255,255,255,0.55)',
+        fontSize:'12px', fontWeight:600, color:'var(--cor-texto-2)',
         textTransform:'uppercase', letterSpacing:'0.05em',
     },
     input: {
-        background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.10)',
-        borderRadius:'8px', padding:'10px 12px', color:'#F8FAFC',
-        fontSize:'14px', fontFamily:'sans-serif', outline:'none',
+        background:'var(--cor-superficie)', border:'1px solid var(--cor-linha)',
+        borderRadius:'8px', padding:'10px 12px', color:'var(--cor-texto)',
+        fontSize:'14px', fontFamily:'var(--fonte)', outline:'none',
     },
     opcoes: { display:'flex', gap:'6px', flexWrap:'wrap' },
     btnOpcao: {
         flex:'1 1 50px', padding:'8px 4px', borderRadius:'8px', border:'1px solid',
         fontSize:'12px', fontWeight:600, cursor:'pointer',
-        fontFamily:'sans-serif', WebkitTapHighlightColor:'transparent',
+        fontFamily:'var(--fonte)', WebkitTapHighlightColor:'transparent',
     },
-    hint: { fontSize:'10px', color:'rgba(255,255,255,0.25)', margin:0 },
+    hint: { fontSize:'10px', color:'var(--cor-texto-3)', margin:0 },
     slider: { width:'100%', cursor:'pointer' },
-    sliderLabels: { display:'flex', justifyContent:'space-between', fontSize:'10px', color:'rgba(255,255,255,0.25)' },
+    sliderLabels: { display:'flex', justifyContent:'space-between', fontSize:'10px', color:'var(--cor-texto-3)' },
     resumo: {
         display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'6px',
-        background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)',
-        borderRadius:'8px', padding:'10px 12px', fontSize:'13px', color:'#F8FAFC',
+        background:'var(--cor-superficie)', border:'1px solid var(--cor-superficie)',
+        borderRadius:'8px', padding:'10px 12px', fontSize:'13px', color:'var(--cor-texto)',
     },
     btnCriar: {
-        padding:'14px', background:'linear-gradient(135deg, #F59E0B, #D97706)',
-        border:'none', borderRadius:'12px', color:'#fff', fontSize:'15px', fontWeight:700,
-        cursor:'pointer', fontFamily:'sans-serif', WebkitTapHighlightColor:'transparent',
+        padding:'14px', background:'var(--cor-destaque)',
+        border:'none', borderRadius:'12px', color:'var(--cor-texto-inverso)', fontSize:'15px', fontWeight:700,
+        cursor:'pointer', fontFamily:'var(--fonte)', WebkitTapHighlightColor:'transparent',
     },
     secaoRebuy: {
         display:'flex', flexDirection:'column', gap:'10px',
-        background:'rgba(248,113,113,0.05)', border:'1px solid rgba(248,113,113,0.15)',
+        background:'var(--cor-perigo-suave)', border:'1px solid var(--cor-perigo-suave)',
         borderRadius:'10px', padding:'12px',
     },
     btnRebuyConfirmar: {
-        flex:1, padding:'12px', background:'linear-gradient(135deg,#EF4444,#B91C1C)',
-        border:'none', borderRadius:'10px', color:'#fff', fontSize:'14px', fontWeight:700,
-        cursor:'pointer', fontFamily:'sans-serif',
+        flex:1, padding:'12px', background:'var(--cor-perigo)',
+        border:'none', borderRadius:'10px', color:'var(--cor-sobre-perigo)', fontSize:'14px', fontWeight:700,
+        cursor:'pointer', fontFamily:'var(--fonte)',
     },
     btnRebuyRecusar: {
         flex:1, padding:'12px',
-        background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)',
-        borderRadius:'10px', color:'rgba(255,255,255,0.55)',
-        fontSize:'13px', cursor:'pointer', fontFamily:'sans-serif',
+        background:'var(--cor-superficie)', border:'1px solid var(--cor-linha)',
+        borderRadius:'10px', color:'var(--cor-texto-2)',
+        fontSize:'13px', cursor:'pointer', fontFamily:'var(--fonte)',
     },
 };
