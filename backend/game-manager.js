@@ -1436,8 +1436,11 @@ export class GameManager {
             return { sucesso: false, erro: 'Não pode fazer rebuy durante uma mão ativa.' };
         }
 
+        // Bônus que já foi perdido na mesa não conta mais: sem limitar ao
+        // stack atual, o origemBonus só acumulava e um rebuy pago com saldo
+        // REAL acabava devolvido como bônus (não sacável) na saída.
+        jogador.origemBonus = Math.min(jogador.origemBonus || 0, jogador.saldo) + (origemBonus || 0);
         jogador.saldo      += valor;
-        jogador.origemBonus = (jogador.origemBonus || 0) + (origemBonus || 0);
         if (jogador.status === 'eliminado') jogador.status = 'ativo';
 
         this.emitirEstado(mesaId);

@@ -235,3 +235,41 @@ test('remoção por inatividade (3ª falta) avisa o servidor com as fichas a dev
     assert.equal(mesa.jogadores.h0, undefined);
     assert.deepEqual(removidos, [{ mesaId, uid: 'h0', saldo: 1000, origemBonus: 300, torneioId: null }]);
 });
+
+test('id de mesa repetido não sobrescreve uma mesa existente', (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { gm, mesaId: id1 } = montarMesa([1000, 1000]);
+    const sequencia = [0.5, 0.5, 0.9, 0.9, 0.3, 0.3];
+    let i = 0;
+    t.mock.method(Math, 'random', () => sequencia[i++ % sequencia.length]);
+    const { mesaId: a } = gm.criarMesa({}, { uid: 'x1', nome: 'x1' });
+    const { mesaId: b } = gm.criarMesa({}, { uid: 'x2', nome: 'x2' });
+    assert.notEqual(a, b);
+    assert.equal(gm.getMesa(a).host, 'x1');
+    assert.equal(gm.getMesa(b).host, 'x2');
+    assert.ok(gm.getMesa(id1));
+});
+
+test('rebuy pago com saldo real não vira bônus por causa do bônus já perdido', (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { gm, mesaId, mesa } = montarMesa([1000, 1000]);
+    const j = mesa.jogadores.h0;
+    j.origemBonus = 1000;          // entrou com 1000 de bônus...
+    j.saldo       = 0;             // ...e perdeu tudo
+    const r = gm.fazerRebuy(mesaId, 'h0', 1000, 0);   // rebuy 100% saldo real
+    assert.equal(r.sucesso, true);
+    assert.equal(j.saldo, 1000);
+    // origemBonus 1000 faria creditarSaidaMesa devolver os 1000 reais como BÔNUS
+    assert.equal(j.origemBonus, 0);
+});
+
+test('vitória por W.O. não revela as cartas do vencedor aos outros', (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { gm, mesaId, mesa } = montarMesa([1000, 1000]);
+    gm.iniciarRodada(mesaId);
+    agir(gm, mesaId, 'h0', 'RAISE', 100);
+    agir(gm, mesaId, 'h1', 'FOLD');
+    assert.equal(mesa.resultadoMao.tipo, 'wo');
+    const visto = gm.filtrarEstadoParaJogador(mesa, 'h1');
+    assert.deepEqual(visto.jogadores.h0.cartas, ['XX', 'XX']);
+});
