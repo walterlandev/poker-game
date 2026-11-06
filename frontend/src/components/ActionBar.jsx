@@ -59,8 +59,11 @@ export default function ActionBar({
     pote          = 0,
     expiraEm      = null,   // prazo do turno atual (mesa.turnoExpiraEm) — só exibição
     nomeDaVez     = '',     // primeiro nome de quem está na vez — só exibição
+    treino        = false,  // mesa de treino: fichas sem o símbolo ₿C — só exibição
     onAcao,
 }) {
+    const moeda = (n) => (treino ? fmt(n) : `₿C ${fmt(n)}`);
+
 
     // Custo para igualar a maior aposta
     const custo     = Math.max(0, maiorAposta - apostaRodada);
@@ -223,7 +226,7 @@ export default function ActionBar({
                         onChange={e => setValorRaise(parseInt(e.target.value))}
                     />
                     <span className={`valor num${ehAllIn ? ' allin' : ''}`}>
-                        {ehAllIn ? `All-in ₿C ${fmt(maxRaise)}` : `₿C ${fmt(valorRaise)}`}
+                        {ehAllIn ? `All-in ${moeda(maxRaise)}` : moeda(valorRaise)}
                     </span>
                 </div>
 
@@ -247,7 +250,7 @@ export default function ActionBar({
                     >
                         {ehCheck
                             ? 'Check'
-                            : <span>{callEhAllIn ? 'All-in' : 'Call'} <small>₿C {fmt(custoReal)}</small></span>}
+                            : <span>{callEhAllIn ? 'All-in' : 'Call'} <small>{moeda(custoReal)}</small></span>}
                         <span className="tecla" aria-hidden="true">C</span>
                     </button>
 
@@ -258,7 +261,7 @@ export default function ActionBar({
                         disabled={!ehMinhaVez || !podeRaise}
                         {...evento(handleRaise)}
                     >
-                        <span>{ehAllIn ? 'All-in' : 'Raise'} <small>₿C {fmt(valorRaise)}</small></span>
+                        <span>{ehAllIn ? 'All-in' : 'Raise'} <small>{moeda(valorRaise)}</small></span>
                         <span className="tecla" aria-hidden="true">R</span>
                     </button>
 
@@ -276,13 +279,13 @@ export default function ActionBar({
 
                 {/* ── Linha de info (desktop) ───────────────────────── */}
                 <div className="ab-info">
-                    <span>Fichas <b>₿C {fmt(saldoAtual)}</b></span>
+                    <span>Fichas <b>{moeda(saldoAtual)}</b></span>
                     <span>
                         {ehCheck
                             ? <b className="positivo">Check grátis</b>
-                            : <>Para pagar <b>₿C {fmt(custoReal)}</b>{callEhAllIn ? ' (all-in)' : ''}</>}
+                            : <>Para pagar <b>{moeda(custoReal)}</b>{callEhAllIn ? ' (all-in)' : ''}</>}
                     </span>
-                    <span>Pote <b>₿C {fmt(pote)}</b></span>
+                    <span>Pote <b>{moeda(pote)}</b></span>
                 </div>
             </div>
         </div>

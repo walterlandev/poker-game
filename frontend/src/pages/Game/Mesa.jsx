@@ -83,6 +83,8 @@ export default function Mesa({ mesa, meuUid, minhasCartas = [], meuAvatar = '', 
     const offset         = meuIndex >= 0 ? meuIndex : 0;
     const retrato        = dims.h > dims.w;
     const euSentado      = meuIndex >= 0;
+    const treino         = mesa?.treino === true;   // fichas sem valor: sem ₿C
+    const moeda          = (n) => (treino ? fmt(n) : `₿C ${fmt(n)}`);
 
     // ── Posições dos assentos em % da oval ──────────────────────────
     const posicoes = jogadoresArray.map(([uid, jogador], index) => {
@@ -135,9 +137,9 @@ export default function Mesa({ mesa, meuUid, minhasCartas = [], meuAvatar = '', 
                     )}
 
                     {mesa.pote > 0 && (
-                        <div className="mesa-pote" aria-label={`Pote ₿C ${fmt(mesa.pote)}`}>
+                        <div className="mesa-pote" aria-label={`Pote ${moeda(mesa.pote)}`}>
                             <PilhaFichas size={Math.round(potFont * 0.9)} valor={mesa.pote} />
-                            <span className="num" style={{ fontSize: potFont + 'px' }}>₿C {fmt(mesa.pote)}</span>
+                            <span className="num" style={{ fontSize: potFont + 'px' }}>{moeda(mesa.pote)}</span>
                         </div>
                     )}
 
@@ -174,6 +176,7 @@ export default function Mesa({ mesa, meuUid, minhasCartas = [], meuAvatar = '', 
                             avatarSz={avatarSz}
                             tema={tema}
                             ocultarCartas={souEu && retrato}
+                            treino={treino}
                         />
                     </div>
                 ))}

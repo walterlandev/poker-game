@@ -79,6 +79,9 @@ function LinhaMesa({ mesa, privada, onEntrar }) {
         : Object.keys(mesa.jogadores || {}).length;
     const estaCheia = qtdJogadores >= MAX_LUGARES;
     const nome      = mesa.nome || `Mesa ${mesa.id}`;
+    // Mesa com bots = mesa de treino (fichas sem valor). Lido com segurança
+    // para funcionar antes e depois do servidor mandar o campo.
+    const treino    = mesa?.treino === true;
 
     return (
         <div className="linha-mesa">
@@ -91,9 +94,14 @@ function LinhaMesa({ mesa, privada, onEntrar }) {
                 <div className="nome">
                     {privada && <Icone nome="cadeado" tamanho={14} titulo="Mesa privada" />}
                     <span>{nome}</span>
+                    {treino && <span className="etiqueta-treino">Treino</span>}
                 </div>
                 <div className="meta">
-                    <span className="buyin">Buy-in <b className="num cor-bc">₿C {fmt(mesa.buyIn || mesa.valorBuyIn)}</b></span>
+                    <span className="buyin">
+                        {treino
+                            ? <>Buy-in <b className="num">Grátis</b></>
+                            : <>Buy-in <b className="num cor-bc">₿C {fmt(mesa.buyIn || mesa.valorBuyIn)}</b></>}
+                    </span>
                     <span className="lugares" aria-label={`${qtdJogadores} de ${MAX_LUGARES} lugares ocupados`}>
                         {Array.from({ length: MAX_LUGARES }).map((_, i) => (
                             <i key={i} className={i < qtdJogadores ? '' : 'livre'} />

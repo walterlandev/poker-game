@@ -43,6 +43,7 @@ export default function Jogador({
     avatarSz       = 48,     // escala responsiva vinda do Mesa.jsx
     tema           = 'classico',
     ocultarCartas  = false,  // celular em retrato: suas cartas aparecem embaixo da mesa
+    treino         = false,  // mesa de treino: fichas sem o símbolo ₿C
 }) {
     if (!jogador) return null;
 
@@ -139,7 +140,7 @@ export default function Jogador({
 
             <div className="assento-placa" style={{ maxWidth: Math.round(avatarSz * 1.9) + 'px' }}>
                 <span className="nm">{nome}</span>
-                <span className="stk num">₿C {fmt(jogador.saldo)}</span>
+                <span className="stk num">{treino ? fmt(jogador.saldo) : `₿C ${fmt(jogador.saldo)}`}</span>
             </div>
         </div>
     );

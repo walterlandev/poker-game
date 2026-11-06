@@ -125,8 +125,10 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
             novosErros.smallBlind = `Blind muito alto para este buy-in. Máximo: ₿C ${Math.floor(form.buyIn * 0.05)}`;
         }
 
-        // Usa o saldoTotal para validar
-        if (saldoTotal < form.buyIn) {
+        // Usa o saldoTotal para validar. Mesa com bots é mesa de TREINO
+        // (fichas de jogo, sem débito de ₿C — quem decide é o servidor),
+        // então o saldo da carteira não limita.
+        if (form.qtdBots === 0 && saldoTotal < form.buyIn) {
             novosErros.buyIn = `Saldo insuficiente. Você tem ₿C ${fmt(saldoTotal)}`;
         }
 
@@ -207,6 +209,9 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
     // ================================================================
     // RENDERIZAÇÃO
     // ================================================================
+    // Mesa com bots = treino (sem débito de ₿C, decidido pelo servidor)
+    const semSaldo = form.qtdBots === 0 && saldoTotal < form.buyIn;
+
     return (
         <>
             {/* Overlay escuro atrás do modal */}
@@ -220,7 +225,9 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
                     <div>
                         <h2 style={estilos.titulo}>Criar Mesa</h2>
                         <p style={estilos.subtitulo}>
-                            Custo: <span style={{ color: '#F59E0B' }}>₿C {fmt(form.buyIn)}</span> (buy-in)
+                            {form.qtdBots > 0
+                                ? 'Mesa de treino: fichas de jogo, sem custo e sem prêmio em ₿C'
+                                : <>Custo: <span style={{ color: 'var(--cor-destaque-texto)' }}>₿C {fmt(form.buyIn)}</span> (buy-in)</>}
                         </p>
                     </div>
                     <button onClick={onFechar} style={estilos.btnFechar} aria-label="Fechar">
@@ -254,7 +261,7 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
                     </Campo>
 
                     {/* Campo: Buy-in com botões rápidos */}
-                    <Campo label="Buy-in (₿C)" erro={erros.buyIn}>
+                    <Campo label={form.qtdBots > 0 ? 'Fichas iniciais (treino)' : 'Buy-in (₿C)'} erro={erros.buyIn}>
                         <div style={estilos.botoesRapidos}>
                             {OPCOES_BUYIN.map(v => (
                                 <button
@@ -333,9 +340,10 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
                             <span style={estilos.sliderLabel}>5</span>
                         </div>
                         {form.qtdBots > 0 && (
-                            <p style={estilos.dicaBots}>
-                                Bots do seu nível serão sorteados automaticamente
-                            </p>
+                            <div className="aviso-treino" role="note">
+                                <b>Mesa de treino</b>
+                                <span>Com bots, as fichas são só de jogo: sem custo e sem prêmio em ₿C. Bots do seu nível são sorteados automaticamente.</span>
+                            </div>
                         )}
                     </Campo>
 
@@ -382,7 +390,8 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
                         </Campo>
                     )}
 
-                    {/* Resumo do custo */}
+                    {/* Resumo do custo (mesa de treino não custa ₿C) */}
+                    {form.qtdBots === 0 && (
                     <div style={estilos.resumoCusto}>
                         <div style={estilos.resumoLinha}>
                             <span style={estilos.resumoLabel}>Seu saldo Total</span>
@@ -410,6 +419,7 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
                             </span>
                         </div>
                     </div>
+                    )}
 
                 </div>
 
@@ -418,15 +428,19 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
                     <button
                         onClick={handleCriar}
                         // Botão desativa se o saldoTotal for menor que o buyIn
-                        disabled={enviando || saldoTotal < form.buyIn}
+                        disabled={enviando || semSaldo}
                         style={{
                             ...estilos.btnCriar,
-                            opacity: enviando || saldoTotal < form.buyIn ? 0.5 : 1,
-                            cursor:  enviando || saldoTotal < form.buyIn
+                            opacity: enviando || semSaldo ? 0.5 : 1,
+                            cursor:  enviando || semSaldo
                                 ? 'not-allowed' : 'pointer',
                         }}
                     >
-                        {enviando ? 'Criando mesa...' : `Criar Mesa · ₿C ${fmt(form.buyIn)}`}
+                        {enviando
+                            ? 'Criando mesa…'
+                            : form.qtdBots > 0
+                                ? 'Criar mesa de treino'
+                                : `Criar mesa · ₿C ${fmt(form.buyIn)}`}
                     </button>
                 </div>
 
