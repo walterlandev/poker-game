@@ -74,6 +74,31 @@ test('abandono depois de eliminações: prêmio dividido só entre os vivos, eli
     assert.equal(creditos.reduce((s, c) => s + c.valor, 0), 400);          // soma conservada
     assert.equal(creditos.reduce((s, c) => s + c.origemBonus, 0), 150);    // bônus continua bônus
     assert.deepEqual(creditos.map(c => c.valor), [200, 200]);
+    // bônus de cada sobrevivente = o próprio bônus pago + parte do bônus dos eliminados
+    const pagos = { p0: 0, p1: 100, p2: 50, p3: 0 };
+    const bonusEliminados = Object.keys(pagos).filter(u => !vivos.includes(u)).reduce((s, u) => s + pagos[u], 0);
+    for (const c of creditos) {
+        const extra = c.origemBonus - pagos[c.uid];
+        assert.ok(extra === Math.floor(bonusEliminados / 2) || extra === Math.ceil(bonusEliminados / 2),
+                  `${c.uid}: bônus ${c.origemBonus}, pagou ${pagos[c.uid]} em bônus`);
+    }
+});
+
+test('abandono: sobrevivente que pagou com bônus não recebe saldo real de outro sobrevivente', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    // p0 pagou só bônus, p1 só real; p2 e p3 (eliminados) pagaram real
+    const { tm, torneioId, torneio, creditos } = montarTorneio(4, { maxRebuys: 0 }, { p0: 100 });
+    tm.iniciarTorneio(torneioId, 'p0');
+    torneio.houveEliminacao = true;
+    torneio.rodadaAtual = 1;
+    torneio.rodadas[1] = { mesas: [{ mesaId: 'x', jogadores: ['p0', 'p1'], vencedor: null, semVencedor: true }] };
+    for (const uid of ['p0', 'p1', 'p2', 'p3']) torneio.jogadores[uid].status = 'eliminado';
+    torneio.jogadores.p0.abandonouNaRodada = 1;
+    torneio.jogadores.p1.abandonouNaRodada = 1;
+    await tm._avancarRodada(torneioId);
+    await esperarCreditos();
+    // cada um: o que pagou (na origem) + metade do pool dos eliminados (200 real)
+    assert.deepEqual(porUid(creditos), { p0: [200, 100], p1: [200, 0] });
 });
 
 test('sem nenhum vivo no abandono: divide entre quem estava na última rodada', async (t) => {

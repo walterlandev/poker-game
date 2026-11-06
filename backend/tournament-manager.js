@@ -387,7 +387,7 @@ export class TournamentManager {
                 await this._distribuirSemCampeao(torneio);
                 this.io.to(`torneio:${torneioId}`).emit('torneio:cancelado_sem_jogadores', {
                     torneioId,
-                    mensagem: 'Torneio encerrado: todos os jogadores saíram. O prêmio foi distribuído entre quem ainda estava vivo.',
+                    mensagem: 'Torneio encerrado: todos os jogadores saíram. Os sobreviventes receberam de volta o que pagaram, mais a parte do que os eliminados pagaram.',
                 });
             }
 
@@ -413,18 +413,27 @@ export class TournamentManager {
      * Torneio que acabou sem campeão (todos abandonaram). Regras:
      *  - Rodada 0 sem nenhuma eliminação jogando: cada um recebe de volta
      *    exatamente o que pagou (entradas + rebuys), bônus como bônus.
-     *  - Depois disso: premioTotal dividido em partes iguais entre os vivos
-     *    no momento do abandono (quem abandonou na rodada atual); sem
-     *    nenhum vivo, entre todos da última rodada disputada. Eliminado
-     *    nunca recebe buy-in de volta.
-     * A soma creditada é exatamente premioTotal, e exatamente premioBonus
-     * dela é creditada como bônus (creditarSaidaMesa(uid, valor, bônus)).
+     *  - Depois disso, os sobreviventes (quem abandonou na rodada atual; sem
+     *    nenhum, todos da última rodada disputada):
+     *      1. recebem de volta o que ELES pagaram, na origem (bônus como
+     *         bônus, real como real);
+     *      2. dividem em partes iguais o pool do que os ELIMINADOS pagaram,
+     *         cada parte com a proporção bônus/real do pool — como se
+     *         tivessem ganhado essas fichas jogando.
+     *    Ninguém recebe saldo real que veio de outro sobrevivente, e
+     *    eliminado não recebe nada.
+     * Bônus e real são conservados separadamente: soma em bônus creditada
+     * = premioBonus, soma em real = premioTotal − premioBonus.
      */
     async _distribuirSemCampeao(torneio) {
+        const pagoDe = (j) => {
+            const total = torneio.buyIn * (1 + (j.rebuys || 0));
+            return { total, bonus: Math.min(total, j.pagoBonus || 0) };
+        };
         if (!torneio.houveEliminacao && torneio.rodadaAtual === 0) {
             for (const j of Object.values(torneio.jogadores)) {
-                const pago = torneio.buyIn * (1 + (j.rebuys || 0));
-                await this.creditar(j.uid, pago, Math.min(pago, j.pagoBonus || 0));
+                const pago = pagoDe(j);
+                await this.creditar(j.uid, pago.total, pago.bonus);
                 await this._notificarSaldoJogador(j.uid);
             }
             return;
@@ -435,15 +444,24 @@ export class TournamentManager {
         const destino  = vivos.length ? vivos : naRodada;
         if (!destino.length) return;
 
-        const n     = destino.length;
-        const total = torneio.premioTotal;
-        const bonus = Math.min(total, torneio.premioBonus || 0);
-        // Partes iguais; as sobras de divisão vão para os primeiros. A parte
-        // em bônus de cada um nunca passa da parte dele (bonus <= total).
+        // Pool = o que os que não estão no destino (eliminados) pagaram
+        let poolTotal = 0, poolBonus = 0;
+        for (const j of Object.values(torneio.jogadores)) {
+            if (destino.includes(j.uid)) continue;
+            const pago = pagoDe(j);
+            poolTotal += pago.total;
+            poolBonus += pago.bonus;
+        }
+
+        const n = destino.length;
         for (let i = 0; i < n; i++) {
-            const parte      = Math.floor(total / n) + (i < total % n ? 1 : 0);
-            const parteBonus = Math.floor(bonus / n) + (i < bonus % n ? 1 : 0);
-            await this.creditar(destino[i], parte, parteBonus);
+            const j     = torneio.jogadores[destino[i]];
+            const pago  = j ? pagoDe(j) : { total: 0, bonus: 0 };
+            // Sobras de divisão vão para os primeiros, nas duas contas; a
+            // parte bônus nunca passa da parte (poolBonus <= poolTotal).
+            const parte      = Math.floor(poolTotal / n) + (i < poolTotal % n ? 1 : 0);
+            const parteBonus = Math.floor(poolBonus / n) + (i < poolBonus % n ? 1 : 0);
+            await this.creditar(destino[i], pago.total + parte, pago.bonus + parteBonus);
             await this._notificarSaldoJogador(destino[i]);
         }
     }
