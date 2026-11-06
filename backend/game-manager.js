@@ -193,6 +193,14 @@ export class GameManager {
             return { sucesso: true, mesaId };
         }
 
+        // Mesa de torneio só tem quem o torneio sentou lá. Antes qualquer um
+        // com o id (previsível: T…_R0_M0) entrava pela rota de mesa comum,
+        // pagando fichasIniciais em ₿C reais que não iam para o prêmio, e
+        // podia "vencer" a mesa sem estar no bracket.
+        if (mesa.torneioId) {
+            return { sucesso: false, erro: 'Mesa de torneio: entre pelo torneio.' };
+        }
+
         // Mesa privada: exige a senha certa pra quem ainda não está sentado.
         // Antes disso não era checado no servidor — a senha só aparecia na
         // tela, mas qualquer um conseguia entrar sem ela.
