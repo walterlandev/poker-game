@@ -306,3 +306,12 @@ test('vitória por W.O. não revela as cartas do vencedor aos outros', (t) => {
     const visto = gm.filtrarEstadoParaJogador(mesa, 'h1');
     assert.deepEqual(visto.jogadores.h0.cartas, ['XX', 'XX']);
 });
+
+test('estado enviado aos clientes não contém a senha da mesa privada', (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { gm, mesaId, mesa } = montarMesa([1000, 1000]);
+    mesa.senha = 'segredo';
+    const visto = gm.filtrarEstadoParaJogador(mesa, 'h1');
+    assert.equal('senha' in visto, false);
+    assert.equal(JSON.stringify(visto).includes('segredo'), false);
+});

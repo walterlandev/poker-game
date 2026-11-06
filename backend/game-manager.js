@@ -121,8 +121,11 @@ export class GameManager {
             };
         });
 
+        // A senha da mesa privada só é checada no servidor (entrarMesa);
+        // nenhum cliente precisa dela, nem quem já está sentado.
+        const { senha, ...mesaPublica } = mesa;
         return {
-            ...mesa,
+            ...mesaPublica,
             baralho:   [],   // nunca expõe o baralho ao cliente
             jogadores: jogadoresFiltrados,
         };
