@@ -86,7 +86,7 @@ function LinhaMesa({ mesa, privada, onEntrar, ocupado }) {
     return (
         <div className="linha-mesa">
             <div className="blinds">
-                <span className="num">{fmt(mesa.smallBlind)}/{fmt(mesa.bigBlind)}</span>
+                <span className="num">{fmt(mesa.smallBlind ?? Math.round((mesa.bigBlind || 0) / 2))}/{fmt(mesa.bigBlind)}</span>
                 <span className="rot">blinds</span>
             </div>
 
