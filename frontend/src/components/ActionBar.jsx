@@ -183,11 +183,11 @@ export default function ActionBar({
 
                 {/* ── Atalhos de aposta (só ajustam o valor do raise) ── */}
                 <div className={`ab-atalhos ab-controle${ALLIN_NOS_ATALHOS ? ' com-allin' : ''}`}>
-                    {atalhos.map(({ label, val }) => (
+                    {atalhos.map(({ label, val }, i) => (
                         <button
                             key={label}
                             type="button"
-                            className={`ab-atalho${valorRaise === val && !ehAllIn ? ' ativo' : ''}`}
+                            className={`ab-atalho${valorRaise === val && !ehAllIn && atalhos.findIndex(a => a.val === val) === i ? ' ativo' : ''}`}
                             disabled={!ehMinhaVez || !podeRaise}
                             onPointerDown={() => setValorRaise(val)}
                         >

@@ -55,7 +55,7 @@ export function CartaFace({ carta, largura = 46, tema = 'classico', indice = fal
                 borderColor: borda,
                 borderWidth: premium ? '2px' : '1px',
                 boxShadow: premium
-                    ? `var(--sombra-1), inset 0 0 0 2px ${fundo}, inset 0 0 0 3px ${borda}`
+                    ? `var(--sombra-carta), inset 0 0 0 2px ${fundo}, inset 0 0 0 3px ${borda}`
                     : undefined,
                 color: cor,
             }}
@@ -90,7 +90,7 @@ export function CartaVerso({ largura = 18, tema = 'classico' }) {
                 width:  largura + 'px',
                 height: Math.round(largura * 1.4) + 'px',
                 background: `repeating-linear-gradient(45deg, ${fundo} 0 3px, ${detalhe} 3px 6px)`,
-                borderColor: classico ? 'var(--cor-destaque-linha)' : undefined,
+                borderColor: classico ? 'var(--cor-verso-borda)' : undefined,
             }}
         />
     );

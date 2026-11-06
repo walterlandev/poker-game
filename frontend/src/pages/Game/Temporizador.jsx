@@ -67,7 +67,7 @@ export default function Temporizador({ totalMs = 90000, expiraEm = null, ativo =
         <div className="temporizador" aria-hidden="true">
             <svg width={lado} height={lado} viewBox={`0 0 ${lado} ${lado}`}>
                 <circle cx={lado/2} cy={lado/2} r={raio}
-                    fill="none" style={{ stroke: 'var(--cor-linha-forte)' }} strokeWidth="3" />
+                    fill="none" style={{ stroke: 'var(--cor-anel-vazio)' }} strokeWidth="3" />
                 <circle cx={lado/2} cy={lado/2} r={raio}
                     fill="none" strokeWidth="3"
                     strokeLinecap="round"
