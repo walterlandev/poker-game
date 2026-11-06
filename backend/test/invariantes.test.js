@@ -32,6 +32,7 @@ for (const semente of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
         const total = stacks.reduce((a, b) => a + b, 0);
         let saiuComFichas = 0;
         let acoes = 0, maos = 0, acoesNaMao = 0;
+        gm.setAoRemoverPorInatividade(info => { saiuComFichas += info.saldo; });
 
         gm.iniciarRodada(mesaId);
         for (let passo = 0; passo < 4000 && gm.getMesa(mesaId); passo++) {
@@ -50,6 +51,10 @@ for (const semente of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
                 if (x < 0.05) {
                     const outro = mesa.ordem[Math.floor(r() * mesa.ordem.length)];
                     gm.processarAcao(mesaId, outro, 'RAISE', 999999, `sock_${outro}`);
+                    continue;
+                }
+                if (x < 0.06) {                    // deixa o relógio estourar (falta / remoção)
+                    avancar(t, 45_600, 5_000);
                     continue;
                 }
                 if (x < 0.07 && Object.keys(mesa.jogadores).length > 2) {
@@ -102,3 +107,46 @@ for (const semente of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
 function totalFichas(mesa) {
     return Object.values(mesa.jogadores).reduce((s, j) => s + j.saldo, 0) + mesa.pote;
 }
+
+test('mesa com bots: 150 mãos sem quebrar turno, saldo nem conservação dentro da mão', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { gm, mesaId, mesa } = montarMesa([2000], { smallBlind: 10, buyIn: 1000 });
+    for (let i = 0; i < 4; i++) gm.adicionarBot(mesaId, 600);
+    const r = rng(99);
+    gm.iniciarRodada(mesaId);
+    let maos = 0, totalMao = totalFichas(mesa), faseAnterior = mesa.fase;
+    for (let passo = 0; passo < 200_000 && maos < 150; passo++) {
+        const ctx = `bots, passo ${passo}, fase ${mesa.fase}`;
+        if (mesa.fase === 'PRE-FLOP' && faseAnterior !== 'PRE-FLOP') {
+            // nova mão: só pode ter entrado dinheiro por rebuy automático de bot
+            const dif = totalFichas(mesa) - totalMao;
+            assert.ok(dif >= 0 && dif % mesa.valorBuyIn === 0, `${ctx}: total mudou ${dif} entre mãos`);
+            totalMao = totalFichas(mesa);
+        }
+        if (mesa.fase === 'SHOWDOWN' && faseAnterior !== 'SHOWDOWN') maos++;
+        faseAnterior = mesa.fase;
+        assert.equal(totalFichas(mesa), totalMao, `${ctx}: fichas não conservadas na mão`);
+        checarTurno(mesa, ctx);
+        for (const j of Object.values(mesa.jogadores)) assert.ok(j.saldo >= 0, `${ctx}: saldo negativo`);
+
+        if (mesa.turno === 'h0') {
+            const j = mesa.jogadores.h0;
+            const custo = mesa.maiorAposta - j.apostaRodada;
+            const x = r();
+            if (x < 0.3) gm.processarAcao(mesaId, 'h0', custo > 0 ? 'FOLD' : 'CHECK', 0, 'sock_h0');
+            else if (x < 0.8) gm.processarAcao(mesaId, 'h0', custo > 0 ? 'CALL' : 'CHECK', 0, 'sock_h0');
+            else gm.processarAcao(mesaId, 'h0', 'RAISE', j.saldo + j.apostaRodada, 'sock_h0');
+            if (mesa.jogadores.h0 && mesa.jogadores.h0.saldo === 0 && mesa.fase === 'SHOWDOWN') {
+                gm.fazerRebuy(mesaId, 'h0', mesa.valorBuyIn);
+                totalMao += mesa.valorBuyIn;
+            }
+        } else {
+            avancar(t, 500, 500);
+            if (mesa.fase === 'AGUARDANDO') {
+                if (mesa.jogadores.h0?.saldo === 0) { gm.fazerRebuy(mesaId, 'h0', mesa.valorBuyIn); totalMao += mesa.valorBuyIn; }
+                gm.iniciarRodada(mesaId);
+            }
+        }
+    }
+    assert.ok(maos >= 150, `só ${maos} mãos`);
+});
