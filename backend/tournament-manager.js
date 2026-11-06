@@ -149,11 +149,17 @@ export class TournamentManager {
         const torneio = this.torneios.get(torneioId);
         if (!torneio) return;
 
-        const n      = torneio.jogadoresPorMesa;
-        const grupos = [];
-        for (let i = 0; i < jogadoresUids.length; i += n) {
-            grupos.push(jogadoresUids.slice(i, i + n));
-        }
+        // Distribui em mesas equilibradas e nunca com um jogador só. Fatiar
+        // de n em n deixava a sobra numa mesa própria (ex.: 3 jogadores, 2
+        // por mesa → 2 + 1): mesa de 1 nunca começa (iniciarRodada exige 2
+        // com fichas), nunca tem vencedor e o torneio travava pra sempre
+        // com o prêmio preso.
+        const n        = torneio.jogadoresPorMesa;
+        const total    = jogadoresUids.length;
+        let   numMesas = Math.ceil(total / n);
+        while (numMesas > 1 && Math.floor(total / numMesas) < 2) numMesas--;
+        const grupos = Array.from({ length: numMesas }, () => []);
+        jogadoresUids.forEach((uid, i) => grupos[i % numMesas].push(uid));
 
         const rodada = { mesas: [] };
 
