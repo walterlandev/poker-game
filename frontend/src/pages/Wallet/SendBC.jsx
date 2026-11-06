@@ -18,7 +18,7 @@
      → Jogador não pode enviar para si mesmo
 
    PROPS:
-     saldo      → number  : saldo atual do remetente em ₿C
+     saldo      → number  : saldo REAL do remetente em ₿C (o bônus não pode ser enviado)
      usuario    → object  : { uid, nome }
      socket     → Socket.io
      onFeedback → fn(tipo, msg)
@@ -26,6 +26,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import PinConfirm from './PinConfirm';
+import Icone      from '../../components/Icone';
 import {
     calcularEnvio,
     validarEnvio,
@@ -180,7 +181,7 @@ export default function SendBC({ saldo, usuario, socket, onFeedback }) {
 
         socket.once('wallet:envio_confirmado', () => {
             onFeedback('sucesso',
-                `₿C ${fmtBC(preview.bcEnviado)} enviados para ${destinatario.nome}!`
+                `₿C ${fmtBC(preview.bcEnviado)} enviados para ${destinatario.nome}.`
             );
             resetar();
         });
@@ -196,238 +197,137 @@ export default function SendBC({ saldo, usuario, socket, onFeedback }) {
     // RENDERIZAÇÃO
     // ================================================================
     return (
-        <div style={estilos.container}>
-
-            {/* ======================================================
-                CABEÇALHO
-            ====================================================== */}
-            <div style={estilos.cabecalho}>
-                <div>
-                    <p style={estilos.titulo}>➡️ Enviar ₿C</p>
-                    <p style={estilos.subtitulo}>
-                        Transferência instantânea entre jogadores
-                    </p>
-                </div>
-                {/* Saldo disponível */}
-                <div style={estilos.saldoChip}>
-                    <span style={estilos.saldoChipLabel}>Disponível</span>
-                    <span style={estilos.saldoChipValor}>₿C {fmtBC(saldo)}</span>
-                </div>
+        <section className="cart-form" aria-labelledby="cart-env-titulo">
+            <div className="cart-form-cab">
+                <h3 id="cart-env-titulo">Enviar ₿C para um jogador</h3>
+                <span className="cart-form-dica num">Real disponível ₿C {fmtBC(saldo)}</span>
             </div>
 
-            {/* ======================================================
-                INFO DE TAXAS
-            ====================================================== */}
-            <div style={estilos.infoTaxa}>
-                <span style={{ fontSize: '13px' }}>ℹ️</span>
-                <p style={estilos.infoTaxaTexto}>
-                    Taxa de envio: <strong style={{ color: 'var(--cor-destaque-texto)' }}>
-                        {TAXAS.ENVIO * 100}%
-                    </strong> sobre o valor enviado
-                    (mínimo ₿C {fmtBC(TAXAS.ENVIO_MIN)}).
-                    Máximo por envio: ₿C {fmtBC(LIMITES.ENVIO_MAX_BC)}.
-                </p>
-            </div>
-
-
-            {/* ======================================================
-                ETAPA 1 — BUSCA DE DESTINATÁRIO
-            ====================================================== */}
+            {/* ---- Etapa 1: busca do destinatário ---- */}
             {(etapa === ETAPA.IDLE || etapa === ETAPA.BUSCANDO) && (
-                <div style={estilos.secao}>
-                    <p style={estilos.secaoLabel}>Para quem enviar?</p>
-
-                    <div style={estilos.inputGroup}>
-                        <span style={estilos.inputIcone}>🔍</span>
+                <>
+                    <label className="cart-campo-rot" htmlFor="cart-env-busca">Para quem</label>
+                    <div className={`cart-campo${erroDestinat ? ' com-erro' : ''}`}>
+                        <span className="cart-campo-pre" aria-hidden="true"><Icone nome="busca" tamanho={16} /></span>
                         <input
+                            id="cart-env-busca"
                             type="text"
-                            placeholder="Nome ou ID do jogador"
+                            placeholder="Nome ou ID do jogador…"
                             value={queryDestinat}
                             onChange={e => buscarDestinatario(e.target.value)}
-                            style={estilos.input}
                             autoComplete="off"
                             autoCorrect="off"
                             spellCheck={false}
+                            aria-invalid={!!erroDestinat}
                         />
                         {queryDestinat.length > 0 && (
-                            <button onClick={resetar} style={estilos.btnLimpar}>✕</button>
+                            <button type="button" className="cart-campo-acao" onClick={resetar} aria-label="Limpar busca">
+                                <Icone nome="fechar" tamanho={16} />
+                            </button>
                         )}
                     </div>
-
-                    {etapa === ETAPA.BUSCANDO && (
-                        <p style={estilos.buscandoTexto}>⏳ Buscando jogador...</p>
-                    )}
-
-                    {erroDestinat && (
-                        <p style={estilos.erroTexto}>⚠ {erroDestinat}</p>
-                    )}
-
-                    <p style={estilos.dicaBusca}>
-                        Digite pelo menos 3 caracteres para buscar
-                    </p>
-                </div>
-            )}
-
-
-            {/* ======================================================
-                ETAPA 2 — DESTINATÁRIO ENCONTRADO + VALOR
-            ====================================================== */}
-            {(etapa === ETAPA.CONFIRMANDO || etapa === ETAPA.PIN || etapa === ETAPA.ENVIANDO) && destinatario && (
-                <>
-                    {/* Card do destinatário */}
-                    <div style={estilos.cardDestinatario}>
-                        <div style={estilos.destinatarioAvatar}>
-                            {destinatario.avatar
-                                ? <img src={destinatario.avatar} alt="" style={estilos.avatarImg} />
-                                : <span style={estilos.avatarLetra}>
-                                    {destinatario.nome?.[0]?.toUpperCase() || '?'}
-                                  </span>
-                            }
-                        </div>
-                        <div style={{ flex: 1 }}>
-                            <p style={estilos.destinatarioNome}>{destinatario.nome}</p>
-                            <p style={estilos.destinatarioUid}>ID: {destinatario.uid}</p>
-                        </div>
-                        <button onClick={resetar} style={estilos.btnTrocar}>
-                            Trocar
-                        </button>
-                    </div>
-
-                    {/* Input de valor */}
-                    <div style={estilos.secao}>
-                        <p style={estilos.secaoLabel}>Quanto enviar?</p>
-
-                        <div style={estilos.inputGroup}>
-                            <span style={estilos.inputIcone}>₿C</span>
-                            <input
-                                type="number"
-                                min={LIMITES.ENVIO_MIN_BC}
-                                max={Math.min(LIMITES.ENVIO_MAX_BC, saldo)}
-                                step="100"
-                                placeholder="0"
-                                value={valorEnvio}
-                                onChange={e => {
-                                    setValorEnvio(e.target.value);
-                                    setErroValor(null);
-                                }}
-                                style={estilos.input}
-                                disabled={etapa !== ETAPA.CONFIRMANDO}
-                            />
-                        </div>
-
-                        {/* Atalhos de valor rápido */}
-                        <div style={estilos.atalhos}>
-                            {[1000, 5000, 10000, 50000].map(v => (
-                                <button
-                                    key={v}
-                                    onClick={() => {
-                                        setValorEnvio(String(v));
-                                        setErroValor(null);
-                                    }}
-                                    disabled={v > saldo || etapa !== ETAPA.CONFIRMANDO}
-                                    style={{
-                                        ...estilos.btnAtalho,
-                                        opacity: v > saldo ? 0.3 : 1,
-                                        cursor:  v > saldo ? 'not-allowed' : 'pointer',
-                                    }}
-                                >
-                                    ₿C {fmtBC(v)}
-                                </button>
-                            ))}
-                        </div>
-
-                        {erroValor && (
-                            <p style={estilos.erroTexto}>⚠ {erroValor}</p>
-                        )}
-                    </div>
-
-                    {/* Preview do envio */}
-                    {preview && (
-                        <div style={estilos.preview}>
-                            <LinhaPreview
-                                label="Destinatário recebe"
-                                valor={`₿C ${fmtBC(preview.bcEnviado)}`}
-                                cor="var(--cor-positivo-texto)"
-                                destaque
-                            />
-                            <LinhaPreview
-                                label={`Taxa de envio (${TAXAS.ENVIO * 100}%)`}
-                                valor={`₿C ${fmtBC(preview.taxaBC)}`}
-                                cor="var(--cor-destaque-texto)"
-                            />
-                            <div style={estilos.previewDivisor} />
-                            <LinhaPreview
-                                label="Total debitado do seu saldo"
-                                valor={`₿C ${fmtBC(preview.totalDebitado)}`}
-                                destaque
-                            />
-                            <LinhaPreview
-                                label="Equivale a"
-                                valor={`R$ ${fmt(bcParaBRL(preview.totalDebitado))}`}
-                                cor="var(--cor-texto-3)"
-                            />
-                            {/* Saldo após envio */}
-                            <div style={estilos.previewDivisor} />
-                            <LinhaPreview
-                                label="Seu saldo após envio"
-                                valor={`₿C ${fmtBC(Math.max(0, saldo - preview.totalDebitado))}`}
-                                cor={saldo - preview.totalDebitado < 0 ? 'var(--cor-perigo-texto)' : 'var(--cor-texto-2)'}
-                            />
-                        </div>
-                    )}
-
-                    {/* Mensagem opcional */}
-                    {etapa === ETAPA.CONFIRMANDO && (
-                        <div style={estilos.secao}>
-                            <p style={estilos.secaoLabel}>Mensagem <span style={{ opacity: 0.4 }}>(opcional)</span></p>
-                            <textarea
-                                placeholder="Ex: Boa sorte na mesa! 🃏"
-                                value={mensagem}
-                                onChange={e => setMensagem(e.target.value.slice(0, 100))}
-                                maxLength={100}
-                                rows={2}
-                                style={estilos.textarea}
-                            />
-                            <p style={estilos.contadorMensagem}>
-                                {mensagem.length}/100
-                            </p>
-                        </div>
-                    )}
-
-                    {/* Botão de enviar */}
-                    {etapa === ETAPA.CONFIRMANDO && (
-                        <button
-                            onClick={handleConfirmarValor}
-                            disabled={!preview}
-                            style={{
-                                ...estilos.btnEnviar,
-                                background: preview
-                                    ? 'var(--cor-destaque)'
-                                    : 'var(--cor-linha)',
-                                color:  preview ? '#fff' : 'var(--cor-texto-3)',
-                                cursor: preview ? 'pointer' : 'not-allowed',
-                            }}
-                        >
-                            {preview
-                                ? `Enviar ₿C ${fmtBC(preview.bcEnviado)} para ${destinatario.nome}`
-                                : 'Informe o valor'}
-                        </button>
-                    )}
-
-                    {/* Estado: enviando */}
-                    {etapa === ETAPA.ENVIANDO && (
-                        <div style={estilos.enviandoBox}>
-                            <span style={{ fontSize: '24px' }}>⏳</span>
-                            <p style={estilos.enviandoTexto}>Processando envio...</p>
-                        </div>
+                    {etapa === ETAPA.BUSCANDO && <p className="cart-nota" role="status">Buscando jogador…</p>}
+                    {erroDestinat && <p className="cart-erro" role="alert">{erroDestinat}</p>}
+                    {etapa === ETAPA.IDLE && !erroDestinat && (
+                        <p className="cart-nota">Digite pelo menos 3 caracteres.</p>
                     )}
                 </>
             )}
 
+            {/* ---- Etapa 2: destinatário encontrado + valor ---- */}
+            {(etapa === ETAPA.CONFIRMANDO || etapa === ETAPA.PIN || etapa === ETAPA.ENVIANDO) && destinatario && (
+                <>
+                    <div className="cart-destino">
+                        <span className="cart-destino-av" aria-hidden="true">
+                            {destinatario.avatar
+                                ? <img src={destinatario.avatar} alt="" width={40} height={40} />
+                                : (destinatario.nome?.[0]?.toUpperCase() || '?')}
+                        </span>
+                        <span className="txt">
+                            <b>{destinatario.nome}</b>
+                            <span className="num">{destinatario.uid?.slice(0, 12)}…</span>
+                        </span>
+                        <button type="button" className="btn btn-fantasma" onClick={resetar} disabled={etapa !== ETAPA.CONFIRMANDO}>
+                            Trocar
+                        </button>
+                    </div>
 
-            {/* ======================================================
-                MODAL DE PIN
-            ====================================================== */}
+                    <label className="cart-campo-rot" htmlFor="cart-env-valor">Valor em ₿C</label>
+                    <div className={`cart-campo${erroValor ? ' com-erro' : ''}`}>
+                        <span className="cart-campo-pre">₿C</span>
+                        <input
+                            id="cart-env-valor"
+                            type="number"
+                            inputMode="numeric"
+                            min={LIMITES.ENVIO_MIN_BC}
+                            max={Math.min(LIMITES.ENVIO_MAX_BC, saldo)}
+                            step="100"
+                            placeholder="0"
+                            value={valorEnvio}
+                            onChange={e => { setValorEnvio(e.target.value); setErroValor(null); }}
+                            disabled={etapa !== ETAPA.CONFIRMANDO}
+                            aria-invalid={!!erroValor}
+                        />
+                    </div>
+                    <div className="cart-atalhos">
+                        {[1000, 5000, 10000, 50000].map(v => (
+                            <button
+                                key={v}
+                                type="button"
+                                className="cart-chip num"
+                                aria-pressed={valorEnvio === String(v)}
+                                onClick={() => { setValorEnvio(String(v)); setErroValor(null); }}
+                                disabled={v > saldo || etapa !== ETAPA.CONFIRMANDO}
+                            >
+                                ₿C {fmtBC(v)}
+                            </button>
+                        ))}
+                    </div>
+                    {erroValor && <p className="cart-erro" role="alert">{erroValor}</p>}
+
+                    {preview && (
+                        <dl className="cart-resumo">
+                            <LinhaPreview label={`${destinatario.nome?.split(' ')[0] || 'Destinatário'} recebe`} valor={`₿C ${fmtBC(preview.bcEnviado)}`} tom="positivo" destaque />
+                            <LinhaPreview label={`Taxa de envio (${TAXAS.ENVIO * 100}%, mínimo ₿C ${fmtBC(TAXAS.ENVIO_MIN)})`} valor={`₿C ${fmtBC(preview.taxaBC)}`} />
+                            <LinhaPreview label="Sai do seu saldo real" valor={`₿C ${fmtBC(preview.totalDebitado)}`} destaque />
+                            <LinhaPreview label="Equivale a" valor={`R$ ${fmt(bcParaBRL(preview.totalDebitado))}`} />
+                            <LinhaPreview
+                                label="Saldo real depois do envio"
+                                valor={`₿C ${fmtBC(Math.max(0, saldo - preview.totalDebitado))}`}
+                                tom={saldo - preview.totalDebitado < 0 ? 'perigo' : undefined}
+                            />
+                        </dl>
+                    )}
+
+                    {etapa === ETAPA.CONFIRMANDO && (
+                        <>
+                            <label className="cart-campo-rot" htmlFor="cart-env-msg">Mensagem (opcional)</label>
+                            <div className="cart-campo area">
+                                <textarea
+                                    id="cart-env-msg"
+                                    placeholder="Ex.: boa sorte na mesa…"
+                                    value={mensagem}
+                                    onChange={e => setMensagem(e.target.value.slice(0, 100))}
+                                    maxLength={100}
+                                    rows={2}
+                                />
+                            </div>
+                            <p className="cart-nota num">{mensagem.length}/100</p>
+
+                            <button type="button" onClick={handleConfirmarValor} disabled={!preview} className="btn btn-principal cart-btn-cheio">
+                                {preview ? `Enviar ₿C ${fmtBC(preview.bcEnviado)}` : 'Informe o valor'}
+                            </button>
+                        </>
+                    )}
+
+                    {etapa === ETAPA.ENVIANDO && (
+                        <button type="button" disabled aria-busy="true" className="btn btn-principal cart-btn-cheio">
+                            Enviando…
+                        </button>
+                    )}
+                </>
+            )}
+
             {etapa === ETAPA.PIN && preview && destinatario && (
                 <PinConfirm
                     titulo="Confirmar envio"
@@ -437,379 +337,19 @@ export default function SendBC({ saldo, usuario, socket, onFeedback }) {
                 />
             )}
 
-
-            {/* ======================================================
-                AVISO DE SEGURANÇA
-            ====================================================== */}
-            <div style={estilos.avisoSeguranca}>
-                <span style={{ fontSize: '13px' }}>🔒</span>
-                <p style={estilos.avisoTexto}>
-                    Envios são irreversíveis após confirmação com PIN.
-                    Verifique sempre o nome do destinatário antes de confirmar.
-                </p>
-            </div>
-
-        </div>
+            <p className="cart-nota">
+                Envios não podem ser desfeitos depois da confirmação com PIN. Confira o nome antes de confirmar. O bônus não pode ser enviado.
+            </p>
+        </section>
     );
 }
 
 
-// ================================================================
-// BLOCO 3: SUBCOMPONENTES
-// ================================================================
-
-function LinhaPreview({ label, valor, cor, destaque }) {
+function LinhaPreview({ label, valor, tom, destaque }) {
     return (
-        <div style={estilos.linhaPreview}>
-            <span style={{
-                fontSize:   destaque ? '13px' : '12px',
-                color:      'var(--cor-texto-3)',
-                fontWeight: destaque ? '500' : '400',
-            }}>
-                {label}
-            </span>
-            <span style={{
-                fontSize:   destaque ? '14px' : '13px',
-                fontWeight: destaque ? '700'  : '500',
-                color:      cor || 'var(--cor-texto)',
-            }}>
-                {valor}
-            </span>
+        <div className={`cart-resumo-linha${destaque ? ' destaque' : ''}${tom ? ' ' + tom : ''}`}>
+            <dt>{label}</dt>
+            <dd className="num">{valor}</dd>
         </div>
     );
 }
-
-
-// ================================================================
-// BLOCO 4: ESTILOS
-// ================================================================
-
-const estilos = {
-
-    container: {
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '14px',
-    },
-
-    cabecalho: {
-        display:        'flex',
-        justifyContent: 'space-between',
-        alignItems:     'flex-start',
-        gap:            '12px',
-    },
-
-    titulo: {
-        fontSize:   '15px',
-        fontWeight: '700',
-        color:      'var(--cor-texto)',
-        margin:     0,
-    },
-
-    subtitulo: {
-        fontSize:  '11px',
-        color:     'var(--cor-texto-3)',
-        margin:    '3px 0 0',
-    },
-
-    saldoChip: {
-        display:       'flex',
-        flexDirection: 'column',
-        alignItems:    'flex-end',
-        background:    'var(--cor-destaque-suave)',
-        border:        '1px solid var(--cor-destaque-suave)',
-        borderRadius:  '8px',
-        padding:       '6px 10px',
-        flexShrink:    0,
-    },
-
-    saldoChipLabel: {
-        fontSize:  '9px',
-        color:     'var(--cor-destaque-linha)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-    },
-
-    saldoChipValor: {
-        fontSize:   '13px',
-        fontWeight: '700',
-        color:      'var(--cor-destaque-texto)',
-    },
-
-    infoTaxa: {
-        display:      'flex',
-        gap:          '8px',
-        alignItems:   'flex-start',
-        padding:      '10px 12px',
-        background:   'var(--cor-destaque-suave)',
-        border:       '1px solid var(--cor-destaque-suave)',
-        borderRadius: '8px',
-    },
-
-    infoTaxaTexto: {
-        fontSize:   '12px',
-        color:      'var(--cor-texto-3)',
-        margin:     0,
-        lineHeight: 1.5,
-    },
-
-    secao: {
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '8px',
-    },
-
-    secaoLabel: {
-        fontSize:   '12px',
-        fontWeight: '600',
-        color:      'var(--cor-texto-2)',
-        margin:     0,
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-    },
-
-    // Input de busca e valor
-    inputGroup: {
-        display:      'flex',
-        alignItems:   'center',
-        background:   'var(--cor-superficie)',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '8px',
-        overflow:     'hidden',
-    },
-
-    inputIcone: {
-        padding:    '0 12px',
-        fontSize:   '13px',
-        fontWeight: '700',
-        color:      'var(--cor-destaque-texto)',
-        background: 'var(--cor-destaque-suave)',
-        borderRight:'1px solid var(--cor-linha)',
-        alignSelf:  'stretch',
-        display:    'flex',
-        alignItems: 'center',
-        whiteSpace: 'nowrap',
-    },
-
-    input: {
-        flex:       1,
-        padding:    '12px',
-        background: 'transparent',
-        border:     'none',
-        outline:    'none',
-        color:      'var(--cor-texto)',
-        fontSize:   '15px',
-        fontWeight: '500',
-        fontFamily: 'inherit',
-        minWidth:   0,
-    },
-
-    btnLimpar: {
-        padding:    '0 12px',
-        background: 'transparent',
-        border:     'none',
-        color:      'var(--cor-texto-3)',
-        cursor:     'pointer',
-        fontSize:   '14px',
-        alignSelf:  'stretch',
-        display:    'flex',
-        alignItems: 'center',
-        fontFamily: 'inherit',
-    },
-
-    buscandoTexto: {
-        fontSize:  '12px',
-        color:     'var(--cor-texto-3)',
-        margin:    0,
-    },
-
-    erroTexto: {
-        fontSize:  '12px',
-        color:     'var(--cor-perigo-texto)',
-        margin:    0,
-    },
-
-    dicaBusca: {
-        fontSize:  '11px',
-        color:     'var(--cor-linha-forte)',
-        margin:    0,
-    },
-
-    // Card do destinatário encontrado
-    cardDestinatario: {
-        display:      'flex',
-        alignItems:   'center',
-        gap:          '12px',
-        background:   'var(--cor-destaque-suave)',
-        border:       '1px solid var(--cor-destaque-linha)',
-        borderRadius: '10px',
-        padding:      '12px',
-    },
-
-    destinatarioAvatar: {
-        width:          '40px',
-        height:         '40px',
-        borderRadius:   '50%',
-        background:     'var(--cor-destaque-linha)',
-        border:         '1px solid var(--cor-destaque-linha)',
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        flexShrink:     0,
-        overflow:       'hidden',
-    },
-
-    avatarImg: {
-        width:  '100%',
-        height: '100%',
-        objectFit: 'cover',
-    },
-
-    avatarLetra: {
-        fontSize:   '18px',
-        fontWeight: '700',
-        color:      'var(--cor-destaque-texto)',
-    },
-
-    destinatarioNome: {
-        fontSize:   '14px',
-        fontWeight: '700',
-        color:      'var(--cor-texto)',
-        margin:     0,
-    },
-
-    destinatarioUid: {
-        fontSize:  '10px',
-        color:     'var(--cor-texto-3)',
-        margin:    '2px 0 0',
-        fontFamily:'monospace',
-    },
-
-    btnTrocar: {
-        background:   'transparent',
-        border:       '1px solid var(--cor-destaque-linha)',
-        borderRadius: '6px',
-        color:        'var(--cor-destaque-texto)',
-        fontSize:     '11px',
-        fontWeight:   '600',
-        padding:      '5px 10px',
-        cursor:       'pointer',
-        fontFamily:   'inherit',
-        flexShrink:   0,
-    },
-
-    // Atalhos de valor rápido
-    atalhos: {
-        display: 'flex',
-        gap:     '6px',
-        flexWrap:'wrap',
-    },
-
-    btnAtalho: {
-        background:   'var(--cor-superficie)',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '6px',
-        color:        'var(--cor-texto-2)',
-        fontSize:     '11px',
-        padding:      '5px 10px',
-        fontFamily:   'inherit',
-        transition:   'all 0.15s',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    // Preview de cálculo
-    preview: {
-        background:    'var(--cor-superficie)',
-        border:        '1px solid var(--cor-linha)',
-        borderRadius:  '10px',
-        padding:       '14px',
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '9px',
-    },
-
-    linhaPreview: {
-        display:        'flex',
-        justifyContent: 'space-between',
-        alignItems:     'center',
-    },
-
-    previewDivisor: {
-        height:     '1px',
-        background: 'var(--cor-superficie)',
-    },
-
-    // Textarea de mensagem
-    textarea: {
-        background:   'var(--cor-superficie)',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '8px',
-        padding:      '10px 12px',
-        color:        'var(--cor-texto)',
-        fontSize:     '13px',
-        fontFamily:   'inherit',
-        resize:       'none',
-        outline:      'none',
-        lineHeight:   1.5,
-        width:        '100%',
-        boxSizing:    'border-box',
-    },
-
-    contadorMensagem: {
-        fontSize:  '10px',
-        color:     'var(--cor-linha-forte)',
-        margin:    0,
-        textAlign: 'right',
-    },
-
-    // Botão principal de enviar
-    btnEnviar: {
-        width:        '100%',
-        padding:      '14px',
-        border:       'none',
-        borderRadius: '10px',
-        fontSize:     '14px',
-        fontWeight:   '600',
-        fontFamily:   'inherit',
-        transition:   'opacity 0.2s',
-        WebkitTapHighlightColor: 'transparent',
-        lineHeight:   1.3,
-    },
-
-    // Estado enviando
-    enviandoBox: {
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'center',
-        gap:            '8px',
-        padding:        '20px',
-        background:     'var(--cor-superficie)',
-        border:         '1px solid var(--cor-linha)',
-        borderRadius:   '10px',
-    },
-
-    enviandoTexto: {
-        fontSize:  '13px',
-        color:     'var(--cor-texto-3)',
-        margin:    0,
-    },
-
-    // Aviso de segurança no rodapé
-    avisoSeguranca: {
-        display:      'flex',
-        gap:          '8px',
-        alignItems:   'flex-start',
-        padding:      '10px 12px',
-        background:   'var(--cor-perigo-suave)',
-        border:       '1px solid var(--cor-perigo-suave)',
-        borderRadius: '8px',
-        marginTop:    '4px',
-    },
-
-    avisoTexto: {
-        fontSize:   '11px',
-        color:      'var(--cor-texto-3)',
-        margin:     0,
-        lineHeight: 1.5,
-    },
-};

@@ -1,361 +1,198 @@
 /* ================================================================
-   ARQUIVO: frontend/src/pages/Lobby/Menu/Wallet/index.jsx
+   ARQUIVO: frontend/src/pages/Wallet/index.jsx
 
-   CONCEITO GERAL:
-   Container interno da carteira do jogador.
-   Gerencia a navegação entre as 3 abas da Wallet:
-     → Visão Geral  (WalletCard  — saldo, depósito, saque)
-     → Histórico    (History     — extrato de transações)
-     → Enviar       (SendBC      — transferência P2P entre jogadores)
-
-   ESTE ARQUIVO não é o index da aplicação toda.
-   Ele é montado dentro do painel/menu do jogador
-   quando a aba "Carteira" é selecionada.
+   Carteira do jogador em TELA ÚNICA (montada na aba "Carteira" do lobby):
+     → topo: saldo TOTAL grande e, sempre visível, a divisão
+       "Real · pode sacar" e "Bônus · só para jogar"
+     → ações: Depositar, Sacar, Enviar (WalletCard, um formulário por vez)
+     → últimas movimentações (History compacto) + "Ver extrato completo"
+     → rodapé: "Registro auditável" com a verificação do ledger
 
    PROPS:
-     usuario  → { uid, nome, saldo, saldoBonus, sacadoHoje, tema }
-     socket   → instância do Socket.io (para eventos em tempo real)
+     usuario  → { uid, nome, saldo, saldoBonus, sacadoHoje, temPin }
+     socket   → instância do Socket.io
 
    EVENTOS SOCKET ESCUTADOS:
      'wallet:saldo_atualizado'  → { saldo, saldoBonus, sacadoHoje }
      'wallet:tx_nova'           → objeto de transação (atualiza histórico)
-
-   EVENTOS SOCKET EMITIDOS (via filhos):
-     'wallet:depositar'
-     'wallet:sacar'
-     'wallet:enviar'
+     'blockchain:status'        → resultado da verificação do ledger
+   EVENTOS SOCKET EMITIDOS (aqui e nos filhos):
+     'blockchain:verificar', 'wallet:depositar', 'wallet:sacar',
+     'wallet:enviar', 'wallet:buscar_historico', 'wallet:buscar_jogador'
 ================================================================ */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import WalletCard from './WalletCard';
 import History    from './History';
-import SendBC     from './SendBC';
-import ChipPoker  from '../../components/ChipPoker';
-
-// ================================================================
-// BLOCO 1: DEFINIÇÃO DAS ABAS
-// ================================================================
-
-const ABAS = [
-    {
-        id:    'geral',
-        label: 'Visão Geral',
-        icone: '💳',
-        desc:  'Saldo, depósito e saque',
-    },
-    {
-        id:    'historico',
-        label: 'Histórico',
-        icone: '📋',
-        desc:  'Extrato de transações',
-    },
-    {
-        id:    'enviar',
-        label: 'Enviar ₿C',
-        icone: '➡️',
-        desc:  'Transferir para jogador',
-    },
-];
-
-
-// ================================================================
-// BLOCO 2: COMPONENTE PRINCIPAL
-// ================================================================
+import Icone      from '../../components/Icone';
+import { fmtBC, fmt, bcParaBRL } from './walletUtils';
 
 export default function WalletIndex({ usuario, socket }) {
 
-    // Aba ativa
-    const [abaAtiva, setAbaAtiva] = useState('geral');
+    // 'principal' (tela única) | 'extrato' (History completo)
+    const [vista, setVista] = useState('principal');
 
-    // ✅ CORREÇÃO: saldo inclui real + bônus
-    const [saldo,       setSaldo]       = useState((usuario?.saldo || 0) + (usuario?.saldoBonus || 0));
-    const [sacadoHoje,  setSacadoHoje]  = useState(usuario?.sacadoHoje || 0);
+    // Saldo separado em real (sacável) e bônus (só para jogar)
+    const [saldoReal,  setSaldoReal ] = useState(usuario?.saldo      || 0);
+    const [saldoBonus, setSaldoBonus] = useState(usuario?.saldoBonus || 0);
+    const [sacadoHoje, setSacadoHoje] = useState(usuario?.sacadoHoje || 0);
 
     // Histórico de transações (alimentado via socket ou fetch inicial)
-    const [transacoes,  setTransacoes]  = useState([]);
+    const [transacoes, setTransacoes] = useState([]);
 
-    // Feedback global (sucesso / erro) vindo dos filhos
-    const [feedback, setFeedback] = useState(null); // { tipo: 'sucesso'|'erro', msg: string }
+    // Aviso (sucesso / erro) vindo dos filhos
+    const [feedback, setFeedback] = useState(null); // { tipo, msg }
+    const timerFeedback = useRef(null);
 
-    // Saldo derivado: usa o estado local (atualizado pelo socket) ou cai
-    // de volta na prop caso o socket ainda não tenha enviado nada.
-    // Não usamos useEffect para sincronizar props → estado (anti-pattern).
-    const saldoAtual     = saldo      ?? ((usuario?.saldo || 0) + (usuario?.saldoBonus || 0));
-    const sacadoHojeReal = sacadoHoje ?? usuario?.sacadoHoje ?? 0;
+    // Verificação do ledger auditável
+    const [statusBlockchain, setStatusBlockchain] = useState(null);
+    const [verificando,      setVerificando     ] = useState(false);
 
+    // Abre um formulário do WalletCard a partir de fora (estado vazio)
+    const [pedidoAcao, setPedidoAcao] = useState(0);
 
-    // ----------------------------------------------------------------
-    // Escuta eventos de socket em tempo real
-    // ----------------------------------------------------------------
+    const saldoTotal = saldoReal + saldoBonus;
+
     useEffect(() => {
         if (!socket) return;
 
         const handleSaldo = ({ saldo: s, saldoBonus: sb, sacadoHoje: sh }) => {
-            setSaldo((s || 0) + (sb || 0));
+            setSaldoReal(s || 0);
+            setSaldoBonus(sb || 0);
             setSacadoHoje(sh ?? 0);
         };
-
-        const handleTxNova = (tx) => {
-            setTransacoes(prev => [tx, ...prev]);
-        };
+        const handleTxNova = (tx) => setTransacoes(prev => [tx, ...prev]);
+        const handleStatus = (status) => { setStatusBlockchain(status); setVerificando(false); };
 
         socket.on('wallet:saldo_atualizado', handleSaldo);
         socket.on('wallet:tx_nova',          handleTxNova);
-
+        socket.on('blockchain:status',       handleStatus);
         return () => {
             // Passa o handler para remover APENAS este listener, não os do App.jsx
             socket.off('wallet:saldo_atualizado', handleSaldo);
             socket.off('wallet:tx_nova',          handleTxNova);
+            socket.off('blockchain:status',       handleStatus);
         };
     }, [socket]);
 
+    useEffect(() => () => clearTimeout(timerFeedback.current), []);
 
-    // ----------------------------------------------------------------
-    // Exibe feedback temporário (3 segundos)
-    // ----------------------------------------------------------------
     const mostrarFeedback = useCallback((tipo, msg) => {
         setFeedback({ tipo, msg });
-        setTimeout(() => setFeedback(null), 3500);
+        clearTimeout(timerFeedback.current);
+        timerFeedback.current = setTimeout(() => setFeedback(null), tipo === 'erro' ? 7000 : 4500);
     }, []);
 
+    function verificarBlockchain() {
+        if (!socket || verificando) return;
+        setVerificando(true);
+        socket.emit('blockchain:verificar');
+    }
 
-    // ----------------------------------------------------------------
-    // Renderiza o conteúdo da aba ativa
-    // ----------------------------------------------------------------
-    function renderAba() {
-        switch (abaAtiva) {
-            case 'geral':
-                return (
+    const statusLedger = verificando
+        ? 'verificando…'
+        : statusBlockchain
+            ? (statusBlockchain.valida ? 'íntegro' : 'adulteração detectada')
+            : 'não verificado';
+
+    return (
+        <div className="cart">
+
+            {/* ---- Topo: saldo total e divisão real / bônus ---- */}
+            <section className="cart-topo" aria-labelledby="cart-titulo">
+                <h1 id="cart-titulo" className="titulo-secao">Carteira</h1>
+                <p className="cart-total-rot">Saldo total</p>
+                <p className="cart-total num">₿C {fmtBC(saldoTotal)}</p>
+                <div className="cart-divisao">
+                    <div className="cart-parte real">
+                        <span className="rot">Real <span aria-hidden="true">·</span> pode sacar</span>
+                        <b className="num">₿C {fmtBC(saldoReal)}</b>
+                        <span className="sub num">≈ R$ {fmt(bcParaBRL(saldoReal))}</span>
+                    </div>
+                    <div className="cart-parte bonus">
+                        <span className="rot">Bônus <span aria-hidden="true">·</span> só para jogar</span>
+                        <b className="num">₿C {fmtBC(saldoBonus)}</b>
+                        <span className="sub">não pode ser sacado nem enviado</span>
+                    </div>
+                </div>
+            </section>
+
+            <div aria-live="polite">
+                {feedback && (
+                    <button
+                        type="button"
+                        className={`aviso-inline ${feedback.tipo === 'sucesso' ? 'sucesso' : 'erro'}`}
+                        onClick={() => setFeedback(null)}
+                    >
+                        <span>{feedback.msg}</span>
+                        <Icone nome="fechar" tamanho={16} />
+                    </button>
+                )}
+            </div>
+
+            {vista === 'principal' && (
+                <>
                     <WalletCard
-                        saldo={saldoAtual}
-                        sacadoHoje={sacadoHojeReal}
+                        key={pedidoAcao}
+                        acaoInicial={pedidoAcao ? 'deposito' : null}
+                        saldoReal={saldoReal}
+                        sacadoHoje={sacadoHoje}
                         usuario={usuario}
                         socket={socket}
                         onFeedback={mostrarFeedback}
                     />
-                );
-            case 'historico':
-                return (
+
+                    <section className="cart-mov" aria-labelledby="cart-mov-titulo">
+                        <div className="cart-mov-cab">
+                            <h2 id="cart-mov-titulo">Últimas movimentações</h2>
+                            <button type="button" className="cart-link" onClick={() => setVista('extrato')}>
+                                Ver extrato completo
+                            </button>
+                        </div>
+                        <History
+                            compacto
+                            transacoes={transacoes}
+                            socket={socket}
+                            onCarregar={setTransacoes}
+                            onDepositar={() => setPedidoAcao(n => n + 1)}
+                        />
+                    </section>
+                </>
+            )}
+
+            {vista === 'extrato' && (
+                <section className="cart-mov" aria-labelledby="cart-ext-titulo">
+                    <div className="cart-mov-cab">
+                        <button type="button" className="btn btn-fantasma cart-voltar" onClick={() => setVista('principal')}>
+                            <Icone nome="receber" tamanho={18} />Carteira
+                        </button>
+                        <h2 id="cart-ext-titulo">Extrato completo</h2>
+                    </div>
                     <History
                         transacoes={transacoes}
                         socket={socket}
                         onCarregar={setTransacoes}
+                        onDepositar={() => { setVista('principal'); setPedidoAcao(n => n + 1); }}
                     />
-                );
-            case 'enviar':
-                return (
-                    <SendBC
-                        saldo={saldoAtual}
-                        usuario={usuario}
-                        socket={socket}
-                        onFeedback={mostrarFeedback}
-                    />
-                );
-            default:
-                return null;
-        }
-    }
-
-
-    // ================================================================
-    // RENDERIZAÇÃO
-    // ================================================================
-    return (
-        <div style={estilos.container}>
-
-            {/* ---- Cabeçalho da Wallet ---- */}
-            <div style={estilos.cabecalho}>
-                <div>
-                    <h2 style={estilos.titulo}>
-                        <ChipPoker size={20} /> Carteira
-                    </h2>
-                    <p style={estilos.subtitulo}>
-                        Seu banco interno do jogo
-                    </p>
-                </div>
-
-                {/* Saldo rápido sempre visível */}
-                <div style={estilos.saldoRapido}>
-                    <span style={estilos.saldoLabel}>Saldo</span>
-                    <span style={estilos.saldoValor}>
-                        ₿C {Number(saldoAtual).toLocaleString('pt-BR')}
-                    </span>
-                </div>
-            </div>
-
-            {/* ---- Feedback global ---- */}
-            {feedback && (
-                <div style={{
-                    ...estilos.feedback,
-                    background: feedback.tipo === 'sucesso'
-                        ? 'var(--cor-positivo-suave)'
-                        : 'var(--cor-perigo-suave)',
-                    border: feedback.tipo === 'sucesso'
-                        ? '1px solid var(--cor-positivo)'
-                        : '1px solid var(--cor-perigo-linha)',
-                    color: feedback.tipo === 'sucesso' ? 'var(--cor-positivo-texto)' : 'var(--cor-perigo-texto)',
-                }}>
-                    <span style={{ fontSize: '15px' }}>
-                        {feedback.tipo === 'sucesso' ? '✓' : '✕'}
-                    </span>
-                    {feedback.msg}
-                </div>
+                </section>
             )}
 
-            {/* ---- Barra de abas (topo) ---- */}
-            <div style={estilos.barraTabs}>
-                {ABAS.map(aba => {
-                    const ativa = abaAtiva === aba.id;
-                    return (
-                        <button
-                            key={aba.id}
-                            onClick={() => setAbaAtiva(aba.id)}
-                            title={aba.desc}
-                            style={{
-                                ...estilos.tab,
-                                background: ativa
-                                    ? 'var(--cor-destaque-suave)'
-                                    : 'transparent',
-                                borderBottom: ativa
-                                    ? '2px solid var(--cor-destaque-texto)'
-                                    : '2px solid transparent',
-                                color: ativa
-                                    ? 'var(--cor-destaque-texto)'
-                                    : 'var(--cor-texto-3)',
-                                fontWeight: ativa ? '600' : '400',
-                            }}
-                        >
-                            <span style={{ fontSize: '15px' }}>{aba.icone}</span>
-                            <span style={{ fontSize: '13px' }}>{aba.label}</span>
-                        </button>
-                    );
-                })}
-            </div>
-
-            {/* ---- Indicador de aba ativa (linha) ---- */}
-            <div style={estilos.divisor} />
-
-            {/* ---- Conteúdo da aba ---- */}
-            <div style={estilos.conteudo}>
-                {renderAba()}
-            </div>
-
+            {/* ---- Rodapé: registro auditável ---- */}
+            <footer className="cart-ledger">
+                <Icone nome="cadeia" tamanho={16} />
+                <span>
+                    Registro auditável <span aria-hidden="true">·</span>{' '}
+                    <span className={statusBlockchain ? (statusBlockchain.valida ? 'ok' : 'falhou') : ''} role="status">
+                        {statusLedger}
+                    </span>
+                    {statusBlockchain && !verificando && (
+                        <span className="num"> ({statusBlockchain.totalBlocos} blocos, {statusBlockchain.totalTransacoes} transações)</span>
+                    )}
+                </span>
+                <button type="button" className="cart-link" onClick={verificarBlockchain} disabled={verificando} aria-busy={verificando || undefined}>
+                    Verificar
+                </button>
+            </footer>
         </div>
     );
 }
-
-
-// ================================================================
-// BLOCO 3: ESTILOS
-// ================================================================
-
-const estilos = {
-
-    container: {
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '0px',
-        height:        '100%',
-    },
-
-    // Cabeçalho com título e saldo rápido
-    cabecalho: {
-        display:        'flex',
-        justifyContent: 'space-between',
-        alignItems:     'flex-start',
-        padding:        '16px 16px 12px',
-        borderBottom:   '1px solid var(--cor-superficie)',
-    },
-
-    titulo: {
-        display:    'flex',
-        alignItems: 'center',
-        gap:        '7px',
-        fontSize:   '18px',
-        fontWeight: '700',
-        color:      'var(--cor-texto)',
-        margin:     0,
-    },
-
-    subtitulo: {
-        fontSize:  '12px',
-        color:     'var(--cor-texto-3)',
-        margin:    '3px 0 0',
-    },
-
-    // Saldo sempre visível no canto superior direito
-    saldoRapido: {
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'flex-end',
-        gap:            '2px',
-        background:     'var(--cor-destaque-suave)',
-        border:         '1px solid var(--cor-destaque-suave)',
-        borderRadius:   '8px',
-        padding:        '8px 12px',
-    },
-
-    saldoLabel: {
-        fontSize:   '10px',
-        color:      'var(--cor-destaque-linha)',
-        fontWeight: '500',
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-    },
-
-    saldoValor: {
-        fontSize:   '15px',
-        fontWeight: '700',
-        color:      'var(--cor-destaque-texto)',
-    },
-
-    // Feedback de sucesso ou erro
-    feedback: {
-        display:    'flex',
-        alignItems: 'center',
-        gap:        '8px',
-        margin:     '10px 16px 0',
-        padding:    '10px 14px',
-        borderRadius: '8px',
-        fontSize:   '13px',
-        fontWeight: '500',
-    },
-
-    // Barra de abas no topo
-    barraTabs: {
-        display:    'flex',
-        gap:        '0px',
-        padding:    '0 16px',
-        marginTop:  '12px',
-    },
-
-    tab: {
-        flex:           1,
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'center',
-        gap:            '3px',
-        padding:        '8px 4px',
-        border:         'none',
-        borderBottom:   '2px solid transparent',
-        cursor:         'pointer',
-        outline:        'none',
-        transition:     'all 0.18s',
-        fontFamily:     'inherit',
-        WebkitTapHighlightColor: 'transparent',
-        borderRadius:   '6px 6px 0 0',
-    },
-
-    divisor: {
-        height:     '1px',
-        background: 'var(--cor-superficie)',
-        margin:     '0 16px',
-    },
-
-    // Área de conteúdo da aba
-    conteudo: {
-        flex:       1,
-        padding:    '16px',
-        overflowY:  'auto',
-    },
-};

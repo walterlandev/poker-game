@@ -2,12 +2,14 @@
    ARQUIVO: frontend/src/pages/Lobby/Menu/Wallet/WalletCard.jsx
 
    CONCEITO GERAL:
-   Visão geral da carteira do jogador. Exibe:
-     → Saldo atual em ₿C e equivalente em R$
-     → Explicação da cotação e do sistema de taxas
-     → Formulário de depósito (R$ → ₿C)
-     → Formulário de saque   (₿C → R$)
-     → Limite diário de saque utilizado
+   Ações da carteira (dentro da tela única de Wallet/index.jsx):
+     → linha curta de cotação e taxas, com "Detalhes" que expande
+     → três ações grandes: Depositar, Sacar, Enviar; abre UM
+       formulário por vez, inline
+     → depósito: valor e resumo em R$, depois QR Code e copia e cola
+     → saque: usa só o saldo REAL (o bônus não é sacável), estado
+       "aguardando PIX" enquanto pendente
+     → enviar: SendBC inline
 
    FLUXO DE SEGURANÇA:
      Depósito → PinConfirm → socket.emit('wallet:depositar')
@@ -15,7 +17,8 @@
      O backend valida o PIN e executa — o frontend nunca credita sozinho.
 
    PROPS:
-     saldo       → number  : saldo atual em ₿C
+     saldoReal   → number  : saldo real (sacável) em ₿C
+     saldoBonus  → number  : saldo de bônus (só para jogar) em ₿C
      sacadoHoje  → number  : ₿C já sacados hoje
      usuario     → object  : { uid, nome }
      socket      → Socket.io
@@ -24,15 +27,15 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import PinConfirm from './PinConfirm';
-import ChipPoker  from '../../components/ChipPoker';
+import SendBC     from './SendBC';
+import Icone      from '../../components/Icone';
 import {
     calcularDeposito,
     calcularSaque,
     validarDeposito,
-    validarSaque,
+    validarSaqueReal,
     fmt,
     fmtBC,
-    bcParaBRL,
     LIMITES,
     TAXAS,
     COTACAO,
@@ -43,10 +46,16 @@ import {
 // BLOCO 1: COMPONENTE PRINCIPAL
 // ================================================================
 
-export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedback }) {
+export default function WalletCard({ saldoReal = 0, sacadoHoje = 0, usuario, socket, onFeedback, acaoInicial = null }) {
 
-    // Ação em foco: 'deposito' | 'saque' | null
-    const [acao, setAcao] = useState(null);
+    // Ação em foco: 'deposito' | 'saque' | 'enviar' | null
+    const [acao, setAcao] = useState(acaoInicial);
+
+    // Detalhes da cotação/taxas (linha curta que expande)
+    const [detalhesAbertos, setDetalhesAbertos] = useState(false);
+
+    // Operação enviada ao servidor e ainda sem resposta: trava o botão
+    const [processando, setProcessando] = useState(null); // 'deposito' | 'saque' | null
 
     // Valores dos inputs
     const [valorDeposito, setValorDeposito] = useState('');
@@ -68,33 +77,14 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
     // Saque fica PENDENTE até o PIX de saída ser confirmado (DEV simula em 3s)
     const [saquePendente, setSaquePendente] = useState(null); // { saqueId, valorBC, brlLiquido, chavePix }
 
-    // Verificação da blockchain interna (ledger auditável)
-    const [statusBlockchain, setStatusBlockchain] = useState(null);
-    const [verificando,      setVerificando]      = useState(false);
-
-    function verificarBlockchain() {
-        if (!socket) return;
-        setVerificando(true);
-        socket.emit('blockchain:verificar');
-    }
-
-    useEffect(() => {
-        if (!socket) return;
-        const onStatus = (status) => {
-            setStatusBlockchain(status);
-            setVerificando(false);
-        };
-        socket.on('blockchain:status', onStatus);
-        return () => socket.off('blockchain:status', onStatus);
-    }, [socket]);
-
     // Escuta confirmação de depósito (DEV auto-confirma; PROD via webhook)
     useEffect(() => {
         if (!socket) return;
 
         const onIniciado = (data) => {
+            setProcessando(null);
             if (data.simulado) {
-                onFeedback('sucesso', `⚙️ Depósito simulado — ₿C ${fmtBC(data.bcCreditar)} creditado em 3s.`);
+                onFeedback('sucesso', `Depósito de teste: ₿C ${fmtBC(data.bcCreditar)} entram no saldo real em alguns segundos.`);
             } else {
                 setPixPendente({
                     pixCopiaECola: data.pixCopiaECola,
@@ -108,24 +98,27 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
 
         const onConfirmado = ({ bcCreditar }) => {
             setPixPendente(null);
-            onFeedback('sucesso', `✅ Depósito confirmado — ₿C ${fmtBC(bcCreditar)} creditados!`);
+            setProcessando(null);
+            onFeedback('sucesso', `Depósito confirmado: ₿C ${fmtBC(bcCreditar)} no saldo real.`);
         };
 
         // Saque fica pendente até o PIX de saída ser (de fato) enviado —
         // ver backend/wallet/wallet-manager.js (wallet:sacar/confirmarSaque).
         const onSaquePendente = (data) => {
+            setProcessando(null);
             setSaquePendente(data);
         };
 
         const onSaqueConfirmado = ({ brlLiquido }) => {
             setSaquePendente(null);
-            onFeedback('sucesso', `✅ Saque confirmado — R$ ${fmt(brlLiquido)} enviados via PIX!`);
+            onFeedback('sucesso', `Saque confirmado: R$ ${fmt(brlLiquido)} enviados por PIX.`);
         };
 
         // Sem isso, PIN errado / falha no depósito ou saque não mostrava
         // nada — o formulário só fechava em silêncio, sem o jogador saber
         // que a operação não foi concluída.
         const onErro = ({ mensagem }) => {
+            setProcessando(null);
             onFeedback('erro', mensagem || 'Não foi possível concluir a operação. Tente novamente.');
         };
 
@@ -202,7 +195,7 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
             return;
         }
         const v   = parseFloat(valorSaque);
-        const val = validarSaque(v, saldo, sacadoHoje);
+        const val = validarSaqueReal(v, saldoReal, sacadoHoje);
         if (!val.valido) { setErroSaque(val.erro); return; }
         setErroSaque(null);
         setAcaoPendente({ tipo: 'saque', payload: calcularSaque(v) });
@@ -237,11 +230,15 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
             });
         }
 
+        setProcessando(tipo);
+        setTimeout(() => setProcessando(atual => (atual === tipo ? null : atual)), 15000);
+
         setPinAberto(false);
         setAcaoPendente(null);
         setValorDeposito('');
         setValorSaque('');
-        setAcao(null);
+        // O formulário fica aberto mostrando "Gerando PIX…"/"Enviando pedido…"
+        // até a resposta; o QR Code/estado pendente aparece logo abaixo.
 
         // Feedback real vem via socket: wallet:deposito_iniciado/confirmado
         // (depósito) ou wallet:saque_pendente/confirmado (saque) — nunca
@@ -252,411 +249,249 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
     // ================================================================
     // RENDERIZAÇÃO
     // ================================================================
+    const podeSacarTudo = saldoReal >= LIMITES.SAQUE_MIN_BC;
+
     return (
-        <div style={estilos.container}>
+        <div className="cart-acoes-bloco">
 
-            {/* ======================================================
-                SEÇÃO 1 — SALDO PRINCIPAL
-            ====================================================== */}
-            <div style={estilos.cardSaldo}>
-
-                <div style={estilos.saldoTopo}>
-                    <div style={estilos.saldoIcone}>
-                        <ChipPoker size={36} />
-                    </div>
-                    <div>
-                        <p style={estilos.saldoLabel}>Saldo disponível</p>
-                        <p style={estilos.saldoBig}>
-                            {fmtBC(saldo)}
-                        </p>
-                        <p style={estilos.saldoEquiv}>
-                            ≈ R$ {fmt(bcParaBRL(saldo))} em reais
-                        </p>
-                    </div>
+            {/* ---- Cotação e taxas: linha curta que expande ---- */}
+            <div className="cart-cotacao">
+                <p className="num">
+                    R$ 1 = ₿C {fmtBC(COTACAO.BC_POR_REAL)}
+                    <span aria-hidden="true"> · </span>depósito {TAXAS.DEPOSITO * 100}%
+                    <span aria-hidden="true"> · </span>saque {TAXAS.SAQUE * 100}%
+                </p>
+                <button
+                    type="button"
+                    className="cart-link"
+                    aria-expanded={detalhesAbertos}
+                    aria-controls="cart-cotacao-detalhes"
+                    onClick={() => setDetalhesAbertos(v => !v)}
+                >
+                    {detalhesAbertos ? 'Fechar' : 'Detalhes'}
+                </button>
+            </div>
+            {detalhesAbertos && (
+                <div id="cart-cotacao-detalhes" className="cart-detalhes">
+                    <p>A ₿C é a ficha do jogo. Cada R$ 1 depositado vira ₿C {fmtBC(COTACAO.BC_POR_REAL)} para jogar nas mesas. A cotação é fixa.</p>
+                    <p>No depósito, a taxa de {TAXAS.DEPOSITO * 100}% é cobrada em R$ além do valor. No saque, a taxa de {TAXAS.SAQUE * 100}% é descontada do valor que você recebe. Enviar ₿C para outro jogador custa {TAXAS.ENVIO * 100}% (mínimo ₿C {fmtBC(TAXAS.ENVIO_MIN)}).</p>
+                    <p>Só o saldo real pode ser sacado ou enviado. O bônus serve apenas para jogar nas mesas e não vira dinheiro.</p>
+                    <p>Saque mínimo de ₿C {fmtBC(LIMITES.SAQUE_MIN_BC)} e limite diário de ₿C {fmtBC(LIMITES.SAQUE_MAX_DIARIO_BC)}.</p>
                 </div>
+            )}
 
-                {/* Barra de limite diário de saque */}
-                <div style={estilos.limiteDiario}>
-                    <div style={estilos.limiteHeader}>
-                        <span style={estilos.limiteLabel}>Saque hoje</span>
-                        <span style={estilos.limiteValor}>
-                            ₿C {fmtBC(sacadoHoje)} / {fmtBC(LIMITES.SAQUE_MAX_DIARIO_BC)}
-                        </span>
-                    </div>
-                    <div style={estilos.barraFundo}>
-                        <div style={{
-                            ...estilos.barraPreenchimento,
-                            width: `${percDiario}%`,
-                            background: percDiario > 80 ? 'var(--cor-perigo-texto)' : 'var(--cor-destaque-texto)',
-                        }} />
-                    </div>
-                    <p style={estilos.limiteRestante}>
-                        Restante hoje: ₿C {fmtBC(restanteDiario)}
-                    </p>
-                </div>
-
+            {/* ---- Três ações grandes ---- */}
+            <div className="cart-acoes" role="group" aria-label="Ações da carteira">
+                <BotaoAcao icone="baixo"  label="Depositar" ativo={acao === 'deposito'} onClick={() => toggleAcao('deposito')} />
+                <BotaoAcao icone="cima"   label="Sacar"     ativo={acao === 'saque'}    onClick={() => toggleAcao('saque')} />
+                <BotaoAcao icone="enviar" label="Enviar"    ativo={acao === 'enviar'}   onClick={() => toggleAcao('enviar')} />
             </div>
 
-
-            {/* ======================================================
-                SEÇÃO 2 — COTAÇÃO E TAXAS (explicação fixa)
-            ====================================================== */}
-            <div style={estilos.cardCotacao}>
-                <p style={estilos.cotacaoTitulo}>💱 Como funciona a ₿C</p>
-
-                <div style={estilos.cotacaoGrid}>
-
-                    <InfoItem
-                        icone="🔄"
-                        titulo="Cotação fixa"
-                        texto={`R$ 1,00 = ₿C ${fmtBC(COTACAO.BC_POR_REAL)}`}
-                        sub="Valor nunca flutua"
-                    />
-                    <InfoItem
-                        icone="⬇️"
-                        titulo="Taxa de depósito"
-                        texto={`${TAXAS.DEPOSITO * 100}% sobre o valor`}
-                        sub="Cobrada em R$ além do depósito"
-                    />
-                    <InfoItem
-                        icone="⬆️"
-                        titulo="Taxa de saque"
-                        texto={`${TAXAS.SAQUE * 100}% sobre o valor`}
-                        sub="Descontada do valor recebido"
-                    />
-                    <InfoItem
-                        icone="🔒"
-                        titulo="Saldo recuperável"
-                        texto="100% do saldo"
-                        sub="Saque a qualquer momento"
-                    />
-
-                </div>
-
-                <div style={estilos.cotacaoAviso}>
-                    <span>ℹ️</span>
-                    <p style={estilos.cotacaoAvisoTexto}>
-                        A ₿C é a ficha digital do jogo. Cada real depositado
-                        vira {fmtBC(COTACAO.BC_POR_REAL)} fichas para jogar nas mesas.
-                        Todo o saldo pode ser sacado a qualquer momento, descontada apenas a taxa.
-                    </p>
-                </div>
-            </div>
-
-
-            {/* ======================================================
-                SEÇÃO 2B — BLOCKCHAIN (ledger auditável)
-            ====================================================== */}
-            <div style={estilos.blockchainCard}>
-                <div style={estilos.blockchainTopo}>
-                    <div>
-                        <p style={estilos.blockchainTitulo}>⛓️ Ledger da ₿C</p>
-                        <p style={estilos.blockchainSub}>
-                            Todo depósito, saque e envio fica registrado numa cadeia de
-                            blocos encadeada — qualquer alteração no histórico quebra a
-                            corrente e fica visível na hora.
-                        </p>
-                    </div>
-                    <button onClick={verificarBlockchain} style={estilos.btnVerificar} disabled={verificando}>
-                        {verificando ? '...' : '🔍 Verificar'}
-                    </button>
-                </div>
-
-                {statusBlockchain && (
-                    <div style={estilos.blockchainStatus}>
-                        <span style={{
-                            ...estilos.blockchainBadge,
-                            background: statusBlockchain.valida ? 'var(--cor-positivo-suave)' : 'var(--cor-perigo-suave)',
-                            color:      statusBlockchain.valida ? 'var(--cor-positivo-texto)' : 'var(--cor-perigo-texto)',
-                        }}>
-                            {statusBlockchain.valida ? '✓ Cadeia íntegra' : '✕ Adulteração detectada'}
-                        </span>
-                        <span style={estilos.blockchainInfo}>
-                            {statusBlockchain.totalBlocos} bloco(s) · {statusBlockchain.totalTransacoes} transação(ões)
-                        </span>
-                    </div>
-                )}
-            </div>
-
-
-            {/* ======================================================
-                SEÇÃO 3 — BOTÕES DE AÇÃO
-            ====================================================== */}
-            <div style={estilos.botoesAcao}>
-                <BotaoAcao
-                    icone="⬇️"
-                    label="Depositar"
-                    cor="var(--cor-positivo-texto)"
-                    ativo={acao === 'deposito'}
-                    onClick={() => toggleAcao('deposito')}
-                />
-                <BotaoAcao
-                    icone="⬆️"
-                    label="Sacar"
-                    cor="var(--cor-destaque-texto)"
-                    ativo={acao === 'saque'}
-                    onClick={() => toggleAcao('saque')}
-                />
-            </div>
-
-
-            {/* ======================================================
-                SEÇÃO 4 — FORMULÁRIO DE DEPÓSITO
-            ====================================================== */}
+            {/* ---- Depósito ---- */}
             {acao === 'deposito' && (
-                <div style={estilos.formCard}>
+                <section className="cart-form" aria-labelledby="cart-dep-titulo">
+                    <div className="cart-form-cab">
+                        <h3 id="cart-dep-titulo">Depositar via PIX</h3>
+                        <span className="cart-form-dica num">
+                            R$ {fmt(LIMITES.DEPOSITO_MIN_BRL)} a R$ {fmt(LIMITES.DEPOSITO_MAX_BRL)} por depósito
+                        </span>
+                    </div>
 
-                    <p style={estilos.formTitulo}>⬇️ Depósito</p>
-
-                    {/* Limites */}
-                    <p style={estilos.formDica}>
-                        Mínimo R$ {fmt(LIMITES.DEPOSITO_MIN_BRL)} · Máximo R$ {fmt(LIMITES.DEPOSITO_MAX_BRL)} por transação
-                    </p>
-
-                    {/* Input valor em R$ */}
-                    <div style={estilos.inputGroup}>
-                        <span style={estilos.inputPrefix}>R$</span>
+                    <label className="cart-campo-rot" htmlFor="cart-dep-valor">Valor em reais</label>
+                    <div className={`cart-campo${erroDeposito ? ' com-erro' : ''}`}>
+                        <span className="cart-campo-pre">R$</span>
                         <input
+                            id="cart-dep-valor"
                             type="number"
+                            inputMode="decimal"
                             min="1"
                             max="500"
                             step="1"
                             placeholder="0,00"
                             value={valorDeposito}
-                            onChange={e => {
-                                setValorDeposito(e.target.value);
-                                setErroDeposito(null);
-                            }}
-                            style={estilos.input}
+                            onChange={e => { setValorDeposito(e.target.value); setErroDeposito(null); }}
+                            aria-invalid={!!erroDeposito}
                         />
                     </div>
+                    {erroDeposito && <p className="cart-erro" role="alert">{erroDeposito}</p>}
 
-                    {erroDeposito && (
-                        <p style={estilos.erroTexto}>⚠ {erroDeposito}</p>
-                    )}
-
-                    {/* Preview do cálculo */}
                     {previewDeposito && (
-                        <div style={estilos.preview}>
-                            <LinhaPreview label="Valor depositado"  valor={`R$ ${fmt(previewDeposito.valorBRL)}`} />
-                            <LinhaPreview label={`Taxa (${previewDeposito.taxaPerc}%)`} valor={`+ R$ ${fmt(previewDeposito.taxaBRL)}`} cor="var(--cor-perigo-texto)" />
-                            <div style={estilos.previewDivisor} />
-                            <LinhaPreview label="Total cobrado"     valor={`R$ ${fmt(previewDeposito.totalBRL)}`}    destaque />
-                            <LinhaPreview label="₿C creditados"     valor={`₿C ${fmtBC(previewDeposito.bcRecebido)}`} cor="var(--cor-positivo-texto)" destaque />
-                        </div>
-                    )}
-
-                    {/* Métodos de pagamento */}
-                    {previewDeposito && (
-                        <>
-                            <p style={estilos.labelMetodo}>Pagar com</p>
-                            <div style={estilos.metodos}>
-                                <MetodoPag icone="📱" label="PIX"    destaque />
-                                <MetodoPag icone="💳" label="Cartão"          />
-                            </div>
-                        </>
+                        <dl className="cart-resumo">
+                            <LinhaPreview label="Valor do depósito" valor={`R$ ${fmt(previewDeposito.valorBRL)}`} />
+                            <LinhaPreview label={`Taxa (${previewDeposito.taxaPerc}%)`} valor={`+ R$ ${fmt(previewDeposito.taxaBRL)}`} />
+                            <LinhaPreview label="Total a pagar" valor={`R$ ${fmt(previewDeposito.totalBRL)}`} destaque />
+                            <LinhaPreview label="Entra no saldo real" valor={`₿C ${fmtBC(previewDeposito.bcRecebido)}`} tom="positivo" />
+                        </dl>
                     )}
 
                     <button
+                        type="button"
                         onClick={handleSubmitDeposito}
-                        disabled={!previewDeposito}
-                        style={{
-                            ...estilos.btnConfirmar,
-                            background: previewDeposito ? 'var(--cor-positivo-texto)' : 'var(--cor-linha)',
-                            color:      previewDeposito ? '#fff'    : 'var(--cor-texto-3)',
-                            cursor:     previewDeposito ? 'pointer' : 'not-allowed',
-                        }}
+                        disabled={!previewDeposito || processando === 'deposito'}
+                        aria-busy={processando === 'deposito' || undefined}
+                        className="btn btn-principal cart-btn-cheio"
                     >
-                        {previewDeposito
-                            ? `Depositar R$ ${fmt(previewDeposito.totalBRL)}`
-                            : 'Informe o valor'}
+                        {processando === 'deposito'
+                            ? 'Gerando PIX…'
+                            : previewDeposito ? `Gerar PIX de R$ ${fmt(previewDeposito.totalBRL)}` : 'Informe o valor'}
                     </button>
-
-                </div>
+                    <p className="cart-nota">Você confirma com o PIN e recebe o QR Code e o código copia e cola aqui mesmo.</p>
+                </section>
             )}
 
-
-            {/* ======================================================
-                SEÇÃO 5 — FORMULÁRIO DE SAQUE
-            ====================================================== */}
+            {/* ---- Saque ---- */}
             {acao === 'saque' && (
-                <div style={estilos.formCard}>
+                <section className="cart-form" aria-labelledby="cart-saq-titulo">
+                    <div className="cart-form-cab">
+                        <h3 id="cart-saq-titulo">Sacar para sua chave PIX</h3>
+                        <span className="cart-form-dica num">
+                            Real disponível ₿C {fmtBC(saldoReal)}
+                        </span>
+                    </div>
 
-                    <p style={estilos.formTitulo}>⬆️ Saque</p>
-
-                    <p style={estilos.formDica}>
-                        Mínimo ₿C {fmtBC(LIMITES.SAQUE_MIN_BC)} · Disponível hoje: ₿C {fmtBC(restanteDiario)}
-                    </p>
-
-                    {/* Input valor em ₿C */}
-                    <div style={estilos.inputGroup}>
-                        <span style={estilos.inputPrefix}>₿C</span>
+                    <label className="cart-campo-rot" htmlFor="cart-saq-valor">Valor em ₿C</label>
+                    <div className={`cart-campo${erroSaque ? ' com-erro' : ''}`}>
+                        <span className="cart-campo-pre">₿C</span>
                         <input
+                            id="cart-saq-valor"
                             type="number"
+                            inputMode="numeric"
                             min={LIMITES.SAQUE_MIN_BC}
                             step="1000"
                             placeholder="0"
                             value={valorSaque}
-                            onChange={e => {
-                                setValorSaque(e.target.value);
-                                setErroSaque(null);
-                            }}
-                            style={estilos.input}
+                            onChange={e => { setValorSaque(e.target.value); setErroSaque(null); }}
+                            aria-invalid={!!erroSaque}
                         />
+                        {podeSacarTudo && (
+                            <button type="button" className="cart-campo-acao texto" onClick={() => setValorSaque(String(saldoReal))}>
+                                Tudo
+                            </button>
+                        )}
                     </div>
 
-                    {/* Atalho: sacar tudo */}
-                    {saldo >= LIMITES.SAQUE_MIN_BC && (
-                        <button
-                            onClick={() => setValorSaque(String(saldo))}
-                            style={estilos.btnTudo}
-                        >
-                            Sacar tudo (₿C {fmtBC(saldo)})
-                        </button>
-                    )}
-
-                    {/* Chave PIX que vai receber o valor */}
-                    <div style={estilos.inputGroup}>
-                        <span style={estilos.inputPrefix}>🔑</span>
+                    <label className="cart-campo-rot" htmlFor="cart-saq-chave">Chave PIX que vai receber</label>
+                    <div className="cart-campo">
                         <input
+                            id="cart-saq-chave"
                             type="text"
-                            placeholder="Sua chave PIX (CPF, e-mail, telefone...)"
+                            autoComplete="off"
+                            spellCheck={false}
+                            placeholder="CPF, e-mail, telefone ou chave aleatória…"
                             value={chavePix}
-                            onChange={e => {
-                                setChavePix(e.target.value);
-                                setErroSaque(null);
-                            }}
-                            style={estilos.input}
+                            onChange={e => { setChavePix(e.target.value); setErroSaque(null); }}
                         />
                     </div>
+                    {erroSaque && <p className="cart-erro" role="alert">{erroSaque}</p>}
 
-                    {erroSaque && (
-                        <p style={estilos.erroTexto}>⚠ {erroSaque}</p>
-                    )}
-
-                    {/* Preview do cálculo */}
-                    {previewSaque && (
-                        <div style={estilos.preview}>
-                            <LinhaPreview label="₿C debitados"      valor={`₿C ${fmtBC(previewSaque.bcDebitado)}`} />
-                            <LinhaPreview label="Equivale a"         valor={`R$ ${fmt(previewSaque.brlBruto)}`} />
-                            <LinhaPreview label={`Taxa (${previewSaque.taxaPerc}%)`} valor={`- R$ ${fmt(previewSaque.taxaBRL)}`} cor="var(--cor-perigo-texto)" />
-                            <div style={estilos.previewDivisor} />
-                            <LinhaPreview label="Você recebe"        valor={`R$ ${fmt(previewSaque.brlLiquido)}`} cor="var(--cor-positivo-texto)" destaque />
+                    <div className="cart-limite" aria-label="Limite diário de saque">
+                        <div className="rot num">
+                            <span>Sacado hoje ₿C {fmtBC(sacadoHoje)}</span>
+                            <span>Resta ₿C {fmtBC(restanteDiario)}</span>
                         </div>
+                        <div className="barra"><i style={{ width: `${percDiario}%` }} className={percDiario > 80 ? 'alto' : ''} /></div>
+                    </div>
+
+                    {previewSaque && (
+                        <dl className="cart-resumo">
+                            <LinhaPreview label="Sai do saldo real" valor={`₿C ${fmtBC(previewSaque.bcDebitado)}`} />
+                            <LinhaPreview label="Equivale a" valor={`R$ ${fmt(previewSaque.brlBruto)}`} />
+                            <LinhaPreview label={`Taxa (${previewSaque.taxaPerc}%)`} valor={`− R$ ${fmt(previewSaque.taxaBRL)}`} />
+                            <LinhaPreview label="Você recebe" valor={`R$ ${fmt(previewSaque.brlLiquido)}`} tom="positivo" destaque />
+                        </dl>
                     )}
 
                     <button
+                        type="button"
                         onClick={handleSubmitSaque}
-                        disabled={!previewSaque || !chavePix.trim()}
-                        style={{
-                            ...estilos.btnConfirmar,
-                            background: previewSaque && chavePix.trim() ? 'var(--cor-destaque-texto)' : 'var(--cor-linha)',
-                            color:      previewSaque && chavePix.trim() ? '#fff'    : 'var(--cor-texto-3)',
-                            cursor:     previewSaque && chavePix.trim() ? 'pointer' : 'not-allowed',
-                        }}
+                        disabled={!previewSaque || !chavePix.trim() || processando === 'saque' || !!saquePendente}
+                        aria-busy={processando === 'saque' || undefined}
+                        className="btn btn-principal cart-btn-cheio"
                     >
-                        {previewSaque
-                            ? `Sacar · Receber R$ ${fmt(previewSaque.brlLiquido)}`
-                            : 'Informe o valor'}
+                        {processando === 'saque'
+                            ? 'Enviando pedido…'
+                            : previewSaque ? `Sacar e receber R$ ${fmt(previewSaque.brlLiquido)}` : 'Informe o valor'}
                     </button>
-
-                </div>
+                    <p className="cart-nota">O bônus não pode ser sacado: só o saldo real sai da carteira.</p>
+                </section>
             )}
 
+            {/* ---- Enviar ₿C (inline) ---- */}
+            {acao === 'enviar' && (
+                <SendBC
+                    saldo={saldoReal}
+                    usuario={usuario}
+                    socket={socket}
+                    onFeedback={onFeedback}
+                />
+            )}
 
-            {/* ======================================================
-                SEÇÃO 5B — SAQUE PENDENTE (aguardando PIX de saída)
-            ====================================================== */}
+            {/* ---- Saque pendente (aguardando PIX de saída) ---- */}
             {saquePendente && (
-                <div style={estilos.pixCard}>
-                    <div style={estilos.pixHeader}>
-                        <span style={{ fontSize: '22px' }}>⏳</span>
-                        <div>
-                            <p style={estilos.pixTitulo}>Processando seu saque</p>
-                            <p style={estilos.pixSub}>
-                                R$ {fmt(saquePendente.brlLiquido)} sendo enviados via PIX pra chave{' '}
-                                <strong>{saquePendente.chavePix}</strong>
-                            </p>
-                        </div>
+                <section className="cart-estado" role="status" aria-live="polite">
+                    <span className="cart-estado-icone" aria-hidden="true"><Icone nome="relogio" /></span>
+                    <div>
+                        <h3>Saque pendente, aguardando PIX</h3>
+                        <p className="num">
+                            R$ {fmt(saquePendente.brlLiquido)} para a chave <b translate="no">{saquePendente.chavePix}</b>.
+                            Isso pode levar alguns instantes; o saldo é atualizado quando o PIX for confirmado.
+                        </p>
                     </div>
-                    <p style={estilos.pixAviso}>
-                        Isso pode levar alguns instantes. Você recebe uma notificação assim que confirmar.
-                    </p>
-                </div>
+                </section>
             )}
 
-
-            {/* ======================================================
-                SEÇÃO 6 — PIX QR CODE (depósito em produção)
-            ====================================================== */}
+            {/* ---- PIX do depósito: QR Code e copia e cola ---- */}
             {pixPendente && (
-                <div style={estilos.pixCard}>
-                    <div style={estilos.pixHeader}>
-                        <span style={{ fontSize: '22px' }}>📱</span>
-                        <div>
-                            <p style={estilos.pixTitulo}>Aguardando pagamento PIX</p>
-                            <p style={estilos.pixSub}>
-                                Escaneie o QR Code ou copie o código abaixo
-                            </p>
-                        </div>
-                        <button
-                            onClick={() => setPixPendente(null)}
-                            style={estilos.pixFechar}
-                            title="Fechar"
-                        >×</button>
+                <section className="cart-pix" aria-labelledby="cart-pix-titulo">
+                    <div className="cart-form-cab">
+                        <h3 id="cart-pix-titulo">Pague o PIX para concluir</h3>
+                        <button type="button" onClick={() => setPixPendente(null)} className="modal-icone-btn" aria-label="Fechar PIX">
+                            <Icone nome="fechar" tamanho={18} />
+                        </button>
                     </div>
+                    <p className="cart-pix-resumo num">
+                        R$ {fmt(pixPendente.totalBRL)} <span aria-hidden="true">→</span> ₿C {fmtBC(pixPendente.bcCreditar)} no saldo real
+                    </p>
 
-                    <div style={estilos.pixResumo}>
-                        <span style={{ color: 'var(--cor-texto-2)', fontSize: '13px' }}>
-                            R$ {fmt(pixPendente.totalBRL)} → ₿C {fmtBC(pixPendente.bcCreditar)}
-                        </span>
-                    </div>
-
-                    {/* QR Code em base64 */}
                     {pixPendente.qrCode && (
-                        <div style={estilos.qrWrap}>
+                        <div className="cart-qr">
                             <img
                                 src={`data:image/png;base64,${pixPendente.qrCode}`}
-                                alt="QR Code PIX"
-                                style={estilos.qrImg}
+                                alt="QR Code do PIX para pagar o depósito"
+                                width={200}
+                                height={200}
                             />
                         </div>
                     )}
 
-                    {/* Pix Copia e Cola */}
                     {pixPendente.pixCopiaECola && (
-                        <div style={estilos.pixCopiaWrap}>
-                            <p style={estilos.pixCodigoTexto}>
-                                {pixPendente.pixCopiaECola}
-                            </p>
-                            <button
-                                onClick={() => {
-                                    navigator.clipboard.writeText(pixPendente.pixCopiaECola);
-                                    setPixCopiado(true);
-                                    setTimeout(() => setPixCopiado(false), 2500);
-                                }}
-                                style={{
-                                    ...estilos.pixBtnCopiar,
-                                    background: pixCopiado ? 'var(--cor-positivo-suave)' : 'var(--cor-destaque-suave)',
-                                    color:      pixCopiado ? 'var(--cor-positivo-texto)' : 'var(--cor-destaque-texto)',
-                                    border:     pixCopiado ? '1px solid var(--cor-positivo)' : '1px solid var(--cor-destaque-linha)',
-                                }}
-                            >
-                                {pixCopiado ? '✓ Copiado!' : '📋 Copiar código'}
-                            </button>
+                        <div className="cart-copia">
+                            <label className="cart-campo-rot" htmlFor="cart-pix-codigo">PIX copia e cola</label>
+                            <div className="cart-copia-linha">
+                                <input id="cart-pix-codigo" readOnly value={pixPendente.pixCopiaECola} className="num" onFocus={e => e.target.select()} />
+                                <button
+                                    type="button"
+                                    className={`btn ${pixCopiado ? 'btn-neutro' : 'btn-principal'}`}
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(pixPendente.pixCopiaECola);
+                                        setPixCopiado(true);
+                                        setTimeout(() => setPixCopiado(false), 2500);
+                                    }}
+                                >
+                                    <Icone nome={pixCopiado ? 'check' : 'copiar'} tamanho={16} />
+                                    {pixCopiado ? 'Copiado' : 'Copiar'}
+                                </button>
+                            </div>
                         </div>
                     )}
 
-                    <p style={estilos.pixAviso}>
-                        Após pagar, o saldo será creditado automaticamente em segundos.
+                    <p className="cart-nota" role="status" aria-live="polite">
+                        Aguardando o pagamento. Depois de pagar, o saldo é creditado em segundos.
                     </p>
-                </div>
+                </section>
             )}
 
-
-            {/* ======================================================
-                MODAL DE PIN
-            ====================================================== */}
+            {/* ---- PIN ---- */}
             {pinAberto && (
                 <PinConfirm
                     titulo={acaoPendente?.tipo === 'deposito' ? 'Confirmar depósito' : 'Confirmar saque'}
@@ -669,575 +504,29 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
                     onCancelar={() => { setPinAberto(false); setAcaoPendente(null); }}
                 />
             )}
-
         </div>
     );
 }
 
 
 // ================================================================
-// BLOCO 2: SUBCOMPONENTES
+// SUBCOMPONENTES
 // ================================================================
 
-function BotaoAcao({ icone, label, cor, ativo, onClick }) {
+function BotaoAcao({ icone, label, ativo, onClick }) {
     return (
-        <button
-            onClick={onClick}
-            style={{
-                ...estilos.botaoAcao,
-                background: ativo ? `color-mix(in srgb, ${cor} 9%, transparent)` : 'var(--cor-superficie)',
-                border:     ativo ? `1px solid color-mix(in srgb, ${cor} 31%, transparent)` : '1px solid var(--cor-linha)',
-                color:      ativo ? cor : 'var(--cor-texto-2)',
-            }}
-        >
-            <span style={{ fontSize: '20px' }}>{icone}</span>
-            <span style={{ fontSize: '13px', fontWeight: ativo ? '600' : '400' }}>{label}</span>
+        <button type="button" onClick={onClick} className="cart-acao" aria-pressed={ativo}>
+            <span className="cart-acao-icone" aria-hidden="true"><Icone nome={icone} tamanho={22} /></span>
+            <span>{label}</span>
         </button>
     );
 }
 
-function InfoItem({ icone, titulo, texto, sub }) {
+function LinhaPreview({ label, valor, tom, destaque }) {
     return (
-        <div style={estilos.infoItem}>
-            <span style={{ fontSize: '18px' }}>{icone}</span>
-            <div>
-                <p style={estilos.infoTitulo}>{titulo}</p>
-                <p style={estilos.infoTexto}>{texto}</p>
-                {sub && <p style={estilos.infoSub}>{sub}</p>}
-            </div>
+        <div className={`cart-resumo-linha${destaque ? ' destaque' : ''}${tom ? ' ' + tom : ''}`}>
+            <dt>{label}</dt>
+            <dd className="num">{valor}</dd>
         </div>
     );
 }
-
-function LinhaPreview({ label, valor, cor, destaque }) {
-    return (
-        <div style={estilos.linhaPreview}>
-            <span style={{
-                fontSize:   destaque ? '13px' : '12px',
-                color:      'var(--cor-texto-3)',
-                fontWeight: destaque ? '500' : '400',
-            }}>
-                {label}
-            </span>
-            <span style={{
-                fontSize:   destaque ? '14px' : '13px',
-                fontWeight: destaque ? '700'  : '500',
-                color:      cor || 'var(--cor-texto)',
-            }}>
-                {valor}
-            </span>
-        </div>
-    );
-}
-
-function MetodoPag({ icone, label, destaque }) {
-    const [ativo, setAtivo] = useState(!!destaque);
-    return (
-        <button
-            onClick={() => setAtivo(true)}
-            style={{
-                ...estilos.metodoPag,
-                background: ativo ? 'var(--cor-destaque-suave)' : 'var(--cor-superficie)',
-                border:     ativo ? '1px solid var(--cor-destaque-linha)' : '1px solid var(--cor-linha)',
-                color:      ativo ? 'var(--cor-destaque-texto)' : 'var(--cor-texto-3)',
-            }}
-        >
-            <span style={{ fontSize: '18px' }}>{icone}</span>
-            <span style={{ fontSize: '12px', fontWeight: ativo ? '600' : '400' }}>{label}</span>
-            {destaque && <span style={estilos.badgePix}>Recomendado</span>}
-        </button>
-    );
-}
-
-
-// ================================================================
-// BLOCO 3: ESTILOS
-// ================================================================
-
-const estilos = {
-
-    container: {
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '14px',
-    },
-
-    // Card principal de saldo
-    cardSaldo: {
-        background:   'var(--cor-superficie)',
-        border:       '1px solid var(--cor-destaque-suave)',
-        borderRadius: '14px',
-        padding:      '18px',
-        display:      'flex',
-        flexDirection:'column',
-        gap:          '16px',
-    },
-
-    saldoTopo: {
-        display:    'flex',
-        alignItems: 'center',
-        gap:        '14px',
-    },
-
-    saldoIcone: {
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        background:     'var(--cor-destaque-suave)',
-        border:         '1px solid var(--cor-destaque-linha)',
-        borderRadius:   '10px',
-        padding:        '10px 12px',
-    },
-
-    saldoLabel: {
-        fontSize:  '11px',
-        color:     'var(--cor-texto-3)',
-        margin:    0,
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-    },
-
-    saldoBig: {
-        fontSize:   '28px',
-        fontWeight: '800',
-        color:      'var(--cor-destaque-texto)',
-        margin:     '2px 0 0',
-        lineHeight:  1,
-    },
-
-    saldoEquiv: {
-        fontSize: '12px',
-        color:    'var(--cor-texto-3)',
-        margin:   '4px 0 0',
-    },
-
-    // Barra de limite diário
-    limiteDiario: {
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '6px',
-    },
-
-    limiteHeader: {
-        display:        'flex',
-        justifyContent: 'space-between',
-    },
-
-    limiteLabel: {
-        fontSize: '11px',
-        color:    'var(--cor-texto-3)',
-    },
-
-    limiteValor: {
-        fontSize: '11px',
-        color:    'var(--cor-texto-2)',
-    },
-
-    barraFundo: {
-        height:       '4px',
-        background:   'var(--cor-linha)',
-        borderRadius: '2px',
-        overflow:     'hidden',
-    },
-
-    barraPreenchimento: {
-        height:       '100%',
-        borderRadius: '2px',
-        transition:   'width 0.4s ease',
-    },
-
-    limiteRestante: {
-        fontSize: '10px',
-        color:    'var(--cor-texto-3)',
-        margin:   0,
-    },
-
-    // Card de cotação / explicação
-    cardCotacao: {
-        background:   'color-mix(in srgb, var(--cor-info) 5%, transparent)',
-        border:       '1px solid color-mix(in srgb, var(--cor-info) 15%, transparent)',
-        borderRadius: '12px',
-        padding:      '14px',
-        display:      'flex',
-        flexDirection:'column',
-        gap:          '12px',
-    },
-
-    cotacaoTitulo: {
-        fontSize:   '13px',
-        fontWeight: '600',
-        color:      'var(--cor-info)',
-        margin:     0,
-    },
-
-    cotacaoGrid: {
-        display:             'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap:                 '10px',
-    },
-
-    infoItem: {
-        display:   'flex',
-        gap:       '8px',
-        alignItems:'flex-start',
-    },
-
-    infoTitulo: {
-        fontSize:   '10px',
-        fontWeight: '600',
-        color:      'var(--cor-texto-3)',
-        margin:     0,
-        textTransform: 'uppercase',
-        letterSpacing: '0.04em',
-    },
-
-    infoTexto: {
-        fontSize:   '12px',
-        fontWeight: '700',
-        color:      'var(--cor-texto)',
-        margin:     '2px 0 0',
-    },
-
-    infoSub: {
-        fontSize: '10px',
-        color:    'var(--cor-texto-3)',
-        margin:   '1px 0 0',
-    },
-
-    cotacaoAviso: {
-        display:    'flex',
-        gap:        '8px',
-        alignItems: 'flex-start',
-        padding:    '8px 10px',
-        background: 'var(--cor-superficie)',
-        borderRadius:'8px',
-    },
-
-    cotacaoAvisoTexto: {
-        fontSize:   '11px',
-        color:      'var(--cor-texto-3)',
-        margin:     0,
-        lineHeight: 1.5,
-    },
-
-    // Painel de verificação da blockchain
-    blockchainCard: {
-        background:   'var(--cor-destaque-suave)',
-        border:       '1px solid var(--cor-destaque-suave)',
-        borderRadius: '12px',
-        padding:      '14px',
-        display:      'flex',
-        flexDirection:'column',
-        gap:          '10px',
-    },
-    blockchainTopo: {
-        display:        'flex',
-        alignItems:     'flex-start',
-        justifyContent: 'space-between',
-        gap:            '10px',
-    },
-    blockchainTitulo: {
-        fontSize:   '13px',
-        fontWeight: '600',
-        color:      'var(--cor-destaque-texto)',
-        margin:     0,
-    },
-    blockchainSub: {
-        fontSize:   '11px',
-        color:      'var(--cor-texto-3)',
-        margin:     '3px 0 0',
-        lineHeight: 1.5,
-        maxWidth:   '320px',
-    },
-    btnVerificar: {
-        background:   'var(--cor-destaque-suave)',
-        border:       '1px solid var(--cor-destaque-linha)',
-        borderRadius: '8px',
-        color:        'var(--cor-destaque-texto)',
-        fontSize:     '12px',
-        fontWeight:   '600',
-        padding:      '7px 12px',
-        cursor:       'pointer',
-        whiteSpace:   'nowrap',
-        fontFamily:   'inherit',
-        flexShrink:   0,
-    },
-    blockchainStatus: {
-        display:    'flex',
-        alignItems: 'center',
-        gap:        '10px',
-        flexWrap:   'wrap',
-    },
-    blockchainBadge: {
-        fontSize:     '11px',
-        fontWeight:   '700',
-        padding:      '3px 9px',
-        borderRadius: '20px',
-    },
-    blockchainInfo: {
-        fontSize: '11px',
-        color:    'var(--cor-texto-3)',
-    },
-
-    // Botões de ação depósito/saque
-    botoesAcao: {
-        display:             'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap:                 '10px',
-    },
-
-    botaoAcao: {
-        display:       'flex',
-        flexDirection: 'column',
-        alignItems:    'center',
-        gap:           '4px',
-        padding:       '14px',
-        borderRadius:  '10px',
-        cursor:        'pointer',
-        outline:       'none',
-        transition:    'all 0.18s',
-        fontFamily:    'inherit',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    // Formulário de depósito / saque
-    formCard: {
-        background:   'var(--cor-superficie)',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '12px',
-        padding:      '16px',
-        display:      'flex',
-        flexDirection:'column',
-        gap:          '12px',
-    },
-
-    formTitulo: {
-        fontSize:   '14px',
-        fontWeight: '700',
-        color:      'var(--cor-texto)',
-        margin:     0,
-    },
-
-    formDica: {
-        fontSize:  '11px',
-        color:     'var(--cor-texto-3)',
-        margin:    0,
-    },
-
-    inputGroup: {
-        display:    'flex',
-        alignItems: 'center',
-        background: 'var(--cor-superficie)',
-        border:     '1px solid var(--cor-linha)',
-        borderRadius:'8px',
-        overflow:   'hidden',
-    },
-
-    inputPrefix: {
-        padding:    '0 12px',
-        fontSize:   '13px',
-        fontWeight: '700',
-        color:      'var(--cor-destaque-texto)',
-        background: 'var(--cor-destaque-suave)',
-        borderRight:'1px solid var(--cor-linha)',
-        alignSelf:  'stretch',
-        display:    'flex',
-        alignItems: 'center',
-    },
-
-    input: {
-        flex:        1,
-        padding:     '12px',
-        background:  'transparent',
-        border:      'none',
-        outline:     'none',
-        color:       'var(--cor-texto)',
-        fontSize:    '16px',
-        fontWeight:  '600',
-        fontFamily:  'inherit',
-    },
-
-    erroTexto: {
-        fontSize:  '12px',
-        color:     'var(--cor-perigo-texto)',
-        margin:    0,
-    },
-
-    btnTudo: {
-        background:   'transparent',
-        border:       '1px solid var(--cor-destaque-linha)',
-        borderRadius: '6px',
-        color:        'var(--cor-destaque-texto)',
-        fontSize:     '11px',
-        padding:      '6px 10px',
-        cursor:       'pointer',
-        fontFamily:   'inherit',
-        alignSelf:    'flex-start',
-    },
-
-    // Preview de cálculo
-    preview: {
-        background:   'var(--cor-superficie)',
-        border:       '1px solid var(--cor-superficie)',
-        borderRadius: '8px',
-        padding:      '12px',
-        display:      'flex',
-        flexDirection:'column',
-        gap:          '8px',
-    },
-
-    linhaPreview: {
-        display:        'flex',
-        justifyContent: 'space-between',
-        alignItems:     'center',
-    },
-
-    previewDivisor: {
-        height:     '1px',
-        background: 'var(--cor-superficie)',
-    },
-
-    labelMetodo: {
-        fontSize:      '11px',
-        color:         'var(--cor-texto-3)',
-        margin:        0,
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-    },
-
-    metodos: {
-        display:             'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap:                 '8px',
-    },
-
-    metodoPag: {
-        display:       'flex',
-        flexDirection: 'column',
-        alignItems:    'center',
-        gap:           '4px',
-        padding:       '10px',
-        borderRadius:  '8px',
-        cursor:        'pointer',
-        outline:       'none',
-        fontFamily:    'inherit',
-        transition:    'all 0.15s',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    badgePix: {
-        fontSize:     '9px',
-        background:   'var(--cor-positivo-suave)',
-        color:        'var(--cor-positivo-texto)',
-        padding:      '1px 5px',
-        borderRadius: '4px',
-        fontWeight:   '600',
-    },
-
-    btnConfirmar: {
-        width:        '100%',
-        padding:      '13px',
-        border:       'none',
-        borderRadius: '10px',
-        fontSize:     '14px',
-        fontWeight:   '600',
-        transition:   'opacity 0.2s',
-        fontFamily:   'inherit',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    // PIX QR Code panel
-    pixCard: {
-        background:    'var(--cor-superficie)',
-        border:        '1px solid var(--cor-positivo)',
-        borderRadius:  '14px',
-        padding:       '16px',
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '12px',
-    },
-
-    pixHeader: {
-        display:    'flex',
-        alignItems: 'center',
-        gap:        '10px',
-    },
-
-    pixTitulo: {
-        fontSize:   '14px',
-        fontWeight: '700',
-        color:      'var(--cor-positivo-texto)',
-        margin:     0,
-    },
-
-    pixSub: {
-        fontSize: '11px',
-        color:    'var(--cor-texto-3)',
-        margin:   '2px 0 0',
-    },
-
-    pixFechar: {
-        marginLeft:   'auto',
-        background:   'transparent',
-        border:       'none',
-        color:        'var(--cor-texto-3)',
-        fontSize:     '20px',
-        cursor:       'pointer',
-        lineHeight:   1,
-        padding:      '0 4px',
-    },
-
-    pixResumo: {
-        textAlign: 'center',
-    },
-
-    qrWrap: {
-        display:        'flex',
-        justifyContent: 'center',
-    },
-
-    qrImg: {
-        width:        '180px',
-        height:       '180px',
-        borderRadius: '8px',
-        border:       '3px solid var(--cor-linha)',
-    },
-
-    pixCopiaWrap: {
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '8px',
-    },
-
-    pixCodigoTexto: {
-        fontSize:     '9px',
-        color:        'var(--cor-texto-3)',
-        background:   'var(--cor-superficie)',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '6px',
-        padding:      '8px',
-        wordBreak:    'break-all',
-        margin:       0,
-        lineHeight:   1.5,
-        maxHeight:    '60px',
-        overflowY:    'auto',
-    },
-
-    pixBtnCopiar: {
-        padding:      '10px',
-        borderRadius: '8px',
-        fontSize:     '13px',
-        fontWeight:   '600',
-        cursor:       'pointer',
-        fontFamily:   'inherit',
-        transition:   'all 0.2s',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    pixAviso: {
-        fontSize:   '11px',
-        color:      'var(--cor-texto-3)',
-        textAlign:  'center',
-        margin:     0,
-    },
-};
