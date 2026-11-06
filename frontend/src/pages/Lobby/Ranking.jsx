@@ -12,7 +12,8 @@
 
    PROPS:
      ranking → array de jogadores ordenado pelo servidor
-               [ { uid, nome, avatar, saldo, rankPontos, posicao } ]
+               [ { uid, nome, avatar, fichasLiquidas, vitorias, posicao } ]
+               (saldo/rankPontos também aceitos, usados nos dados de exemplo)
      meuUid  → string: uid do jogador logado (para destacar)
 ================================================================ */
 
@@ -34,6 +35,8 @@ function medalha(posicao) {
 // Formata número grande de forma compacta
 // Ex: 12500 → "12,5K", 1200000 → "1,2M"
 function fmtCompacto(n) {
+    n = Number(n);
+    if (!Number.isFinite(n)) return '0';
     if (n >= 1000000) return (n / 1000000).toFixed(1).replace('.', ',') + 'M';
     if (n >= 1000)    return (n / 1000).toFixed(1).replace('.', ',') + 'K';
     return String(n);
@@ -65,7 +68,14 @@ export default function Ranking({ ranking = [], meuUid }) {
     const [categoria, setCategoria] = useState('saldo');
 
     // Usa dados de exemplo se o ranking vier vazio
-    const dados = ranking.length > 0 ? ranking : RANKING_EXEMPLO;
+    // O servidor (GET /ranking → buscarRanking) manda `fichasLiquidas` e
+    // `vitorias`; os dados de exemplo usam `saldo` e `rankPontos`. Normaliza
+    // para os nomes que o componente usa, com fallback para 0 (nunca undefined).
+    const dados = (ranking.length > 0 ? ranking : RANKING_EXEMPLO).map(j => ({
+        ...j,
+        saldo:      j.fichasLiquidas ?? j.saldo ?? 0,
+        rankPontos: j.vitorias       ?? j.rankPontos ?? 0,
+    }));
 
     // Ordena conforme a categoria selecionada
     const dadosOrdenados = [...dados].sort((a, b) =>
