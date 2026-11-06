@@ -112,7 +112,10 @@ export class GameManager {
             jogadoresFiltrados[uid] = {
                 ...jogador,
                 avatar,
-                cartas: (uid === meuUid || mesa.fase === 'SHOWDOWN')
+                // Só abre as cartas num showdown de verdade: em vitória por
+                // W.O. ninguém precisa mostrar a mão (revelar entrega o blefe).
+                cartas: (uid === meuUid
+                        || (mesa.fase === 'SHOWDOWN' && mesa.resultadoMao?.tipo === 'showdown'))
                     ? jogador.cartas
                     : jogador.cartas.map(() => 'XX'),
             };
