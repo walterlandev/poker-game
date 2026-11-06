@@ -722,7 +722,14 @@ export class GameManager {
         else if (acao === 'RAISE') {
             const aumentoReal = valorTotal - jaApostou;
 
-            if (jogador.saldo >= aumentoReal) {
+            // Estritamente maior: apostar o stack inteiro (é o que o botão
+            // All-in manda: RAISE saldo + apostaRodada) é ALL-IN, não raise
+            // comum. Com >=, o jogador ficava com saldo 0 mas status 'ativo'
+            // — recebia a vez e o relógio nas ruas seguintes (podia "dar
+            // all-in de novo", e levava fold automático por tempo, perdendo
+            // o pote) — e um all-in curto reabria a ação e encolhia o raise
+            // mínimo. O ramo abaixo já trata completo × incompleto.
+            if (jogador.saldo > aumentoReal) {
                 // Raise completo
                 const salto          = valorTotal - apostaMesa;
                 valorInvestido       = aumentoReal;
