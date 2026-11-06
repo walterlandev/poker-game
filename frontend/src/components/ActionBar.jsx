@@ -25,7 +25,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 //                    de aposta (leva o slider ao máximo); o botão All-in
 //                    de ação direta continua existindo.
 const ACAO_NO_CLIQUE    = true;
-const ALLIN_NOS_ATALHOS = false;
+const ALLIN_NOS_ATALHOS = true;
 const EVENTO_ACAO       = ACAO_NO_CLIQUE ? 'onClick' : 'onPointerDown';
 
 const ROTULO_ATALHO = { Min: 'Mín', '½': '½ pote', '⅔': '⅔ pote', Pote: 'Pote' };
