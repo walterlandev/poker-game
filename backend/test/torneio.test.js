@@ -9,12 +9,50 @@ const TIMERS = { apis: ['setTimeout', 'setInterval'] };
 function montarTorneio(nJogadores, config = {}) {
     const io = criarIoFalso();
     const gm = new GameManager(io);
-    const tm = new TournamentManager(io, gm);
+    // Crédito espionado: registra em vez de ir ao Firestore
+    const creditos = [];
+    const tm = new TournamentManager(io, gm, {
+        creditarSaidaMesa: async (uid, valor, origemBonus = 0) => { creditos.push({ uid, valor, origemBonus }); },
+        buscarSaldo:       async () => ({}),
+    });
     gm.setTournamentManager(tm);
     const { torneioId } = tm.criarTorneio({ buyIn: 100, ...config }, { uid: 'p0', nome: 'p0' });
     for (let i = 1; i < nJogadores; i++) tm.entrarTorneio(torneioId, { uid: `p${i}`, nome: `p${i}` });
-    return { io, gm, tm, torneioId, torneio: tm.getTorneio(torneioId) };
+    return { io, gm, tm, torneioId, torneio: tm.getTorneio(torneioId), creditos };
 }
+
+/** Saída igual à do server.js (processarSaidaMesa): sairMesa + abandonarMesa. */
+function sair(gm, tm, torneioId, mesaId, uid) {
+    gm.sairMesa(mesaId, uid);
+    tm.abandonarMesa(torneioId, uid);
+}
+
+test('todos saem de uma mesa de torneio: mesa fecha sem vencedor e o vencedor da outra é campeão', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { gm, tm, torneioId, torneio, creditos } = montarTorneio(4, { jogadoresPorMesa: 2, maxRebuys: 0 });
+    tm.iniciarTorneio(torneioId, 'p0');
+    const [m0, m1] = torneio.rodadas[0].mesas;
+    for (const uid of m0.jogadores) sair(gm, tm, torneioId, m0.mesaId, uid);
+    tm.notificarVencedorMesa(torneioId, m1.mesaId, m1.jogadores[0]);
+    for (let i = 0; i < 10; i++) await new Promise(r => setImmediate(r));
+    assert.equal(torneio.status, 'finalizado');
+    assert.equal(torneio.campeao, m1.jogadores[0]);
+    assert.deepEqual(creditos, [{ uid: m1.jogadores[0], valor: 400, origemBonus: 0 }]);
+});
+
+test('todos saem de todas as mesas: torneio encerra e devolve cada entrada paga (nada se perde)', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { gm, tm, torneioId, torneio, creditos } = montarTorneio(2, { maxRebuys: 0 });
+    tm.iniciarTorneio(torneioId, 'p0');
+    const m0 = torneio.rodadas[0].mesas[0];
+    for (const uid of m0.jogadores) sair(gm, tm, torneioId, m0.mesaId, uid);
+    for (let i = 0; i < 10; i++) await new Promise(r => setImmediate(r));
+    assert.equal(torneio.status, 'finalizado');
+    assert.equal(torneio.campeao, null);
+    const devolvido = creditos.reduce((s, c) => s + c.valor, 0);
+    assert.equal(devolvido, torneio.premioTotal);
+    assert.deepEqual(creditos.map(c => c.uid).sort(), ['p0', 'p1']);
+});
 
 test('nenhuma mesa de torneio é criada com um jogador só', (t) => {
     t.mock.timers.enable(TIMERS);

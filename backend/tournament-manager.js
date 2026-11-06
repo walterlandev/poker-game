@@ -26,10 +26,13 @@ import { creditarSaidaMesa, buscarSaldo } from './firebase-admin.js';
 
 export class TournamentManager {
 
-    constructor(io, gameManager) {
+    // deps: só para os testes espionarem o crédito; em produção usa o Firestore.
+    constructor(io, gameManager, deps = {}) {
         this.io          = io;
         this.gameManager = gameManager;
         this.torneios    = new Map();
+        this.creditar    = deps.creditarSaidaMesa || creditarSaidaMesa;
+        this.buscarSaldo = deps.buscarSaldo       || buscarSaldo;
     }
 
 
@@ -268,6 +271,26 @@ export class TournamentManager {
         this.emitirEstadoTorneio(torneioId);
     }
 
+    /**
+     * Todos os jogadores de uma mesa saíram (o GameManager apagou a mesa):
+     * ela fecha sem vencedor e a rodada segue com as outras mesas. Antes
+     * ninguém avisava o torneio, a mesa nunca tinha vencedor e o torneio
+     * ficava em andamento para sempre, com o prêmio preso.
+     */
+    encerrarMesaSemVencedor(torneioId, mesaId) {
+        const torneio = this.torneios.get(torneioId);
+        if (!torneio || torneio.status !== 'em_andamento') return;
+        const mesaInfo = torneio.rodadas[torneio.rodadaAtual]?.mesas.find(m => m.mesaId === mesaId);
+        if (!mesaInfo || mesaInfo.vencedor || mesaInfo.semVencedor) return;
+
+        mesaInfo.semVencedor = true;
+        mesaInfo.jogadores.forEach(uid => {
+            const j = torneio.jogadores[uid];
+            if (j && j.status === 'jogando') j.status = 'eliminado';
+        });
+        this._verificarRodadaCompleta(torneioId);
+    }
+
 
     // ================================================================
     // VERIFICAR SE A RODADA TERMINOU
@@ -280,7 +303,7 @@ export class TournamentManager {
         const rodada = torneio.rodadas[torneio.rodadaAtual];
         if (!rodada) return;
 
-        const todasTerminadas = rodada.mesas.every(m => m.vencedor !== null);
+        const todasTerminadas = rodada.mesas.every(m => m.vencedor !== null || m.semVencedor);
         if (!todasTerminadas) {
             this.emitirEstadoTorneio(torneioId);
             return;
@@ -341,13 +364,26 @@ export class TournamentManager {
             // Winner-take-all: o campeão leva o prêmio inteiro (soma de
             // todas as entradas + rebuys) creditado direto no saldo real.
             if (campeaoUid && torneio.premioTotal > 0) {
-                await creditarSaidaMesa(campeaoUid, torneio.premioTotal);
+                await this.creditar(campeaoUid, torneio.premioTotal);
                 this.io.to(`torneio:${torneioId}`).emit('torneio:premio_creditado', {
                     torneioId,
                     campeaoUid,
                     premio: torneio.premioTotal,
                 });
                 await this._notificarSaldoJogador(campeaoUid);
+            } else if (!campeaoUid && torneio.premioTotal > 0) {
+                // Ninguém sobrou (todos abandonaram as mesas): sem campeão,
+                // o prêmio não pode simplesmente sumir — cada um recebe de
+                // volta o que pagou (entrada + rebuys), somando premioTotal.
+                for (const j of Object.values(torneio.jogadores)) {
+                    const pago = torneio.buyIn * (1 + (j.rebuys || 0));
+                    await this.creditar(j.uid, pago);
+                    await this._notificarSaldoJogador(j.uid);
+                }
+                this.io.to(`torneio:${torneioId}`).emit('torneio:cancelado_sem_jogadores', {
+                    torneioId,
+                    mensagem: 'Torneio encerrado: todos os jogadores saíram. As entradas foram devolvidas.',
+                });
             }
 
             console.log(`🏆 Torneio ${torneioId} finalizado! Campeão: ${torneio.jogadores[campeaoUid]?.nome} — prêmio ₿C ${torneio.premioTotal}`);
@@ -489,7 +525,7 @@ export class TournamentManager {
     // depois de um refresh.
     async _notificarSaldoJogador(uid) {
         try {
-            const saldos = await buscarSaldo(uid);
+            const saldos = await this.buscarSaldo(uid);
             for (const [, s] of this.io.sockets.sockets) {
                 if (s.data.uid === uid) {
                     s.emit('wallet:saldo_atualizado', {

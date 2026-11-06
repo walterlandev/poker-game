@@ -311,6 +311,10 @@ export class GameManager {
             this._limparTimers(mesaId);
             mesas.delete(mesaId);
             this.io.emit('mesas_atualizadas');
+            // Mesa de torneio esvaziada: fecha sem vencedor para o torneio seguir.
+            if (mesa.torneioId && this.tournamentManager) {
+                this.tournamentManager.encerrarMesaSemVencedor(mesa.torneioId, mesaId);
+            }
             return;
         }
 
