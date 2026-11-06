@@ -2,22 +2,64 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Jogadores: lê e escreve apenas o próprio perfil
-    match /jogadores/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    function ehDono(uid) {
+      return request.auth != null && request.auth.uid == uid;
     }
 
-    // Ranking: leitura pública (leaderboard), escrita só do próprio usuário
+    function textoCurto(valor, max) {
+      return valor is string && valor.size() <= max;
+    }
+
+    function mudou() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // Jogadores: o dono lê o próprio perfil. Saldo, bônus, admin, PIN,
+    // limites de saque, temas e dados bancários só o servidor altera
+    // (Admin SDK, que não passa por estas regras).
+    match /jogadores/{uid} {
+      allow read: if ehDono(uid);
+
+      // Cadastro: perfil novo, só com os campos e valores iniciais zerados.
+      allow create: if ehDono(uid)
+        && request.resource.data.keys().hasOnly([
+             'uid', 'nome', 'email', 'avatar', 'saldo', 'saldoBonus',
+             'sacadoHoje', 'bonusResgatado', 'rankPontos', 'tema',
+             'temasComprados', 'criadoEm'])
+        && request.resource.data.uid == uid
+        && textoCurto(request.resource.data.nome, 60)
+        && request.resource.data.saldo == 0
+        && request.resource.data.saldoBonus == 0
+        && request.resource.data.sacadoHoje == 0
+        && request.resource.data.bonusResgatado == false
+        && request.resource.data.rankPontos == 0
+        && request.resource.data.tema == 'classico'
+        && request.resource.data.temasComprados.size() == 0;
+
+      // Edição pelo próprio jogador: só dados de perfil. O tamanho só é
+      // checado no campo que muda (perfis antigos guardam avatar em base64
+      // enorme e precisam continuar podendo editar o nome).
+      allow update: if ehDono(uid)
+        && mudou().hasOnly(['nome', 'avatar', 'telefone', 'email'])
+        && (!('nome' in mudou())     || textoCurto(request.resource.data.nome, 60))
+        && (!('avatar' in mudou())   || textoCurto(request.resource.data.avatar, 500))
+        && (!('telefone' in mudou()) || textoCurto(request.resource.data.telefone, 30))
+        && (!('email' in mudou())    || textoCurto(request.resource.data.email, 120));
+
+      allow delete: if false;
+    }
+
+    // Ranking: leitura pública (leaderboard); só o servidor escreve.
     match /ranking/{uid} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
     }
 
-    // Transações: só o dono pode ler
+    // Transações: só o dono lê; só o servidor escreve.
     match /transacoes/{txId} {
       allow read: if request.auth != null
                   && request.auth.uid == resource.data.uid;
-      allow write: if false; // apenas o backend escreve via Admin SDK
+      allow write: if false;
     }
 
   }

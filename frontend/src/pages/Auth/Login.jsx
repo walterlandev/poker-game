@@ -72,16 +72,23 @@ async function buscarOuCriarPerfil(userFirebase) {
         return { uid: userFirebase.uid, ...snap.data() };
     }
 
-    // Primeiro acesso — cria o perfil
+    // Primeiro acesso — cria o perfil igual ao do Cadastro, com tudo
+    // zerado. O bônus de boas-vindas é resgatado depois na Carteira
+    // (wallet:resgatar_bonus). As regras do Firestore recusam perfil novo
+    // com saldo diferente de zero.
     const novoPerfil = {
-        uid:        userFirebase.uid,
-        nome:       userFirebase.displayName || 'Jogador',
-        email:      userFirebase.email,
-        avatar:     userFirebase.photoURL || '',
-        saldo:      2000,       // ₿C iniciais de boas-vindas
-        rankPontos: 0,
-        tema:       'classico',
-        criadoEm:   new Date().toISOString(),
+        uid:            userFirebase.uid,
+        nome:           userFirebase.displayName || 'Jogador',
+        email:          userFirebase.email,
+        avatar:         userFirebase.photoURL || '',
+        saldo:          0,
+        saldoBonus:     0,
+        sacadoHoje:     0,
+        bonusResgatado: false,
+        rankPontos:     0,
+        tema:           'classico',
+        temasComprados: [],
+        criadoEm:       new Date().toISOString(),
     };
 
     await setDoc(ref, novoPerfil);

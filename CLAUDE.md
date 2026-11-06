@@ -1,6 +1,8 @@
 # Poker Game (₿C Bitchager) — guia pra qualquer sessão nova do Claude Code
 
-Leia isto ANTES de mexer em qualquer coisa. Se precisar de mais detalhe,
+Leia isto ANTES de mexer em qualquer coisa. Para situar-se rápido (estado
+atual, linha do tempo, pendências) leia `.claude/RESUMO_PROJETO.md` — é curto
+e economiza tokens. Só se precisar de mais detalhe,
 o relatório completo está em `.claude/RELATORIO_PROJETO.txt` (arquitetura,
 como cada parte deveria funcionar, histórico completo do que já foi feito,
 e pendências conhecidas). Mantenha os dois arquivos atualizados quando
