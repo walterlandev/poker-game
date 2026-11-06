@@ -72,6 +72,7 @@ export class GameManager {
         this.io                = io;
         this.timers            = new Map();
         this.tournamentManager = null;  // setado após criação via setTournamentManager()
+        this.salvarResultado   = salvarResultadoRodada;  // trocável nos testes
     }
 
     setTournamentManager(tm) {
@@ -182,6 +183,10 @@ export class GameManager {
             ultimaAcaoDescritiva: 'Mesa criada. Aguardando jogadores.',
             ordem:                [usuario.uid],
             senha:                config.senha ? String(config.senha) : null,
+            // Mesa de TREINO (com bots): fichas sem valor, nada é debitado nem
+            // creditado. Decidido pelo servidor (servico-mesas.js, pelo número
+            // de bots) — nunca pelo cliente — e não muda depois.
+            treino:               config.treino === true,
             contribuicoesEncerradas: [],
             jogadores: {
                 [usuario.uid]: this._criarJogador(usuario, config.buyIn || 1000, 'humano'),
@@ -370,7 +375,12 @@ export class GameManager {
 
     adicionarBot(mesaId, rankPontosJogador = 0) {
         const mesa = mesas.get(mesaId);
-        if (!mesa || Object.keys(mesa.jogadores).length >= 9) return;
+        if (!mesa) return { sucesso: false, erro: 'Mesa não encontrada.' };
+        // Bot só em mesa de treino: os bots recompram fichas do nada, então
+        // numa mesa com dinheiro real quem ganhasse deles sacaria ₿C criado
+        // por eles. Mesa de torneio nunca é de treino.
+        if (!mesa.treino) return { sucesso: false, erro: 'Bots só jogam em mesa de treino (fichas sem valor). Crie uma mesa com bots para treinar.' };
+        if (Object.keys(mesa.jogadores).length >= 9) return { sucesso: false, erro: 'Mesa cheia.' };
 
         const index = Object.keys(mesa.jogadores).length;
         const bot   = BotManager.gerarBot(index, mesa.valorBuyIn, rankPontosJogador);
@@ -396,6 +406,7 @@ export class GameManager {
         // (aba Mesas) ficava desatualizado até algum outro evento disparar
         // — alguém podia tentar entrar numa mesa que só "parecia" ter vaga.
         this.io.emit('mesas_atualizadas');
+        return { sucesso: true };
     }
 
     _criarJogador(usuario, buyIn, tipo) {
@@ -685,6 +696,7 @@ export class GameManager {
                 saldo:       jogador.saldo,
                 origemBonus: jogador.origemBonus || 0,
                 torneioId:   mesa.torneioId || null,
+                treino:      !!mesa.treino,
             });
             // sairMesa já trata a saída no meio de uma mão como desistência
             // (fold) e resolve corretamente quem age em seguida — setar
@@ -1206,7 +1218,8 @@ export class GameManager {
             fichasPerdidas: premiados[uid]  ? 0 : mesa.valorBuyIn,
             venceu:         !!premiados[uid],
         }));
-        salvarResultadoRodada(resultados);
+        // Mesa de treino não conta para ranking/estatística.
+        if (!mesa.treino) this.salvarResultado(resultados);
     }
 
     /**
@@ -1356,7 +1369,7 @@ export class GameManager {
             this._agendarProximaRodada(mesaId);
         }
 
-        salvarResultadoRodada([{
+        if (!mesa.treino) this.salvarResultado([{
             uid:            vencedorUid,
             nome:           j.nome,
             avatar:         j.avatar || '',
@@ -1506,6 +1519,7 @@ export class GameManager {
             jogadores:            {},
             torneioId,              // ← liga ao torneio
             senha:                null,
+            treino:               false,
             contribuicoesEncerradas: [],
         };
 

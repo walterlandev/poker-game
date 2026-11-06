@@ -150,3 +150,99 @@ test('duplo "Entrar no torneio" debita uma vez só', async (t) => {
     assert.equal(liquido(debitos, creditos, 'x'), 100);
     assert.equal(tm.getTorneio(torneioId).premioTotal, 200);
 });
+
+// ── #19: mesa com bots = mesa de TREINO (fichas sem valor) ──────────
+/** criarMesa espera 300 ms entre bots: avança o relógio falso até terminar. */
+async function criarComBots(t, servico, socket, config) {
+    const p = servico.criarMesa(socket, config);
+    let pronto = false, id;
+    p.then(v => { pronto = true; id = v; });
+    for (let i = 0; i < 200 && !pronto; i++) { await tick(); t.mock.timers.tick(100); }
+    return id;
+}
+
+test('treino: mesa com bots é criada sem débito e marcada treino (e o cliente não decide isso)', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { servico, gm, debitos } = montar();
+    const mesaId = await criarComBots(t, servico, sock('a'), { buyIn: 700, qtdBots: 2 });
+    const mesa = gm.getMesa(mesaId);
+    assert.equal(mesa.treino, true);
+    assert.equal(Object.keys(mesa.jogadores).length, 3);
+    assert.equal(mesa.jogadores.a.saldo, 700);           // mesmo stack, só como fichas
+    assert.equal(debitos.length, 0);
+    assert.equal(gm.filtrarEstadoParaJogador(mesa, 'a').treino, true);
+
+    const real = await servico.criarMesa(sock('b'), { buyIn: 500, qtdBots: 0, treino: true });
+    assert.equal(gm.getMesa(real).treino, false);        // treino vindo do cliente é ignorado
+    assert.equal(debitos.length, 1);
+});
+
+test('treino: entrar, rebuy, sair (inclusive no meio da mão) e desconectar não mexem no saldo', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { servico, gm, debitos, creditos } = montar();
+    const a = sock('a'), b = sock('b');
+    const mesaId = await criarComBots(t, servico, a, { buyIn: 500, qtdBots: 1 });
+    await servico.entrarMesa(b, { mesaId });
+    const mesa = gm.getMesa(mesaId);
+    mesa.jogadores.b.saldo = 0;
+    await servico.rebuy(b, { valor: 500 });
+    assert.equal(mesa.jogadores.b.saldo, 500);
+    gm.iniciarRodada(mesaId);
+    assert.equal(mesa.fase, 'PRE-FLOP');
+    await servico.sairMesa(b, 'voluntária');              // no meio da mão
+    await servico.sairMesa(a, 'desconexão');
+    assert.deepEqual(debitos, []);
+    assert.deepEqual(creditos, []);
+});
+
+test('treino: remoção por inatividade não credita nada', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { servico, gm, creditos } = montar();
+    const a = sock('a'), b = sock('b');
+    const mesaId = await criarComBots(t, servico, a, { buyIn: 500, qtdBots: 1 });
+    await servico.entrarMesa(b, { mesaId });
+    const mesa = gm.getMesa(mesaId);
+    gm.iniciarRodada(mesaId);
+    for (const j of Object.values(mesa.jogadores)) j.faltasSeguidas = 2;
+    avancar(t, 46_000, 1000);
+    await tick();
+    assert.ok(Object.values(mesa.jogadores).filter(j => j.tipo === 'humano').length < 2);
+    assert.deepEqual(creditos, []);
+});
+
+test('treino: mão de treino não grava ranking/estatística; mesa real grava', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { servico, gm } = montar();
+    const gravados = [];
+    gm.salvarResultado = (r) => gravados.push(r);
+    const treinoId = await criarComBots(t, servico, sock('a'), { buyIn: 500, qtdBots: 1 });
+    gm.iniciarRodada(treinoId);
+    const mt = gm.getMesa(treinoId);
+    gm.processarAcao(treinoId, mt.turno, 'FOLD', 0, 'x');
+    assert.equal(mt.fase, 'SHOWDOWN');
+    assert.equal(gravados.length, 0);
+
+    const realId = await servico.criarMesa(sock('r1'), { buyIn: 500 });
+    await servico.entrarMesa(sock('r2'), { mesaId: realId });
+    gm.iniciarRodada(realId);
+    const mr = gm.getMesa(realId);
+    gm.processarAcao(realId, mr.turno, 'FOLD', 0, 'x');
+    assert.equal(gravados.length, 1);
+});
+
+test('bot não entra em mesa real nem em mesa de torneio', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { servico, gm, tm } = montar();
+    const realId = await servico.criarMesa(sock('a'), { buyIn: 500 });
+    const r = gm.adicionarBot(realId, 0);
+    assert.equal(r?.sucesso, false);
+    assert.equal(Object.keys(gm.getMesa(realId).jogadores).length, 1);
+    assert.equal(gm.getMesa(realId).treino, false);
+
+    const { torneioId } = tm.criarTorneio({ buyIn: 100 }, { uid: 't0', nome: 't0' });
+    tm.entrarTorneio(torneioId, { uid: 't1', nome: 't1' });
+    tm.iniciarTorneio(torneioId, 't0');
+    const mesaT = tm.getTorneio(torneioId).rodadas[0].mesas[0].mesaId;
+    assert.equal(gm.adicionarBot(mesaT, 0)?.sucesso, false);
+    assert.ok(Object.values(gm.getMesa(mesaT).jogadores).every(j => j.tipo === 'humano'));
+});

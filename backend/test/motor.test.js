@@ -266,7 +266,7 @@ test('remoção por inatividade (3ª falta) avisa o servidor com as fichas a dev
     mesa.jogadores.h0.origemBonus    = 300;
     avancar(t, 45_500);
     assert.equal(mesa.jogadores.h0, undefined);
-    assert.deepEqual(removidos, [{ mesaId, uid: 'h0', saldo: 1000, origemBonus: 300, torneioId: null }]);
+    assert.deepEqual(removidos, [{ mesaId, uid: 'h0', saldo: 1000, origemBonus: 300, torneioId: null, treino: false }]);
 });
 
 test('id de mesa repetido não sobrescreve uma mesa existente', (t) => {

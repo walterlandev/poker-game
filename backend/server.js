@@ -142,6 +142,7 @@ app.get('/mesas', (req, res) => {
             bigBlind:     m.bigBlind,
             buyIn:        m.valorBuyIn,
             temSenha:     !!m.senha,
+            treino:       !!m.treino,   // mesa com bots: fichas sem valor
         }));
     res.json({ mesas });
 });
@@ -379,7 +380,8 @@ io.on('connection', (socket) => {
         const mesa = gameManager.getMesa(mesaId);
         if (!mesa || mesa.host !== socket.data.uid) return;
 
-        gameManager.adicionarBot(mesaId, dados?.rankPontos || 0);
+        const r = gameManager.adicionarBot(mesaId, dados?.rankPontos || 0);
+        if (r && !r.sucesso) socket.emit('erro', { mensagem: r.erro });
     });
 
 

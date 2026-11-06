@@ -43,11 +43,23 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         const buyIn = config.buyIn || 1000;
         if (mesaOndeEstaSentado(uid)) { socket.emit('erro', { mensagem: MSG.OUTRA_MESA }); return; }
 
-        // debitarEntradaMesa valida e normaliza o valor (nunca confiar num
-        // buyIn negativo/inválido vindo do cliente); a mesa usa o valor que
-        // ele realmente processou (fichasDebitadas).
-        const debito = await debitar(uid, buyIn);
-        if (!debito.sucesso) { socket.emit('erro', { mensagem: debito.erro }); return; }
+        // Mesa de TREINO = criada com 1+ bot. Decidido aqui, pelo número de
+        // bots — config.treino do cliente é ignorado. Fichas sem valor: nada
+        // é debitado (nem creditado na saída); o buy-in vira só o stack.
+        const qtdBots = Math.max(0, Math.min(8, Math.floor(Number(config.qtdBots)) || 0));
+        const treino  = qtdBots > 0;
+
+        let debito;
+        if (treino) {
+            const n = Math.floor(Number(buyIn));
+            debito = { sucesso: true, fichasDebitadas: Number.isFinite(n) && n > 0 ? n : 1000, debitarBonus: 0 };
+        } else {
+            // debitarEntradaMesa valida e normaliza o valor (nunca confiar num
+            // buyIn negativo/inválido vindo do cliente); a mesa usa o valor que
+            // ele realmente processou (fichasDebitadas).
+            debito = await debitar(uid, buyIn);
+            if (!debito.sucesso) { socket.emit('erro', { mensagem: debito.erro }); return; }
+        }
 
         const usuario = {
             uid,
@@ -59,9 +71,9 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
             // bônus do que entrou de fato quando ele sair.
             origemBonus: debito.debitarBonus || 0,
         };
-        const resultado = gameManager.criarMesa({ ...config, buyIn: debito.fichasDebitadas }, usuario);
+        const resultado = gameManager.criarMesa({ ...config, treino, buyIn: debito.fichasDebitadas }, usuario);
         if (!resultado.sucesso) {
-            await creditar(uid, debito.fichasDebitadas, debito.debitarBonus);
+            if (!treino) await creditar(uid, debito.fichasDebitadas, debito.debitarBonus);
             socket.emit('erro', { mensagem: resultado.erro });
             return;
         }
@@ -71,15 +83,13 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         socket.data.mesaId = mesaId;
         socketMesa.set(socket.id, mesaId);
 
-        if (config.qtdBots > 0) {
-            for (let i = 0; i < config.qtdBots; i++) {
-                await new Promise(r => setTimeout(r, 300));
-                gameManager.adicionarBot(mesaId, usuario.rankPontos || 0);
-            }
+        for (let i = 0; i < qtdBots; i++) {
+            await new Promise(r => setTimeout(r, 300));
+            gameManager.adicionarBot(mesaId, usuario.rankPontos || 0);
         }
 
         socket.emit('mesa_criada', { mesaId });
-        await emitirSaldo(socket, uid);
+        if (!treino) await emitirSaldo(socket, uid);
         console.log(`🃏 Mesa ${mesaId} criada por ${usuario.nome} (buy-in ₿C ${buyIn})`);
         return mesaId;
     }
@@ -96,7 +106,7 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         // Se jogador já está na mesa (reconexão), não debita novamente
         const jaEstaNaMesa = !!mesa.jogadores[uid];
         let debito = null;
-        if (!jaEstaNaMesa) {
+        if (!jaEstaNaMesa && !mesa.treino) {     // treino: fichas sem valor, sem débito
             debito = await debitar(uid, mesa.valorBuyIn);
             if (!debito.sucesso) { socket.emit('erro', { mensagem: debito.erro }); return; }
         }
@@ -129,18 +139,22 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         const valor = parseInt(dados?.valor) || 0;
         if (valor <= 0) { socket.emit('erro', { mensagem: 'Valor de rebuy inválido.' }); return; }
 
-        const debito = await debitar(uid, valor);
-        if (!debito.sucesso) { socket.emit('erro', { mensagem: debito.erro }); return; }
+        const treino = !!gameManager.getMesa(mesaId)?.treino;   // treino: sem débito
+        let debito = null;
+        if (!treino) {
+            debito = await debitar(uid, valor);
+            if (!debito.sucesso) { socket.emit('erro', { mensagem: debito.erro }); return; }
+        }
 
-        const resultado = gameManager.fazerRebuy(mesaId, uid, valor, debito.debitarBonus || 0);
+        const resultado = gameManager.fazerRebuy(mesaId, uid, valor, debito?.debitarBonus || 0);
         if (!resultado.sucesso) {
             // Devolve o débito se o rebuy falhou (ex: mão ativa, valor errado)
-            await creditar(uid, valor, debito.debitarBonus || 0);
+            if (debito) await creditar(uid, valor, debito.debitarBonus || 0);
             socket.emit('erro', { mensagem: resultado.erro });
             return;
         }
         socket.emit('rebuy_ok', { valor });
-        await emitirSaldo(socket, uid);
+        if (debito) await emitirSaldo(socket, uid);
     }
 
     async function entrarTorneio(socket, { torneioId } = {}) {
@@ -192,6 +206,7 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         const fichasRestantes = mesa?.jogadores?.[uid]?.saldo       || 0;
         const origemBonus     = mesa?.jogadores?.[uid]?.origemBonus || 0;
         const torneioId       = mesa?.torneioId || null;
+        const treino          = !!mesa?.treino;
 
         socket.leave(mesaId);
         socketMesa.delete(socket.id);
@@ -203,6 +218,10 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
             console.log(`🚪 ${socket.data.nome} abandonou mesa de torneio (${motivo}): ₿C ${fichasRestantes} de fichas forfeited.`);
             return;
         }
+        if (treino) {   // fichas de treino não valem nada fora da mesa
+            console.log(`🚪 ${socket.data.nome} saiu da mesa de treino (${motivo}).`);
+            return;
+        }
         if (fichasRestantes > 0) {
             await creditar(uid, fichasRestantes, origemBonus);
             await emitirSaldo(socket, uid);
@@ -211,8 +230,9 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
     }
 
     /** Remoção automática por inatividade (callback do GameManager). */
-    async function removidoPorInatividade({ uid, saldo, origemBonus, torneioId }) {
+    async function removidoPorInatividade({ uid, saldo, origemBonus, torneioId, treino }) {
         if (torneioId) { tournamentManager.abandonarMesa(torneioId, uid); return; }
+        if (treino) return;   // fichas de treino: nada a creditar
         if (saldo > 0) {
             await creditar(uid, saldo, origemBonus);
             for (const [, s] of io?.sockets?.sockets || []) {
