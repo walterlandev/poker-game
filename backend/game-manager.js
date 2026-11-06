@@ -497,6 +497,17 @@ export class GameManager {
         mesa.mensagemVitoria      = null;
         mesa.ultimaAcaoDescritiva = 'Nova rodada iniciada. Blinds apostados.';
 
+        // Blind que deixou o jogador all-in (ex.: heads-up com SB curto):
+        // quem sobra não tem contra quem apostar — a mão corre direto, sem
+        // dar a vez (e o relógio) a um jogador all-in.
+        if (this._ninguemMaisPrecisaAgir(mesa)) {
+            mesa.turno = null;
+            this.emitirEstado(mesaId);
+            setTimeout(() => this._avancarFase(mesaId), 1_500);
+            if (eraAguardando) this.io.emit('mesas_atualizadas');
+            return;
+        }
+
         // _gerenciarTurno primeiro: ele grava mesa.turnoExpiraEm (prazo real
         // do relógio) antes do estado ser transmitido, senão o primeiro
         // estado_mesa da mão sairia sem o prazo atualizado.
@@ -926,7 +937,12 @@ export class GameManager {
             mesa.ultimaAcaoDescritiva = `O ${novaFase} foi revelado.`;
         }
 
-        const primeiro = this._encontrarPrimeiroParaAgir(mesaId);
+        // Com no máximo um jogador ainda capaz de apostar, não há rodada de
+        // apostas: ele não tem contra quem apostar. Antes ele recebia a vez
+        // (e o relógio, e faltas por tempo) em cada rua até o showdown.
+        const primeiro = this._ninguemMaisPrecisaAgir(mesa)
+            ? null
+            : this._encontrarPrimeiroParaAgir(mesaId);
 
         if (!primeiro) {
             // Todos all-in → avança automaticamente. Ninguém tem a vez: sem
@@ -944,6 +960,21 @@ export class GameManager {
 
         this._gerenciarTurno(mesaId);
         this.emitirEstado(mesaId);
+    }
+
+    /**
+     * true quando nenhuma decisão de aposta resta: no máximo um jogador
+     * ainda pode apostar (tem cartas, não deu fold, não está all-in) e ele
+     * já cobre a maior aposta da rodada.
+     */
+    _ninguemMaisPrecisaAgir(mesa) {
+        const podemAgir = mesa.ordem
+            .map(uid => mesa.jogadores[uid])
+            .filter(j => j && j.cartas?.length > 0
+                && j.status !== 'fold' && j.status !== 'sitout' && j.status !== 'all-in');
+        if (podemAgir.length === 0) return true;
+        if (podemAgir.length > 1)   return false;
+        return (podemAgir[0].apostaRodada || 0) >= (mesa.maiorAposta || 0);
     }
 
     /**

@@ -107,12 +107,39 @@ test('fold com check disponível no pós-flop não trava a rodada num loop de ch
     assert.equal(mesa.fase, 'TURN', `rodada deveria fechar; turno ficou com ${mesa.turno}`);
 });
 
+test('jogador all-in não consegue agir durante o runout', (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { gm, mesaId, mesa } = montarMesa([1000, 1000]);
+    gm.iniciarRodada(mesaId);
+    agir(gm, mesaId, 'h0', 'RAISE', 1000);
+    agir(gm, mesaId, 'h1', 'CALL');
+    assert.equal(mesa.fase, 'FLOP');
+    agir(gm, mesaId, 'h1', 'CHECK');               // clique atrasado / repetido
+    assert.equal(mesa.fase, 'FLOP');
+    assert.equal(mesa.cartasComunitarias.length, 3);
+});
+
+test('com só um jogador com fichas, as ruas seguintes saem sem pedir ação a ninguém', (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { gm, mesaId, mesa } = montarMesa([1000, 500]);
+    gm.iniciarRodada(mesaId);
+    agir(gm, mesaId, 'h0', 'RAISE', 500);          // h0 ainda fica com 500
+    agir(gm, mesaId, 'h1', 'CALL');                // h1 paga all-in
+    assert.equal(mesa.jogadores.h1.status, 'all-in');
+    assert.equal(mesa.fase, 'FLOP');
+    assert.equal(mesa.turno, null, `ninguém pode apostar contra h0, mas a vez foi para ${mesa.turno}`);
+    avancar(t, 1500 * 3);
+    assert.equal(mesa.fase, 'SHOWDOWN');
+    assert.equal(totalFichas(mesa), 1500);
+});
+
 test('heads-up: SB que fica all-in só com o blind não recebe a vez', (t) => {
     t.mock.timers.enable(TIMERS);
     const { gm, mesaId, mesa } = montarMesa([5, 1000]);
     gm.iniciarRodada(mesaId);
     assert.equal(mesa.jogadores.h0.status, 'all-in');
     assert.notEqual(mesa.turno, 'h0');
+    assert.equal(mesa.turno, null, 'BB não tem contra quem apostar');
     avancar(t, 60_000);
     assert.equal(totalFichas(mesa), 1005);
 });
