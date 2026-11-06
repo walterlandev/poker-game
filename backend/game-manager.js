@@ -226,16 +226,18 @@ export class GameManager {
         let proximoUid          = null;
         let vencedorPorAbandono = null;
 
-        if (maoAtiva) {
-            // O dinheiro que ele já apostou nesta mão continua contando pro
-            // pote (side pots) — só a elegibilidade de ganhar se perde,
-            // igual um fold comum. Sem guardar isso antes de apagar o
-            // jogador, essa contribuição "sumia" do cálculo do pote.
-            if (jogador.apostaTotal > 0) {
-                mesa.contribuicoesEncerradas = mesa.contribuicoesEncerradas || [];
-                mesa.contribuicoesEncerradas.push({ apostaTotal: jogador.apostaTotal });
-            }
+        // O dinheiro que ele já apostou nesta mão continua contando pro
+        // pote (side pots) — só a elegibilidade de ganhar se perde, igual
+        // um fold comum. Vale também para quem JÁ tinha dado fold antes de
+        // sair (sem cartas, maoAtiva falso): sem isso a aposta dele sumia
+        // das faixas do side pot e a diferença caía inteira no último pote.
+        const maoEmAndamento = mesa.fase !== 'AGUARDANDO' && mesa.fase !== 'SHOWDOWN';
+        if (maoEmAndamento && jogador.apostaTotal > 0) {
+            mesa.contribuicoesEncerradas = mesa.contribuicoesEncerradas || [];
+            mesa.contribuicoesEncerradas.push({ apostaTotal: jogador.apostaTotal });
+        }
 
+        if (maoAtiva) {
             jogador.status = 'fold';
             jogador.cartas = [];
 
