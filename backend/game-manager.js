@@ -460,6 +460,7 @@ export class GameManager {
             j.status        = 'ativo';
             j.apostaRodada  = 0;
             j.apostaTotal   = 0;   // ← RESET obrigatório a cada mão
+            j.nivelAoAgir   = null; // ainda não agiu nesta rua (blind não conta)
             j.cartas        = [baralho.pop(), baralho.pop()];
         });
 
@@ -501,6 +502,7 @@ export class GameManager {
         mesa.pote                 = mesa.jogadores[sbId].apostaRodada
                                   + mesa.jogadores[bbId].apostaRodada;
         mesa.maiorAposta          = mesa.bigBlind;
+        mesa.nivelReabertura      = mesa.bigBlind;   // o BB conta como aposta completa
         mesa.ultimoRaiseVal       = mesa.bigBlind;
         mesa.sbId                 = sbId;
         mesa.bbId                 = bbId;
@@ -707,6 +709,20 @@ export class GameManager {
             acao = 'CALL';
         }
 
+        // All-in incompleto não reabre a ação: quem já agiu nesta rua só
+        // pode aumentar se houve um raise COMPLETO depois da última ação
+        // dele (mesa.nivelReabertura = maior aposta do último raise
+        // completo; jogador.nivelAoAgir = maior aposta quando ele agiu).
+        if (acao === 'RAISE'
+            && jogador.nivelAoAgir != null
+            && (mesa.nivelReabertura || 0) <= jogador.nivelAoAgir) {
+            if (socketId) {
+                this.emitirErro(socketId, 'O all-in foi menor que um raise completo — você só pode pagar ou desistir.');
+                return;
+            }
+            acao = 'CALL';
+        }
+
         // Validação do raise mínimo (No-Limit: último raise + aposta atual)
         if (acao === 'RAISE') {
             const raiseMinimo    = apostaMesa + (mesa.ultimoRaiseVal || mesa.bigBlind);
@@ -817,7 +833,9 @@ export class GameManager {
         // Se o raise reabriu apostas, atualiza o marcador de primeira posição
         if (reabriuApostas) {
             mesa.primeiroJogador = uid;
+            mesa.nivelReabertura = mesa.maiorAposta;
         }
+        if (acao !== 'FOLD') jogador.nivelAoAgir = mesa.maiorAposta;
 
         mesa.ultimaAcao           = acao;
         mesa.ultimaAcaoDescritiva = fraseNarrativa;
@@ -939,9 +957,13 @@ export class GameManager {
 
         // Reseta apostas da rodada para todos
         mesa.ordem.forEach(uid => {
-            if (mesa.jogadores[uid]) mesa.jogadores[uid].apostaRodada = 0;
+            if (mesa.jogadores[uid]) {
+                mesa.jogadores[uid].apostaRodada = 0;
+                mesa.jogadores[uid].nivelAoAgir  = null;
+            }
         });
 
+        mesa.nivelReabertura = 0;
         mesa.maiorAposta    = 0;
         mesa.ultimoRaiseVal = mesa.bigBlind;
         mesa.fase           = novaFase;

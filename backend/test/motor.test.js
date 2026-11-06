@@ -92,6 +92,34 @@ test('all-in curto pelo botão (raise incompleto) não reabre nem reduz o raise 
     assert.equal(mesa.maiorAposta, 130);
 });
 
+test('all-in incompleto não reabre o raise para quem já agiu (só pagar ou desistir)', (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { gm, io, mesaId, mesa } = montarMesa([1000, 130, 1000]);
+    gm.iniciarRodada(mesaId);
+    agir(gm, mesaId, 'h0', 'RAISE', 100);          // h0 já agiu (raise completo)
+    agir(gm, mesaId, 'h1', 'RAISE', 130);          // all-in incompleto (+30)
+    agir(gm, mesaId, 'h2', 'CALL');                // BB ainda não tinha agido: poderia aumentar, só pagou
+    assert.equal(mesa.turno, 'h0');
+    agir(gm, mesaId, 'h0', 'RAISE', 400);          // não pode: a ação não foi reaberta pra ele
+    assert.equal(mesa.turno, 'h0', 'raise deveria ser recusado');
+    assert.equal(mesa.jogadores.h0.apostaRodada, 100);
+    assert.ok(errosEmitidos(io).some(m => /pagar ou desistir/i.test(m)));
+    agir(gm, mesaId, 'h0', 'CALL');
+    assert.equal(mesa.fase, 'FLOP');
+});
+
+test('quem ainda não agiu pode aumentar depois de um all-in incompleto', (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { gm, mesaId, mesa } = montarMesa([1000, 130, 1000]);
+    gm.iniciarRodada(mesaId);
+    agir(gm, mesaId, 'h0', 'RAISE', 100);
+    agir(gm, mesaId, 'h1', 'RAISE', 130);          // incompleto
+    agir(gm, mesaId, 'h2', 'RAISE', 300);          // BB: raise completo (130 + 80 mínimo)
+    assert.equal(mesa.maiorAposta, 300);
+    agir(gm, mesaId, 'h0', 'RAISE', 600);          // ação reaberta para h0
+    assert.equal(mesa.maiorAposta, 600);
+});
+
 test('fold com check disponível no pós-flop não trava a rodada num loop de check', (t) => {
     t.mock.timers.enable(TIMERS);
     const { gm, mesaId, mesa } = montarMesa([1000, 1000, 1000]);
