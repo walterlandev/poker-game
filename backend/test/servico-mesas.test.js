@@ -73,6 +73,27 @@ test('criar, entrar e sair de mesa real: debita o buy-in e devolve o stack', asy
     assert.ok(gm.getMesa(mesaId));
 });
 
+// ── #21: uma mesa por jogador ────────────────────────────────────────
+test('quem já está sentado não cria nem entra em outra mesa (e não é debitado)', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { servico, gm, debitos } = montar();
+    const a = sock('a'), b = sock('b');
+    const mesa1 = await servico.criarMesa(a, { buyIn: 500 });
+    const mesa2 = await servico.criarMesa(b, { buyIn: 500 });
+    const debitosAntes = debitos.length;
+
+    assert.equal(await servico.criarMesa(a, { buyIn: 500 }), undefined);
+    assert.equal(await servico.entrarMesa(a, { mesaId: mesa2 }), undefined);
+    assert.equal(debitos.length, debitosAntes);
+    assert.equal(gm.getMesa(mesa2).jogadores.a, undefined);
+    assert.ok(a.erros().every(m => m === 'Você já está sentado em outra mesa. Saia dela antes de entrar em outra.'));
+    assert.equal(a.erros().length, 2);
+
+    // reconexão na MESMA mesa continua funcionando, sem novo débito
+    assert.equal(await servico.entrarMesa(a, { mesaId: mesa1 }), mesa1);
+    assert.equal(debitos.length, debitosAntes);
+});
+
 // ── #20: duplo clique / requisições concorrentes ─────────────────────
 const liquido = (debitos, creditos, uid) =>
     soma(debitos.filter(d => d.uid === uid)) - soma(creditos.filter(c => c.uid === uid));

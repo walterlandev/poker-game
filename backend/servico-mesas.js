@@ -8,7 +8,8 @@
 ================================================================ */
 
 export const MSG = {
-    OCUPADO: 'Aguarde: sua operação anterior ainda está sendo processada.',
+    OCUPADO:    'Aguarde: sua operação anterior ainda está sendo processada.',
+    OUTRA_MESA: 'Você já está sentado em outra mesa. Saia dela antes de entrar em outra.',
 };
 
 export function criarServicoMesas({ io, gameManager, tournamentManager, debitar, creditar, emitirSaldo, socketMesa = new Map() }) {
@@ -31,10 +32,16 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         finally { emOperacao.delete(uid); }
     };
 
+    // Um jogador só fica sentado numa mesa por vez. Com duas, socket.data.mesaId
+    // apontava só para a última e as fichas da primeira ficavam presas lá.
+    const mesaOndeEstaSentado = (uid) =>
+        gameManager.getMesasAtivas().find(m => m.jogadores[uid]) || null;
+
     async function criarMesa(socket, config = {}) {
         if (!socket.data.uid) { socket.emit('erro', { mensagem: 'Autentique-se primeiro.' }); return; }
         const uid   = socket.data.uid;
         const buyIn = config.buyIn || 1000;
+        if (mesaOndeEstaSentado(uid)) { socket.emit('erro', { mensagem: MSG.OUTRA_MESA }); return; }
 
         // debitarEntradaMesa valida e normaliza o valor (nunca confiar num
         // buyIn negativo/inválido vindo do cliente); a mesa usa o valor que
@@ -83,6 +90,8 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         const uid  = socket.data.uid;
         const mesa = gameManager.getMesa(dados.mesaId);
         if (!mesa) { socket.emit('erro', { mensagem: 'Mesa não encontrada.' }); return; }
+        const sentadoEm = mesaOndeEstaSentado(uid);
+        if (sentadoEm && sentadoEm.id !== mesa.id) { socket.emit('erro', { mensagem: MSG.OUTRA_MESA }); return; }
 
         // Se jogador já está na mesa (reconexão), não debita novamente
         const jaEstaNaMesa = !!mesa.jogadores[uid];
