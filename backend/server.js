@@ -171,6 +171,23 @@ app.post('/webhook/mercadopago', processarWebhookMP(io));
 // socketMesa: socket.id → mesaId  (para limpeza no disconnect)
 const socketMesa = new Map();
 
+// Remoção automática por inatividade (3 faltas seguidas, decidida dentro do
+// game-manager): devolve as fichas igual a um sair_mesa voluntário. Antes
+// ninguém creditava nada — o stack inteiro do jogador removido sumia.
+gameManager.setAoRemoverPorInatividade(async ({ uid, saldo, origemBonus, torneioId }) => {
+    if (torneioId) {
+        tournamentManager.abandonarMesa(torneioId, uid);
+        return;
+    }
+    if (saldo > 0) {
+        await creditarSaidaMesa(uid, saldo, origemBonus);
+        for (const [, s] of io.sockets.sockets) {
+            if (s.data.uid === uid) await emitirSaldoAtualizado(s, uid);
+        }
+    }
+    console.log(`🚪 ${uid} removido por inatividade: ₿C ${saldo} devolvidos`);
+});
+
 
 // ================================================================
 // BLOCO 5: EVENTOS DO SOCKET.IO

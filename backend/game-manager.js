@@ -78,6 +78,11 @@ export class GameManager {
         this.tournamentManager = tm;
     }
 
+    /** fn({ mesaId, uid, saldo, origemBonus, torneioId }) — chamado antes de remover o jogador. */
+    setAoRemoverPorInatividade(fn) {
+        this.aoRemoverPorInatividade = fn;
+    }
+
 
     // ================================================================
     // EMISSÃO DE ESTADO
@@ -625,6 +630,17 @@ export class GameManager {
             console.log(`🚫 ${jogador.nome} removido por inatividade.`);
             this.io.to(mesaId).emit('notificacao', {
                 mensagem: `${jogador.nome} foi removido por inatividade.`,
+            });
+            // Quem devolve as fichas ao saldo real é o servidor
+            // (processarSaidaMesa só roda em sair_mesa/disconnect). Sem
+            // avisar, o jogador removido aqui perdia o stack inteiro: ele
+            // some de mesa.jogadores e um "Sair" depois credita 0.
+            this.aoRemoverPorInatividade?.({
+                mesaId,
+                uid,
+                saldo:       jogador.saldo,
+                origemBonus: jogador.origemBonus || 0,
+                torneioId:   mesa.torneioId || null,
             });
             // sairMesa já trata a saída no meio de uma mão como desistência
             // (fold) e resolve corretamente quem age em seguida — setar
