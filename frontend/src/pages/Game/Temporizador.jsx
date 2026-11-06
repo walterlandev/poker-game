@@ -53,55 +53,31 @@ export default function Temporizador({ totalMs = 90000, expiraEm = null, ativo =
 
     if (!ativo) return null;
 
-    const raio      = (tamanho - 4) / 2;
+    // Anel desenhado por fora do avatar (o contêiner tem inset -4px)
+    const lado      = tamanho + 8;
+    const raio      = (lado - 3) / 2;
     const circunf   = 2 * Math.PI * raio;
-    const progresso = restante / totalMs;
+    const progresso = Math.max(0, Math.min(1, restante / totalMs));
     const offset    = circunf * (1 - progresso);
     const segundos  = Math.ceil(restante / 1000);
-
-    let cor = '#22C55E';
-    if (progresso < 0.5) cor = '#F59E0B';
-    if (progresso < 0.2) cor = '#EF4444';
+    const urgente   = progresso < 0.2;
+    const cor       = urgente ? 'var(--cor-perigo)' : 'var(--cor-destaque)';
 
     return (
-        <div style={{
-            position:       'absolute',
-            top:            '50%',
-            left:           '50%',
-            transform:      'translate(-50%, -50%)',
-            width:          `${tamanho}px`,
-            height:         `${tamanho}px`,
-            display:        'flex',
-            alignItems:     'center',
-            justifyContent: 'center',
-            pointerEvents:  'none',
-            zIndex:         10,
-        }}>
-            <svg width={tamanho} height={tamanho}
-                style={{ position:'absolute', top:0, left:0 }}>
-                <circle cx={tamanho/2} cy={tamanho/2} r={raio}
-                    fill="none" stroke="rgba(0,0,0,0.4)" strokeWidth="3" />
-                <circle cx={tamanho/2} cy={tamanho/2} r={raio}
-                    fill="none" stroke={cor} strokeWidth="3"
+        <div className="temporizador" aria-hidden="true">
+            <svg width={lado} height={lado} viewBox={`0 0 ${lado} ${lado}`}>
+                <circle cx={lado/2} cy={lado/2} r={raio}
+                    fill="none" style={{ stroke: 'var(--cor-linha-forte)' }} strokeWidth="3" />
+                <circle cx={lado/2} cy={lado/2} r={raio}
+                    fill="none" strokeWidth="3"
                     strokeLinecap="round"
                     strokeDasharray={circunf}
                     strokeDashoffset={offset}
-                    transform={`rotate(-90 ${tamanho/2} ${tamanho/2})`}
-                    style={{
-                        transition: 'stroke-dashoffset 0.1s linear, stroke 0.5s ease',
-                        filter:     `drop-shadow(0 0 4px ${cor}80)`,
-                    }}
+                    transform={`rotate(-90 ${lado/2} ${lado/2})`}
+                    style={{ stroke: cor, transition: 'stroke-dashoffset 0.1s linear' }}
                 />
             </svg>
-            <span style={{
-                fontSize:   segundos >= 10 ? '10px' : '12px',
-                fontWeight: '800',
-                color:      cor,
-                lineHeight: 1,
-                zIndex:     1,
-                textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-                animation:  segundos <= 10 ? 'pulsar 0.8s ease-in-out infinite' : 'none',
-            }}>
+            <span className={`temporizador-seg${urgente ? ' urgente' : ''}`}>
                 {segundos}
             </span>
         </div>

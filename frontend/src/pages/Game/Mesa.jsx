@@ -1,20 +1,57 @@
-import { useRef, useEffect, useState } from 'react';
-import Jogador   from './Jogador';
-import { getTema } from '../../core/temas';
-import { PilhaFichas } from '../../components/ChipPoker';
+/* ================================================================
+   ARQUIVO: frontend/src/pages/Game/Mesa.jsx
 
-function parsearCarta(codigo) {
-    if (!codigo || codigo === 'XX') return null;
-    const naipe = codigo.slice(-1);   // Unicode — não aplicar toLowerCase
-    const valor = codigo.slice(0, -1);
-    return { codigo, valor, naipe };
-}
+   Desenha a mesa (trilho de couro + feltro), o centro (fase, pote,
+   cartas comunitárias), os assentos e as fichas de aposta.
+
+   DOIS FORMATOS (decidido pelo CSS de .mesa-oval, medido aqui):
+     → paisagem (desktop/tablet): oval deitada, lugares distribuídos
+       igualmente na borda, você embaixo.
+     → retrato (celular ≤ 600px): mesa em pé. Os adversários ocupam
+       posições fixas pensadas para até 9 lugares sem cobrir o centro;
+       você fica embaixo e suas cartas aparecem grandes fora da mesa
+       (Game/index.jsx).
+   Só apresentação: nenhuma regra de jogo é decidida aqui.
+================================================================ */
+
+import { useRef, useEffect, useState } from 'react';
+import Jogador from './Jogador';
+import { parsearCarta } from '../../core/temas';
+import { CartaFace, CartaVazia } from '../../components/Carta';
+import ChipPoker, { PilhaFichas } from '../../components/ChipPoker';
+import { corPorValor } from '../../core/chipCores';
 
 function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
 
 function tempoDoJogador(uid) {
     return uid?.startsWith('bot_') ? 10000 : 45000;
 }
+
+const NOME_FASE = {
+    'PRE-FLOP': 'Pré-flop',
+    'FLOP':     'Flop',
+    'TURN':     'Turn',
+    'RIVER':    'River',
+    'SHOWDOWN': 'Showdown',
+};
+
+// ── Retrato: posições (x%, y% da oval) no sentido horário a partir de você ──
+const P = {
+    baixoEsq:  [16, 88], ladoEsqB: [3, 66], ladoEsqA: [3, 26], topoEsq: [27, 3],
+    topo:      [50, 1],  topoDir:  [73, 3], ladoDirA: [97, 26], ladoDirB: [97, 66],
+    baixoDir:  [84, 88],
+};
+const LAYOUT_RETRATO = {
+    1: [P.topo],
+    2: [P.topoEsq, P.topoDir],
+    3: [P.ladoEsqA, P.topo, P.ladoDirA],
+    4: [P.ladoEsqB, P.ladoEsqA, P.ladoDirA, P.ladoDirB],
+    5: [P.ladoEsqB, P.ladoEsqA, P.topo, P.ladoDirA, P.ladoDirB],
+    6: [P.ladoEsqB, P.ladoEsqA, P.topoEsq, P.topoDir, P.ladoDirA, P.ladoDirB],
+    7: [P.baixoEsq, P.ladoEsqB, P.ladoEsqA, P.topo, P.ladoDirA, P.ladoDirB, P.baixoDir],
+    8: [P.baixoEsq, P.ladoEsqB, P.ladoEsqA, P.topoEsq, P.topoDir, P.ladoDirA, P.ladoDirB, P.baixoDir],
+};
+const POS_EU_RETRATO = [50, 97];
 
 export default function Mesa({ mesa, meuUid, minhasCartas = [], meuAvatar = '', tema = 'classico' }) {
     const ovalRef = useRef(null);
@@ -41,281 +78,121 @@ export default function Mesa({ mesa, meuUid, minhasCartas = [], meuAvatar = '', 
 
     const jogadoresArray = Object.entries(mesa.jogadores || {});
     const cartasCom      = (mesa.cartasComunitarias || []).map(parsearCarta);
-    const temaObj        = getTema(tema);
     const total          = jogadoresArray.length;
     const meuIndex       = jogadoresArray.findIndex(([uid]) => uid === meuUid);
     const offset         = meuIndex >= 0 ? meuIndex : 0;
+    const retrato        = dims.h > dims.w;
+    const euSentado      = meuIndex >= 0;
 
-    // ── Semi-eixos: posiciona os jogadores NA BORDA da oval ──────────
-    // 82% → centro do avatar fica sobre a borda do trilho, com uma folga
-    // maior que antes (era 88%) pra sobrar espaço pro avatar + a ficha de
-    // aposta flutuante acima dele não serem cobertos pelo cabeçalho em
-    // mesas grandes (tela cheia).
-    const sx = (dims.w / 2) * 0.82;
-    const sy = (dims.h / 2) * 0.82;
-
-    // ── Posições dos jogadores em % da oval ────────────────────────
-    // +90° → indiceRel=0 (jogador local) fica na BASE (ângulo 90° = baixo)
+    // ── Posições dos assentos em % da oval ──────────────────────────
     const posicoes = jogadoresArray.map(([uid, jogador], index) => {
         const indiceRel = (index - offset + total) % total;
-        const angulo    = (indiceRel / total) * 360 + 90;
-        const rad       = (angulo * Math.PI) / 180;
+        let esquerda, topo;
 
-        return {
-            uid, jogador,
-            esquerda: 50 + ((sx * Math.cos(rad)) / dims.w) * 100,
-            topo:     50 + ((sy * Math.sin(rad)) / dims.h) * 100,
-            souEu:    uid === meuUid,
-        };
+        if (retrato) {
+            // Quem assiste sem estar sentado: todos entram nas posições fixas
+            const nAdv   = euSentado ? total - 1 : total;
+            const slots  = LAYOUT_RETRATO[Math.min(8, Math.max(1, nAdv))] || LAYOUT_RETRATO[8];
+            if (euSentado && indiceRel === 0) {
+                [esquerda, topo] = POS_EU_RETRATO;
+            } else {
+                const k = euSentado ? indiceRel - 1 : indiceRel;
+                [esquerda, topo] = slots[k] || POS_EU_RETRATO;
+            }
+        } else {
+            // +90° → indiceRel=0 (jogador local) fica na BASE
+            const angulo = (indiceRel / total) * 360 + 90;
+            const rad    = (angulo * Math.PI) / 180;
+            esquerda = 50 + Math.cos(rad) * 50 * 0.92;
+            topo     = 50 + Math.sin(rad) * 50 * 0.92;
+        }
+        return { uid, jogador, esquerda, topo, souEu: uid === meuUid };
     });
 
-    // ── Tamanho do avatar escala com a largura da oval ─────────────
-    // clamp: mínimo 44px, máximo 72px
-    const avatarSz = Math.max(44, Math.min(72, Math.round(dims.w * 0.13)));
+    // ── Escalas ─────────────────────────────────────────────────────
+    const avatarSz = retrato
+        ? (total >= 7 ? 40 : 44)
+        : Math.max(44, Math.min(64, Math.round(dims.w * 0.072)));
+    const cardW = retrato
+        ? Math.max(34, Math.min(46, Math.floor((dims.w - 40) / 5.6)))
+        : Math.max(40, Math.min(64, Math.round(dims.w * 0.074)));
+    const potFont = retrato ? 19 : (dims.w > 700 ? 23 : 19);
 
-    // ── Tela pequena: cartas ao lado do avatar em vez de embaixo ───
-    const layoutCompacto = dims.w < 340;
-
-    // ── Tamanho das cartas comunitárias escala com a oval ──────────
-    const cardW = Math.max(32, Math.min(56, Math.round(dims.w * 0.09)));
-    const cardH = Math.round(cardW * 1.42);
-    const cardFont = Math.max(8, Math.round(cardW * 0.22));
-    const cardNaipe = Math.max(14, Math.round(cardW * 0.50));
-
-    const potFont   = Math.max(11, Math.min(15, Math.round(dims.w * 0.033)));
-    const faseFont  = Math.max(8,  Math.min(11, Math.round(dims.w * 0.024)));
+    // Aposta da rodada: entre o assento e o centro
+    const fracaoAposta = retrato ? 0.36 : 0.4;
 
     return (
-        <div style={css.container}>
-            {/* Oval de referência — medida pelo ResizeObserver */}
-            <div ref={ovalRef} className="mesa-oval" style={css.oval}>
+        <div className="mesa-container">
+            <div ref={ovalRef} className="mesa-oval">
+                <div className="mesa-trilho">
+                    <div className="mesa-feltro" />
+                </div>
 
-                {/* Trilho escuro (borda almofadada da mesa) */}
-                <div style={css.trilho}>
+                {/* Centro: fase + pote + cartas */}
+                <div className="mesa-centro">
+                    {mesa.fase && mesa.fase !== 'AGUARDANDO' && (
+                        <span className="mesa-fase">{NOME_FASE[mesa.fase] || mesa.fase}</span>
+                    )}
 
-                    {/* Feltro verde */}
-                    <div style={css.feltro}>
-
-                        {/* Centro: fase + pot + cartas */}
-                        <div style={css.centro}>
-                            {mesa.fase && mesa.fase !== 'AGUARDANDO' && (
-                                <span style={{ ...css.faseBadge, fontSize: faseFont + 'px' }}>
-                                    {mesa.fase.replace('-', ' ')}
-                                </span>
-                            )}
-
-                            {mesa.pote > 0 && (
-                                <div style={css.pot}>
-                                    <PilhaFichas size={Math.max(14, Math.round(potFont * 1.1))} valor={mesa.pote} />
-                                    <span style={{ fontSize: potFont + 'px', fontWeight: 700, color: '#F59E0B' }}>
-                                        Pot ₿C {fmt(mesa.pote)}
-                                    </span>
-                                </div>
-                            )}
-
-                            {/* Cartas comunitárias */}
-                            <div style={css.cartasRow}>
-                                {mesa.fase === 'AGUARDANDO' ? (
-                                    <p style={{ ...css.textoVazio, fontSize: faseFont + 'px' }}>
-                                        Aguardando jogadores...
-                                    </p>
-                                ) : cartasCom.length > 0 ? (
-                                    Array.from({ length: 5 }).map((_, i) => {
-                                        const carta = cartasCom[i];
-                                        return carta
-                                            ? <CartaCom key={i} carta={carta} w={cardW} h={cardH} fv={cardFont} fn={cardNaipe} temaObj={temaObj} />
-                                            : <CartaComVazia key={i} w={cardW} h={cardH} />;
-                                    })
-                                ) : (
-                                    <p style={{ ...css.textoVazio, fontSize: faseFont + 'px' }}>
-                                        Distribuindo...
-                                    </p>
-                                )}
-                            </div>
+                    {mesa.pote > 0 && (
+                        <div className="mesa-pote" aria-label={`Pote ₿C ${fmt(mesa.pote)}`}>
+                            <PilhaFichas size={Math.round(potFont * 0.9)} valor={mesa.pote} />
+                            <span className="num" style={{ fontSize: potFont + 'px' }}>₿C {fmt(mesa.pote)}</span>
                         </div>
+                    )}
 
-                        {/* Jogadores posicionados na borda do feltro */}
-                        {posicoes.map(({ uid, jogador, esquerda, topo, souEu }) => (
-                            <div key={uid} style={{
-                                position:  'absolute',
-                                left:      `${esquerda}%`,
-                                top:       `${topo}%`,
-                                transform: 'translate(-50%, -50%)',
-                                zIndex:    4,
-                            }}>
-                                <Jogador
-                                    jogador={souEu && meuAvatar
-                                        ? { ...jogador, avatar: meuAvatar }
-                                        : jogador}
-                                    souEu={souEu}
-                                    ehVez={mesa.turno === uid}
-                                    cartasPrivadas={souEu ? minhasCartas : []}
-                                    ehDealer={mesa.dealer === uid}
-                                    ehSB={mesa.sbId === uid}
-                                    ehBB={mesa.bbId === uid}
-                                    tempoMs={tempoDoJogador(uid)}
-                                    expiraEm={mesa.turno === uid ? mesa.turnoExpiraEm : null}
-                                    avatarSz={avatarSz}
-                                    tema={tema}
-                                    compacto={layoutCompacto}
-                                />
-                            </div>
-                        ))}
-
+                    <div className="mesa-comunitarias">
+                        {mesa.fase === 'AGUARDANDO' ? (
+                            <p className="mesa-vazio">Aguardando jogadores…</p>
+                        ) : cartasCom.length > 0 ? (
+                            Array.from({ length: 5 }).map((_, i) => {
+                                const carta = cartasCom[i];
+                                // Comunitárias usam o seu baralho (quem está olhando)
+                                return carta
+                                    ? <CartaFace key={i} carta={carta} largura={cardW} tema={tema} className="carta-revelada" />
+                                    : <CartaVazia key={i} largura={cardW} />;
+                            })
+                        ) : (
+                            <p className="mesa-vazio">Distribuindo…</p>
+                        )}
                     </div>
                 </div>
+
+                {/* Assentos */}
+                {posicoes.map(({ uid, jogador, esquerda, topo, souEu }) => (
+                    <div key={uid} className="mesa-assento" style={{ left: `${esquerda}%`, top: `${topo}%` }}>
+                        <Jogador
+                            jogador={souEu && meuAvatar ? { ...jogador, avatar: meuAvatar } : jogador}
+                            souEu={souEu}
+                            ehVez={mesa.turno === uid}
+                            cartasPrivadas={souEu ? minhasCartas : []}
+                            ehDealer={mesa.dealer === uid}
+                            ehSB={mesa.sbId === uid}
+                            ehBB={mesa.bbId === uid}
+                            tempoMs={tempoDoJogador(uid)}
+                            expiraEm={mesa.turno === uid ? mesa.turnoExpiraEm : null}
+                            avatarSz={avatarSz}
+                            tema={tema}
+                            ocultarCartas={souEu && retrato}
+                        />
+                    </div>
+                ))}
+
+                {/* Fichas de aposta da rodada */}
+                {posicoes.map(({ uid, jogador, esquerda, topo }) => {
+                    const foldado = jogador.status === 'fold' || jogador.status === 'FOLD';
+                    const aposta  = jogador.apostaRodada || jogador.aposta || 0;
+                    if (aposta <= 0 || foldado) return null;
+                    const x = esquerda + (50 - esquerda) * fracaoAposta;
+                    const y = topo     + (50 - topo)     * fracaoAposta;
+                    return (
+                        <div key={`aposta-${uid}`} className="mesa-aposta" style={{ left: `${x}%`, top: `${y}%` }}>
+                            <ChipPoker size={16} {...corPorValor(aposta)} />
+                            <span className="num">{fmt(aposta)}</span>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
 }
-
-// ── Carta comunitária com dimensões dinâmicas ──────────────────────
-function CartaCom({ carta, w, h, fv, fn, temaObj }) {
-    const t       = temaObj || { naipes: {}, frente: { fundo:'#FFFFFF', borda:'#D1D5DB', raio:8 } };
-    const cor     = t.naipes[carta.naipe]?.cor || '#111827';
-    const fundo   = t.frente.fundo || '#FFFFFF';
-    const borda   = t.frente.borda || '#D1D5DB';
-    const premium = !!t.premium;
-    const raio    = Math.round(w * 0.1);
-    return (
-        <div style={{
-            width:          w + 'px',
-            height:         h + 'px',
-            background:     fundo,
-            borderRadius:   raio + 'px',
-            border:         premium ? `2px solid ${borda}` : `1px solid ${borda}`,
-            boxShadow:      premium
-                ? `0 3px 10px rgba(0,0,0,0.6), inset 0 0 0 2px ${fundo}, inset 0 0 0 3px ${borda}80`
-                : '0 3px 10px rgba(0,0,0,0.6)',
-            display:        'flex',
-            alignItems:     'center',
-            justifyContent: 'center',
-            position:       'relative',
-            flexShrink:     0,
-        }}>
-            {premium && [
-                { top: '2px', left: '2px' }, { top: '2px', right: '2px' },
-                { bottom: '2px', left: '2px' }, { bottom: '2px', right: '2px' },
-            ].map((pos, i) => (
-                <span key={i} style={{ position: 'absolute', ...pos, fontSize: Math.round(fn * 0.4) + 'px', color: borda, opacity: 0.7, lineHeight: 1 }}>✦</span>
-            ))}
-            <span style={{
-                position: 'absolute', top: '3px', left: '3px',
-                fontSize: fv + 'px', fontWeight: 900, lineHeight: 1,
-                color: cor, fontFamily: 'Georgia, serif',
-            }}>
-                {carta.valor}{carta.naipe}
-            </span>
-            <span style={{ fontSize: fn + 'px', color: cor, lineHeight: 1 }}>
-                {carta.naipe}
-            </span>
-            <span style={{
-                position: 'absolute', bottom: '3px', right: '3px',
-                fontSize: fv + 'px', fontWeight: 900, lineHeight: 1,
-                color: cor, transform: 'rotate(180deg)',
-                fontFamily: 'Georgia, serif',
-            }}>
-                {carta.valor}{carta.naipe}
-            </span>
-        </div>
-    );
-}
-
-function CartaComVazia({ w, h }) {
-    return (
-        <div style={{
-            width:        w + 'px',
-            height:       h + 'px',
-            background:   'rgba(255,255,255,0.04)',
-            border:       '1px dashed rgba(255,255,255,0.12)',
-            borderRadius: Math.round(w * 0.1) + 'px',
-            flexShrink:   0,
-        }} />
-    );
-}
-
-const css = {
-    container: {
-        width:          '100%',
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-    },
-    // Oval: preenche a largura disponível, altura definida pelo aspect-ratio
-    oval: {
-        width:        '100%',
-        aspectRatio:  '1.75 / 1',
-        position:     'relative',
-        borderRadius: '50%',
-    },
-    trilho: {
-        position:     'absolute',
-        inset:        0,
-        borderRadius: '50%',
-        background:   'linear-gradient(160deg,#2c2c2c 0%,#111 60%,#1a1a1a 100%)',
-        boxShadow:    [
-            '0 0 0 3px #3a3a3a',
-            '0 0 0 6px #111',
-            '0 16px 60px rgba(0,0,0,0.85)',
-            'inset 0 4px 12px rgba(255,255,255,0.05)',
-        ].join(', '),
-        padding:      '14px',
-        display:      'flex',
-        alignItems:   'center',
-        justifyContent: 'center',
-    },
-    feltro: {
-        width:        '100%',
-        height:       '100%',
-        borderRadius: '50%',
-        background:   'radial-gradient(ellipse at 50% 40%, #2d7a47 0%, #1d5e34 45%, #133d21 80%, #0c2d17 100%)',
-        boxShadow:    'inset 0 0 60px rgba(0,0,0,0.5), inset 0 0 20px rgba(0,0,0,0.3)',
-        border:       '1px solid rgba(255,255,255,0.04)',
-        position:     'relative',
-        overflow:     'visible',
-        display:      'flex',
-        alignItems:   'center',
-        justifyContent: 'center',
-    },
-    centro: {
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'center',
-        justifyContent: 'center',
-        gap:            '5px',
-        // Maior que a ficha de aposta flutuante do jogador (zIndex 6 em
-        // Jogador.jsx) — sem isso, em mesas menores a ficha por cima do
-        // avatar podia cobrir as cartas comunitárias no centro.
-        zIndex:         7,
-        padding:        '4px',
-        pointerEvents:  'none',
-    },
-    faseBadge: {
-        color:         'rgba(255,255,255,0.38)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.1em',
-        fontWeight:    600,
-    },
-    pot: {
-        display:      'flex',
-        alignItems:   'center',
-        gap:          '6px',
-        background:   'rgba(0,0,0,0.45)',
-        border:       '1px solid rgba(245,158,11,0.30)',
-        borderRadius: '20px',
-        padding:      '2px 12px 2px 8px',
-    },
-    cartasRow: {
-        display:        'flex',
-        gap:            '4px',
-        alignItems:     'center',
-        justifyContent: 'center',
-        flexWrap:       'nowrap',
-    },
-    textoVazio: {
-        color:     'rgba(255,255,255,0.28)',
-        margin:    0,
-        textAlign: 'center',
-        fontStyle: 'italic',
-    },
-};

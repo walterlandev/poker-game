@@ -267,32 +267,18 @@ export default function HandStrength({
 
     // ── Modo compacto: pill horizontal ────────────────────────────────
     if (compact) {
+        // Nome da mão + chance de vitória, com barra (cores do tema visual)
         return (
-            <div className="hs-root" style={{
-                display:      'flex',
-                alignItems:   'center',
-                gap:          '8px',
-                background:   'rgba(255,255,255,0.05)',
-                border:       `1px solid ${cor}44`,
-                borderRadius: '20px',
-                padding:      '4px 12px',
-                transition:   'border-color 0.4s',
-                flexShrink:   0,
-            }}>
-                {/* % win */}
-                <span style={{ fontSize:'14px', fontWeight:'800', color: cor, lineHeight:1 }}>
-                    {win}%
-                </span>
-                {/* Separador */}
-                <span style={{ width:'1px', height:'14px', background:'rgba(255,255,255,0.15)', flexShrink:0 }} />
-                {/* Nome da mão */}
-                <span style={{ fontSize:'11px', fontWeight:'600', color:'rgba(255,255,255,0.65)', whiteSpace:'nowrap' }}>
-                    {nome}
-                </span>
-                {/* Barra mini de nível */}
-                <div style={{ width:'40px', height:'3px', background:'rgba(255,255,255,0.08)', borderRadius:'2px', overflow:'hidden', flexShrink:0 }}>
-                    <div style={{ width: nivelPct + '%', height:'100%', background: cor, borderRadius:'2px', transition:'width 0.5s' }} />
+            <div className="forca-mao" ref={containerRef}>
+                <span className="titulo-desk">Sua mão</span>
+                <div className="rot">
+                    <b>{nome}</b>
+                    <span className="num">{win}%</span>
                 </div>
+                <div className="barra" role="progressbar" aria-label="Chance de vitória" aria-valuenow={win} aria-valuemin={0} aria-valuemax={100}>
+                    <i style={{ width: win + '%' }} />
+                </div>
+                <span className="hs-improved" style={{ display: 'none' }}>A mão melhorou</span>
             </div>
         );
     }
