@@ -28,6 +28,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getAuth, signOut }                 from 'firebase/auth';
 
 import Header              from './Header';
+import Icone               from '../../components/Icone';
 import Tabs                from './Tabs';
 import ListaMesas          from './ListaMesas';
 import Ranking             from './Ranking';
@@ -254,11 +255,21 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
     // RENDERIZAÇÃO
     // ================================================================
     return (
-        <div style={estilos.pagina} className="lobby-pagina">
+        <div className="lobby">
 
-            {/* ---- HEADER ---- */}
+            {/* ---- HEADER (com a navegação: no celular ela vira barra embaixo) ---- */}
             <Header
                 usuario={usuario}
+                navegacao={
+                    <Tabs
+                        tabAtiva={tabAtiva}
+                        onMudar={setTabAtiva}
+                        qtdPublicas={mesasPublicas.length}
+                        qtdPrivadas={mesasPrivadas.length}
+                        qtdTorneios={qtdTorneios}
+                        isAdmin={!!usuario?.isAdmin}
+                    />
+                }
                 onAbrirLoja={          () => setTabAtiva(TABS.LOJA)}
                 onAbrirCarteira={      () => setTabAtiva(TABS.CARTEIRA)}
                 onAbrirPerfil={        () => setModalPerfil(true)}
@@ -268,185 +279,123 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
 
             {/* ---- Banner servidor offline ---- */}
             {!backendOnline && (
-                <div style={{
-                    background:   'rgba(239,68,68,0.12)',
-                    border:       '1px solid rgba(239,68,68,0.30)',
-                    borderRadius: '0',
-                    padding:      '8px 16px',
-                    display:      'flex',
-                    alignItems:   'center',
-                    gap:          '8px',
-                    fontSize:     '13px',
-                    color:        '#FCA5A5',
-                }}>
-                    <span>🔴</span>
-                    <span>Servidor offline — inicie o backend com <code style={{ background:'rgba(0,0,0,0.3)', padding:'1px 5px', borderRadius:'4px' }}>cd backend && npm run dev</code></span>
+                <div className="faixa-aviso erro" role="alert">
+                    Servidor offline. Inicie o backend com <code>cd backend && npm run dev</code>
                 </div>
             )}
 
             {/* ---- CORPO ---- */}
-            <div className="lobby-body">
+            <div className="lobby-corpo">
 
-                <div className="lobby-esquerda">
+                <main className="lobby-principal">
 
-                    {/* Tabs principais */}
-                    <Tabs
-                        tabAtiva={tabAtiva}
-                        onMudar={setTabAtiva}
-                        qtdPublicas={mesasPublicas.length}
-                        qtdPrivadas={mesasPrivadas.length}
-                        qtdTorneios={qtdTorneios}
-                        isAdmin={!!usuario?.isAdmin}
-                    />
+                    {erro && (
+                        <div className="aviso-inline erro" role="alert">
+                            <span>{erro}</span>
+                            <button type="button" onClick={buscarMesas} className="btn btn-neutro">
+                                Tentar novamente
+                            </button>
+                        </div>
+                    )}
 
-                    <div className="lobby-conteudo">
+                    {erroEntrada && (
+                        <button type="button" className="aviso-inline erro" onClick={() => setErroEntrada(null)}>
+                            <span>{erroEntrada}</span>
+                            <Icone nome="fechar" tamanho={16} />
+                        </button>
+                    )}
 
-                        {erro && (
-                            <div style={estilos.erro}>
-                                <span>{erro}</span>
-                                <button onClick={buscarMesas} style={estilos.btnTentar}>
-                                    Tentar novamente
+                    {/* ---- ABA: CARTEIRA ---- */}
+                    {tabAtiva === TABS.CARTEIRA && (
+                        <WalletIndex
+                            usuario={usuario}
+                            socket={socket}
+                        />
+                    )}
+
+                    {/* ---- ABA: MESAS (públicas + privadas com sub-filtro) ---- */}
+                    {tabAtiva === TABS.MESAS && (
+                        <section aria-labelledby="titulo-mesas">
+                            <div className="secao-cab">
+                                <div className="esq">
+                                    <h1 id="titulo-mesas" className="titulo-secao">Mesas</h1>
+                                    <div className="segmento" role="group" aria-label="Tipo de mesa">
+                                        <button
+                                            type="button"
+                                            aria-pressed={filtroMesas === FILTRO_MESAS.PUBLICAS}
+                                            onClick={() => setFiltroMesas(FILTRO_MESAS.PUBLICAS)}
+                                        >
+                                            Públicas <span className="cont num">{mesasPublicas.length}</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            aria-pressed={filtroMesas === FILTRO_MESAS.PRIVADAS}
+                                            onClick={() => setFiltroMesas(FILTRO_MESAS.PRIVADAS)}
+                                        >
+                                            <Icone nome="cadeado" tamanho={15} />
+                                            Privadas <span className="cont num">{mesasPrivadas.length}</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <button type="button" onClick={() => setModalCriar(true)} className="btn btn-principal btn-criar">
+                                    <Icone nome="mais" tamanho={18} />
+                                    Criar mesa
                                 </button>
                             </div>
-                        )}
 
-                        {erroEntrada && (
-                            <div style={{ ...estilos.erro, cursor: 'pointer' }}
-                                 onClick={() => setErroEntrada(null)}>
-                                <span>⚠️ {erroEntrada}</span>
-                            </div>
-                        )}
+                            {filtroMesas === FILTRO_MESAS.PUBLICAS && (
+                                <ListaMesas
+                                    mesas={mesasPublicas}
+                                    carregando={carregando}
+                                    privadas={false}
+                                    onEntrar={handleEntrarPublica}
+                                />
+                            )}
+                            {filtroMesas === FILTRO_MESAS.PRIVADAS && (
+                                <ListaMesas
+                                    mesas={mesasPrivadas}
+                                    carregando={carregando}
+                                    privadas={true}
+                                    onEntrar={handleClicarPrivada}
+                                />
+                            )}
+                        </section>
+                    )}
 
-                        {/* ---- ABA: CARTEIRA ---- */}
-                        {tabAtiva === TABS.CARTEIRA && (
-                            <WalletIndex
-                                usuario={usuario}
-                                socket={socket}
-                            />
-                        )}
+                    {/* ---- ABA: CAMPEONATO ---- */}
+                    {tabAtiva === TABS.CAMPEONATO && (
+                        <Campeonato
+                            usuario={usuario}
+                            socket={socket}
+                            onEntrarMesa={onEntrarMesa}
+                            conviteTorneio={conviteTorneio}
+                        />
+                    )}
 
-                        {/* ---- ABA: MESAS (públicas + privadas com sub-filtro) ---- */}
-                        {tabAtiva === TABS.MESAS && (
-                            <>
-                                {/* Sub-filtro público / privado */}
-                                <div style={estilos.subFiltro}>
-                                    <button
-                                        className="sub-filtro-btn"
-                                        onClick={() => setFiltroMesas(FILTRO_MESAS.PUBLICAS)}
-                                        style={{
-                                            background: filtroMesas === FILTRO_MESAS.PUBLICAS
-                                                ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.04)',
-                                            border: filtroMesas === FILTRO_MESAS.PUBLICAS
-                                                ? '1px solid rgba(124,58,237,0.40)' : '1px solid rgba(255,255,255,0.07)',
-                                            color: filtroMesas === FILTRO_MESAS.PUBLICAS
-                                                ? '#A78BFA' : 'rgba(255,255,255,0.40)',
-                                            fontWeight: filtroMesas === FILTRO_MESAS.PUBLICAS ? '600' : '400',
-                                        }}
-                                    >
-                                        🌐 Públicas
-                                        {mesasPublicas.length > 0 && (
-                                            <span style={estilos.badge}>{mesasPublicas.length}</span>
-                                        )}
-                                    </button>
+                    {/* ---- ABA: RANKING ---- */}
+                    {tabAtiva === TABS.RANKING && (
+                        <Ranking ranking={ranking} meuUid={usuario?.uid} />
+                    )}
 
-                                    <button
-                                        className="sub-filtro-btn"
-                                        onClick={() => setFiltroMesas(FILTRO_MESAS.PRIVADAS)}
-                                        style={{
-                                            background: filtroMesas === FILTRO_MESAS.PRIVADAS
-                                                ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)',
-                                            border: filtroMesas === FILTRO_MESAS.PRIVADAS
-                                                ? '1px solid rgba(245,158,11,0.35)' : '1px solid rgba(255,255,255,0.07)',
-                                            color: filtroMesas === FILTRO_MESAS.PRIVADAS
-                                                ? '#F59E0B' : 'rgba(255,255,255,0.40)',
-                                            fontWeight: filtroMesas === FILTRO_MESAS.PRIVADAS ? '600' : '400',
-                                        }}
-                                    >
-                                        🔒 Privadas
-                                        {mesasPrivadas.length > 0 && (
-                                            <span style={{
-                                                ...estilos.badge,
-                                                background: 'rgba(245,158,11,0.20)',
-                                                color: '#F59E0B',
-                                            }}>
-                                                {mesasPrivadas.length}
-                                            </span>
-                                        )}
-                                    </button>
-                                </div>
+                    {/* ---- ABA: LOJA ---- */}
+                    {tabAtiva === TABS.LOJA && (
+                        <Loja usuario={usuario} socket={socket} />
+                    )}
 
-                                {/* Lista de mesas do filtro ativo */}
-                                {filtroMesas === FILTRO_MESAS.PUBLICAS && (
-                                    <ListaMesas
-                                        mesas={mesasPublicas}
-                                        carregando={carregando}
-                                        privadas={false}
-                                        onEntrar={handleEntrarPublica}
-                                    />
-                                )}
-                                {filtroMesas === FILTRO_MESAS.PRIVADAS && (
-                                    <ListaMesas
-                                        mesas={mesasPrivadas}
-                                        carregando={carregando}
-                                        privadas={true}
-                                        onEntrar={handleClicarPrivada}
-                                    />
-                                )}
-                            </>
-                        )}
-
-                        {/* ---- ABA: CAMPEONATO ---- */}
-                        {tabAtiva === TABS.CAMPEONATO && (
-                            <Campeonato
-                                usuario={usuario}
-                                socket={socket}
-                                onEntrarMesa={onEntrarMesa}
-                                conviteTorneio={conviteTorneio}
-                            />
-                        )}
-
-                        {/* ---- ABA: RANKING (mobile) ---- */}
-                        {tabAtiva === TABS.RANKING && (
-                            <Ranking ranking={ranking} meuUid={usuario?.uid} />
-                        )}
-
-                        {/* ---- ABA: LOJA ---- */}
-                        {tabAtiva === TABS.LOJA && (
-                            <Loja usuario={usuario} socket={socket} />
-                        )}
-
-                        {/* ---- ABA: ADMIN (só quem é admin vê a tab) ---- */}
-                        {tabAtiva === TABS.ADMIN && usuario?.isAdmin && (
-                            <Admin socket={socket} />
-                        )}
-
-                    </div>
-                </div>
+                    {/* ---- ABA: ADMIN (só quem é admin vê a tab) ---- */}
+                    {tabAtiva === TABS.ADMIN && usuario?.isAdmin && (
+                        <Admin socket={socket} />
+                    )}
+                </main>
 
                 {/* Coluna direita: ranking fixo (desktop) */}
-                <div className="lobby-direita">
-                    <div style={estilos.direitaTitulo}>
-                        <span style={estilos.direitaTituloTexto}>🏆 Ranking</span>
-                    </div>
-                    <div style={estilos.direitaConteudo}>
-                        <Ranking ranking={ranking} meuUid={usuario?.uid} />
-                    </div>
-                </div>
+                <aside className="lobby-lado" aria-labelledby="titulo-ranking-lado">
+                    <h2 id="titulo-ranking-lado" className="lado-titulo">Ranking</h2>
+                    <p className="lado-sub">Atualiza a cada minuto</p>
+                    <Ranking ranking={ranking} meuUid={usuario?.uid} />
+                </aside>
 
             </div>
-
-            {/* ---- BOTÃO CRIAR MESA (só aparece na aba Mesas) ---- */}
-            {tabAtiva === TABS.MESAS && (
-                <div className="lobby-rodape">
-                    <button
-                        onClick={() => setModalCriar(true)}
-                        style={estilos.btnCriar}
-                    >
-                        <span style={{ fontSize: '22px', lineHeight: 1 }}>+</span>
-                        Criar Mesa
-                    </button>
-                </div>
-            )}
 
             {/* ---- MODAIS ---- */}
             {modalCriar && (
@@ -496,130 +445,12 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
 
             {/* Overlay de "entrando na mesa" */}
             {entrando && (
-                <div style={{
-                    position: 'fixed', inset: 0, zIndex: 999,
-                    background: 'rgba(10,15,30,0.80)',
-                    display: 'flex', flexDirection: 'column',
-                    alignItems: 'center', justifyContent: 'center',
-                    gap: '14px', backdropFilter: 'blur(4px)',
-                }}>
-                    <div style={{
-                        width: '36px', height: '36px',
-                        border: '3px solid rgba(255,255,255,0.10)',
-                        borderTop: '3px solid #7C3AED',
-                        borderRadius: '50%', animation: 'girar 0.8s linear infinite',
-                    }} />
-                    <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.55)' }}>
-                        Entrando na mesa...
-                    </span>
+                <div className="tela-espera" role="status">
+                    <div className="roda" />
+                    <span>Entrando na mesa…</span>
                 </div>
             )}
 
         </div>
     );
 }
-
-
-// ================================================================
-// BLOCO 3: ESTILOS
-// ================================================================
-
-const estilos = {
-
-    pagina: {
-        minHeight:     '100vh',
-        background:    'radial-gradient(ellipse 900px 500px at 50% -8%, rgba(16,94,52,0.30) 0%, rgba(16,94,52,0) 60%), #0a0f1e',
-        color:         '#F8FAFC',
-        display:       'flex',
-        flexDirection: 'column',
-        margin:        '0 auto',
-        fontFamily:    'sans-serif',
-        position:      'relative',
-    },
-
-    // Sub-filtro público / privado dentro da aba Mesas
-    subFiltro: {
-        display:      'flex',
-        gap:          '8px',
-        marginBottom: '14px',
-    },
-
-    // Badge de contagem nas tabs de mesas
-    badge: {
-        display:      'inline-flex',
-        alignItems:   'center',
-        justifyContent:'center',
-        marginLeft:   '5px',
-        minWidth:     '18px',
-        height:       '18px',
-        borderRadius: '9px',
-        fontSize:     '10px',
-        fontWeight:   '700',
-        background:   'rgba(124,58,237,0.20)',
-        color:        '#A78BFA',
-        padding:      '0 4px',
-    },
-
-    direitaTitulo: {
-        padding:      '14px 16px',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        flexShrink:   0,
-    },
-
-    direitaTituloTexto: {
-        fontSize:   '14px',
-        fontWeight: '600',
-        color:      '#F8FAFC',
-    },
-
-    direitaConteudo: {
-        flex:      1,
-        overflowY: 'auto',
-        padding:   '12px 16px',
-        WebkitOverflowScrolling: 'touch',
-    },
-
-    btnCriar: {
-        width:          '100%',
-        padding:        '14px',
-        background:     'linear-gradient(135deg, #7C3AED, #4F46E5)',
-        border:         'none',
-        borderRadius:   '12px',
-        color:          'white',
-        fontSize:       '16px',
-        fontWeight:     '600',
-        cursor:         'pointer',
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        gap:            '8px',
-        WebkitTapHighlightColor: 'transparent',
-        transition:     'opacity 0.15s',
-        fontFamily:     'sans-serif',
-    },
-
-    erro: {
-        background:    'rgba(239,68,68,0.1)',
-        border:        '1px solid rgba(239,68,68,0.3)',
-        borderRadius:  '10px',
-        padding:       '12px 14px',
-        marginBottom:  '12px',
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '8px',
-        fontSize:      '13px',
-        color:         '#FCA5A5',
-    },
-
-    btnTentar: {
-        background:   'rgba(239,68,68,0.2)',
-        border:       '1px solid rgba(239,68,68,0.4)',
-        borderRadius: '6px',
-        color:        '#FCA5A5',
-        fontSize:     '12px',
-        padding:      '6px 12px',
-        cursor:       'pointer',
-        alignSelf:    'flex-start',
-        fontFamily:   'sans-serif',
-    },
-};
