@@ -715,7 +715,7 @@ input[type="range"]:disabled { opacity: .4; cursor: default; }
     display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 14px; border: 0; border-radius: 8px;
     background: transparent; cursor: pointer; font-family: inherit; font-size: var(--t-14); color: var(--cor-texto-2);
 }
-.segmento button[aria-pressed="true"] { background: var(--cor-superficie-2); color: var(--cor-texto); font-weight: 600; }
+.segmento button[aria-pressed="true"], .segmento button[aria-checked="true"] { background: var(--cor-superficie-2); color: var(--cor-texto); font-weight: 600; }
 .segmento .cont { font-size: var(--t-12); color: var(--cor-texto-3); }
 
 .faixa-aviso { padding: 8px 16px; font-size: var(--t-14); }
@@ -855,3 +855,58 @@ button.aviso-inline { cursor: pointer; }
     font-size: var(--t-12); line-height: 1.45;
 }
 .aviso-treino b { color: var(--cor-texto); font-size: var(--t-14); font-weight: 600; }
+
+/* ================================================================
+   MODAL GENÉRICO (Configurações e outros)
+================================================================ */
+.modal-veu { position: fixed; inset: 0; z-index: calc(var(--z-modal) - 1); background: var(--cor-veu); backdrop-filter: blur(3px); }
+.modal {
+    position: fixed; z-index: var(--z-modal); left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: calc(100% - 24px); max-width: 440px; max-height: 88dvh; display: flex; flex-direction: column; overflow: hidden;
+    border-radius: var(--r-folha); background: var(--cor-superficie); border: 1px solid var(--cor-linha);
+    box-shadow: var(--sombra-2); color: var(--cor-texto); font-family: var(--fonte); animation: fadeIn .15s ease;
+}
+.modal-cab {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0;
+    padding: 10px 10px 10px 20px; border-bottom: 1px solid var(--cor-linha);
+}
+.modal-cab .esq { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.modal-cab h2 { margin: 0; font-size: var(--t-19); font-weight: 700; }
+.modal-icone-btn {
+    display: grid; place-items: center; width: var(--toque); height: var(--toque); border: 0; border-radius: var(--r-botao);
+    background: transparent; color: var(--cor-texto-2); cursor: pointer;
+}
+.modal-icone-btn:hover { background: var(--cor-superficie-2); color: var(--cor-texto); }
+.modal-corpo { flex: 1; overflow-y: auto; padding: var(--s-4) var(--s-5) var(--s-5); overscroll-behavior: contain; }
+
+.config-grupo { margin-bottom: var(--s-5); }
+.config-grupo h3 { margin: 0 0 var(--s-2); font-size: var(--t-12); font-weight: 600; color: var(--cor-texto-3); }
+.config-item {
+    width: 100%; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 12px; border: 0;
+    border-radius: var(--r-botao); background: var(--cor-fundo); color: var(--cor-texto); cursor: pointer;
+    font-family: inherit; text-align: left;
+}
+button.config-item:hover { background: var(--cor-superficie-2); }
+.config-item.estatico { cursor: default; }
+.config-item > .icone { color: var(--cor-texto-2); }
+.config-item .txt { flex: 1; min-width: 0; }
+.config-item .txt b { display: block; font-size: var(--t-14); font-weight: 600; }
+.config-item .txt span { font-size: var(--t-12); color: var(--cor-texto-2); }
+.config-item .seta { color: var(--cor-texto-3); }
+.segmento-largo { display: flex; width: 100%; margin-top: var(--s-2); }
+.segmento-largo button { flex: 1; justify-content: center; padding: 0 8px; }
+.interruptor {
+    position: relative; width: 46px; height: 28px; flex-shrink: 0; border: 0; border-radius: var(--r-pilula); cursor: pointer;
+    background: var(--cor-superficie-3); transition: background-color .2s;
+}
+.interruptor span {
+    position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--cor-polegar); box-shadow: var(--sombra-peq); transition: transform .2s;
+}
+.interruptor.ligado { background: var(--cor-destaque); }
+.interruptor.ligado span { transform: translateX(18px); }
+.config-info { padding: 4px 12px; border-radius: var(--r-botao); background: var(--cor-fundo); }
+.info-linha { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; font-size: var(--t-12); }
+.info-linha span { color: var(--cor-texto-3); }
+.info-linha b { font-weight: 500; color: var(--cor-texto-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.info-linha b.mono { font-family: ui-monospace, Consolas, monospace; }
