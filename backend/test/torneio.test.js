@@ -6,7 +6,7 @@ import { criarIoFalso, socketFalso, avancar } from './helpers.js';
 
 const TIMERS = { apis: ['setTimeout', 'setInterval'] };
 
-function montarTorneio(nJogadores, config = {}) {
+function montarTorneio(nJogadores, config = {}, pagoBonus = {}) {
     const io = criarIoFalso();
     const gm = new GameManager(io);
     // Crédito espionado: registra em vez de ir ao Firestore
@@ -16,8 +16,8 @@ function montarTorneio(nJogadores, config = {}) {
         buscarSaldo:       async () => ({}),
     });
     gm.setTournamentManager(tm);
-    const { torneioId } = tm.criarTorneio({ buyIn: 100, ...config }, { uid: 'p0', nome: 'p0' });
-    for (let i = 1; i < nJogadores; i++) tm.entrarTorneio(torneioId, { uid: `p${i}`, nome: `p${i}` });
+    const { torneioId } = tm.criarTorneio({ buyIn: 100, ...config }, { uid: 'p0', nome: 'p0', pagoBonus: pagoBonus.p0 || 0 });
+    for (let i = 1; i < nJogadores; i++) tm.entrarTorneio(torneioId, { uid: `p${i}`, nome: `p${i}`, pagoBonus: pagoBonus[`p${i}`] || 0 });
     return { io, gm, tm, torneioId, torneio: tm.getTorneio(torneioId), creditos };
 }
 
@@ -40,18 +40,58 @@ test('todos saem de uma mesa de torneio: mesa fecha sem vencedor e o vencedor da
     assert.deepEqual(creditos, [{ uid: m1.jogadores[0], valor: 400, origemBonus: 0 }]);
 });
 
-test('todos saem de todas as mesas: torneio encerra e devolve cada entrada paga (nada se perde)', async (t) => {
+const esperarCreditos = async () => { for (let i = 0; i < 20; i++) await new Promise(r => setImmediate(r)); };
+const porUid = creditos => Object.fromEntries(creditos.map(c => [c.uid, [c.valor, c.origemBonus]]));
+
+test('abandono na rodada 0, antes de qualquer eliminação: cada um recebe o que pagou, bônus como bônus', async (t) => {
     t.mock.timers.enable(TIMERS);
-    const { gm, tm, torneioId, torneio, creditos } = montarTorneio(2, { maxRebuys: 0 });
+    const { gm, tm, torneioId, torneio, creditos } = montarTorneio(2, { maxRebuys: 0 }, { p0: 30, p1: 100 });
     tm.iniciarTorneio(torneioId, 'p0');
     const m0 = torneio.rodadas[0].mesas[0];
     for (const uid of m0.jogadores) sair(gm, tm, torneioId, m0.mesaId, uid);
-    for (let i = 0; i < 10; i++) await new Promise(r => setImmediate(r));
+    await esperarCreditos();
     assert.equal(torneio.status, 'finalizado');
     assert.equal(torneio.campeao, null);
-    const devolvido = creditos.reduce((s, c) => s + c.valor, 0);
-    assert.equal(devolvido, torneio.premioTotal);
-    assert.deepEqual(creditos.map(c => c.uid).sort(), ['p0', 'p1']);
+    assert.deepEqual(porUid(creditos), { p0: [100, 30], p1: [100, 100] });
+});
+
+test('abandono depois de eliminações: prêmio dividido só entre os vivos, eliminado não recebe', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    // p0..p3, 2 por mesa; pagos: p0 100 real, p1 100 bônus, p2 50 bônus, p3 real
+    const { gm, tm, torneioId, torneio, creditos } = montarTorneio(4, { jogadoresPorMesa: 2, maxRebuys: 0 },
+                                                                    { p1: 100, p2: 50 });
+    tm.iniciarTorneio(torneioId, 'p0');
+    const [m0, m1] = torneio.rodadas[0].mesas;
+    tm.notificarVencedorMesa(torneioId, m0.mesaId, m0.jogadores[0]);   // eliminação jogando
+    tm.notificarVencedorMesa(torneioId, m1.mesaId, m1.jogadores[0]);
+    assert.equal(torneio.rodadaAtual, 1);
+    const vivos = [m0.jogadores[0], m1.jogadores[0]].sort();
+    const final = torneio.rodadas[1].mesas[0];
+    for (const uid of final.jogadores) sair(gm, tm, torneioId, final.mesaId, uid);
+    await esperarCreditos();
+    assert.equal(torneio.status, 'finalizado');
+    assert.deepEqual(creditos.map(c => c.uid).sort(), vivos);
+    assert.equal(creditos.reduce((s, c) => s + c.valor, 0), 400);          // soma conservada
+    assert.equal(creditos.reduce((s, c) => s + c.origemBonus, 0), 150);    // bônus continua bônus
+    assert.deepEqual(creditos.map(c => c.valor), [200, 200]);
+});
+
+test('sem nenhum vivo no abandono: divide entre quem estava na última rodada', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { tm, torneioId, torneio, creditos } = montarTorneio(3, { maxRebuys: 0 }, { p0: 1 });
+    tm.iniciarTorneio(torneioId, 'p0');
+    // estado montado: a mesa da rodada fechou sem vencedor e ninguém consta como vivo
+    const m0 = torneio.rodadas[0].mesas[0];
+    m0.semVencedor = true;
+    torneio.jogadores.p0.status = 'eliminado';
+    torneio.jogadores.p1.status = 'eliminado';
+    torneio.jogadores.p2.status = 'eliminado';
+    torneio.houveEliminacao = true;
+    await tm._avancarRodada(torneioId);
+    await esperarCreditos();
+    assert.deepEqual(creditos.map(c => c.uid).sort(), ['p0', 'p1', 'p2']);
+    assert.equal(creditos.reduce((s, c) => s + c.valor, 0), 300);
+    assert.equal(creditos.reduce((s, c) => s + c.origemBonus, 0), 1);
 });
 
 test('nenhuma mesa de torneio é criada com um jogador só', (t) => {

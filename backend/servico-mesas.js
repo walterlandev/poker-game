@@ -121,7 +121,7 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
             debito = await debitar(uid, torneio.buyIn);
             if (!debito.sucesso) { socket.emit('erro', { mensagem: debito.erro }); return; }
         }
-        const usuario = { uid, nome: socket.data.nome, avatar: socket.data.avatar || '', tema: socket.data.tema };
+        const usuario = { uid, nome: socket.data.nome, avatar: socket.data.avatar || '', tema: socket.data.tema, pagoBonus: debito?.debitarBonus || 0 };
         const resultado = tournamentManager.entrarTorneio(torneioId, usuario);
         if (!resultado.sucesso) {
             if (!jaEstaNaTorneio) await creditar(uid, debito.fichasDebitadas, debito.debitarBonus);

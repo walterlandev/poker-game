@@ -481,6 +481,7 @@ io.on('connection', (socket) => {
             nome:   socket.data.nome,
             avatar: socket.data.avatar || '',
             tema:   socket.data.tema,
+            pagoBonus: debito.debitarBonus || 0,   // origem do buy-in (bônus nunca vira real)
         };
 
         const resultado = tournamentManager.criarTorneio(
@@ -575,7 +576,7 @@ io.on('connection', (socket) => {
             return;
         }
 
-        const resultado = tournamentManager.processarRebuy(torneioId, socket.data.uid);
+        const resultado = tournamentManager.processarRebuy(torneioId, socket.data.uid, debito.debitarBonus || 0);
         if (!resultado.sucesso) {
             await creditarSaidaMesa(socket.data.uid, debito.fichasDebitadas, debito.debitarBonus);
             socket.emit('erro', { mensagem: resultado.erro });

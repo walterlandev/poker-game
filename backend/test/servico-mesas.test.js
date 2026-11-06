@@ -48,6 +48,16 @@ function sock(uid) {
 
 const soma = l => l.reduce((s, x) => s + x.valor, 0);
 
+test('entrar no torneio registra quanto da entrada foi paga com bônus', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { servico, tm } = montar({ bonus: 40 });
+    const { torneioId } = tm.criarTorneio({ buyIn: 100 }, { uid: 'h', nome: 'h' });
+    await servico.entrarTorneio(sock('x'), { torneioId });
+    const torneio = tm.getTorneio(torneioId);
+    assert.equal(torneio.jogadores.x.pagoBonus, 40);
+    assert.equal(torneio.premioBonus, 40);
+});
+
 test('criar, entrar e sair de mesa real: debita o buy-in e devolve o stack', async (t) => {
     t.mock.timers.enable(TIMERS);
     const { servico, gm, debitos, creditos } = montar();
