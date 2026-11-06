@@ -453,6 +453,16 @@ export class GameManager {
             }
         });
 
+        // Mesa de torneio que ficou com um só jogador com fichas (os outros
+        // saíram/caíram entre mãos): ele venceu a mesa. Sem isso a mesa
+        // ficava em AGUARDANDO para sempre e o torneio nunca terminava.
+        if (ativos.length === 1 && mesa.torneioId && this.tournamentManager) {
+            mesa.fase = 'AGUARDANDO';
+            this.emitirEstado(mesaId);
+            this.tournamentManager.notificarVencedorMesa(mesa.torneioId, mesaId, ativos[0]);
+            return;
+        }
+
         if (ativos.length < 2) {
             mesa.fase            = 'AGUARDANDO';
             mesa.mensagemVitoria = 'Aguardando jogadores com fichas...';

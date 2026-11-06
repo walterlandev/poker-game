@@ -44,7 +44,7 @@ test('mesa de torneio que fica com um só jogador (os outros saíram entre mãos
     const mesaId = torneio.rodadas[0].mesas[0].mesaId;
     // dois saem antes da primeira mão (mesmo caminho de processarSaidaMesa)
     for (const uid of ['p1', 'p2']) { gm.sairMesa(mesaId, uid); tm.abandonarMesa(torneioId, uid); }
-    avancar(t, 5_000);
+    avancar(t, 65_000, 1000);  // inclui a janela de rebuy (60 s)
     assert.equal(torneio.status, 'finalizado', `torneio ficou '${torneio.status}', mesa em ${gm.getMesa(mesaId)?.fase}`);
     assert.equal(torneio.campeao, 'p0');
 });
