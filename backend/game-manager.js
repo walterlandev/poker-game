@@ -511,7 +511,7 @@ export class GameManager {
         if (this._ninguemMaisPrecisaAgir(mesa)) {
             mesa.turno = null;
             this.emitirEstado(mesaId);
-            setTimeout(() => this._avancarFase(mesaId), 1_500);
+            this._agendarRunout(mesaId);
             if (eraAguardando) this.io.emit('mesas_atualizadas');
             return;
         }
@@ -959,7 +959,7 @@ export class GameManager {
             // checagem de vez, avançando uma rua extra fora do runout.
             mesa.turno = null;
             this.emitirEstado(mesaId);
-            setTimeout(() => this._avancarFase(mesaId), 1_500);
+            this._agendarRunout(mesaId);
             return;
         }
 
@@ -1284,6 +1284,19 @@ export class GameManager {
             fichasPerdidas: 0,
             venceu:         true,
         }]);
+    }
+
+    /**
+     * Agenda a próxima rua do runout (ninguém mais pode apostar). O timer
+     * fica registrado em this.timers para _limparTimers cancelá-lo — antes
+     * era um setTimeout solto: se a mão acabasse no meio (ex.: W.O. porque
+     * um all-in saiu da mesa), ele ainda disparava _avancarFase, refazia o
+     * showdown por cima do resultado e agendava um segundo reinício.
+     */
+    _agendarRunout(mesaId) {
+        const t = this.timers.get(mesaId) || {};
+        t.acao  = setTimeout(() => this._avancarFase(mesaId), 1_500);
+        this.timers.set(mesaId, t);
     }
 
     _agendarProximaRodada(mesaId) {
