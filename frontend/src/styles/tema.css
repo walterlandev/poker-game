@@ -823,3 +823,20 @@ button.aviso-inline { cursor: pointer; }
     .estado-mesa.mob { display: none; }
     .linha-mesa .acao { align-items: flex-end; }
 }
+
+/* ================================================================
+   DIÁLOGO (confirmação)
+================================================================ */
+.dialogo-veu {
+    position: fixed; inset: 0; z-index: var(--z-modal); display: grid; place-items: center; padding: 16px;
+    background: var(--cor-veu); animation: fadeIn .15s ease;
+}
+.dialogo {
+    width: 100%; max-width: 380px; padding: var(--s-5); border-radius: var(--r-folha);
+    background: var(--cor-superficie); border: 1px solid var(--cor-linha); box-shadow: var(--sombra-2);
+    color: var(--cor-texto); font-family: var(--fonte);
+}
+.dialogo h2 { margin: 0 0 8px; font-size: var(--t-19); font-weight: 700; }
+.dialogo p { margin: 0 0 var(--s-5); font-size: var(--t-14); line-height: 1.5; color: var(--cor-texto-2); }
+.dialogo-acoes { display: flex; gap: var(--s-2); }
+.dialogo-acoes .btn { flex: 1; min-height: 48px; }

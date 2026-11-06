@@ -16,6 +16,7 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
     const [saldoBonus,   setSaldoBonus  ] = useState(usuario?.saldoBonus || 0);
     const [notifGanho,   setNotifGanho  ] = useState(null);
     const [linkCopiado,  setLinkCopiado ] = useState(false);
+    const [confirmarSaida, setConfirmarSaida] = useState(false);
 
     const timerRef   = useRef(null);
     const ganhoRef   = useRef(null);
@@ -127,12 +128,21 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
     const temaMinhas   = euSou?.tema || usuario?.tema || 'classico';
     const mostrarMao   = jogoAtivo && euSou;
 
+    // Sair no meio de uma mão em que você ainda está jogando pede confirmação;
+    // fora disso (entre mãos, já desistiu, sem cartas) sai direto.
+    const participandoDaMao = jogoAtivo && !!euSou && !foldado
+        && ((euSou?.cartas?.length > 0) || temCartas);
+    const pedirSaida = () => {
+        if (participandoDaMao) setConfirmarSaida(true);
+        else handleSair();
+    };
+
     return (
         <div className="jogo">
 
             {/* ── Topo ───────────────────────────────── */}
             <header className="jogo-topo">
-                <button type="button" onClick={handleSair} className="btn-sair-mesa">
+                <button type="button" onClick={pedirSaida} className="btn-sair-mesa">
                     <Icone nome="sair" />
                     Sair
                 </button>
@@ -276,6 +286,13 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
                 {notificacao && <div className="jogo-aviso">{notificacao}</div>}
             </div>
             {notifGanho && <NotifResultado notif={notifGanho} />}
+
+            {confirmarSaida && (
+                <ConfirmarSaida
+                    onFicar={() => setConfirmarSaida(false)}
+                    onSair={() => { setConfirmarSaida(false); handleSair(); }}
+                />
+            )}
         </div>
     );
 }
@@ -322,6 +339,43 @@ function NotifResultado({ notif }) {
                     {res.vencedores[0].mao ? ` — ${res.vencedores[0].mao}` : ''}
                 </div>
             )}
+        </div>
+    );
+}
+
+// ── Confirmação de saída no meio da mão ────────────────────────────
+function ConfirmarSaida({ onFicar, onSair }) {
+    const ficarRef = useRef(null);
+    useEffect(() => {
+        ficarRef.current?.focus();
+        const onKey = (e) => { if (e.key === 'Escape') onFicar(); };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [onFicar]);
+
+    return (
+        <div className="dialogo-veu" onClick={onFicar}>
+            <div
+                className="dialogo"
+                role="alertdialog"
+                aria-modal="true"
+                aria-labelledby="dialogo-sair-titulo"
+                aria-describedby="dialogo-sair-texto"
+                onClick={e => e.stopPropagation()}
+            >
+                <h2 id="dialogo-sair-titulo">Sair no meio da mão?</h2>
+                <p id="dialogo-sair-texto">
+                    Você está jogando esta mão. Se sair agora, desiste dela e o que já apostou fica no pote.
+                </p>
+                <div className="dialogo-acoes">
+                    <button type="button" ref={ficarRef} className="btn btn-neutro" onClick={onFicar}>
+                        Continuar na mesa
+                    </button>
+                    <button type="button" className="btn btn-perigo-contorno" onClick={onSair}>
+                        Sair da mesa
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
