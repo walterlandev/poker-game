@@ -367,7 +367,7 @@ button { touch-action: manipulation; color: inherit; }
 .assento-placa .nm {
     display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.assento-placa .stk { display: block; font-weight: 600; color: var(--cor-texto-2); }
+.assento-placa .stk { display: block; font-weight: 600; color: var(--cor-texto-2); white-space: nowrap; }
 .assento.turno .assento-placa .stk { color: var(--cor-destaque-texto); }
 .assento-etq {
     position: absolute; top: -6px; right: -12px; z-index: 3; font-size: var(--t-11); font-weight: 700;
@@ -483,14 +483,14 @@ button { touch-action: manipulation; color: inherit; }
 
 /* Avisos flutuantes */
 .jogo-aviso {
-    position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: var(--z-aviso);
+    position: fixed; top: 64px; left: 0; right: 0; margin: 0 auto; width: max-content; z-index: var(--z-aviso);
     max-width: min(360px, calc(100% - 32px)); padding: 10px 16px; border-radius: var(--r-botao);
     background: var(--cor-superficie-2); color: var(--cor-texto); font-size: var(--t-14);
     box-shadow: var(--sombra-2); border: 1px solid var(--cor-linha); text-align: center;
     animation: winIn .25s ease;
 }
 .jogo-resultado {
-    position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: var(--z-aviso);
+    position: fixed; top: 64px; left: 0; right: 0; margin: 0 auto; z-index: var(--z-aviso);
     width: calc(100% - 48px); max-width: 320px; padding: 14px 20px; border-radius: var(--r-painel);
     display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center;
     background: var(--cor-superficie); border: 1px solid var(--cor-linha); box-shadow: var(--sombra-2);
@@ -780,7 +780,8 @@ button.aviso-inline { cursor: pointer; }
     }
     .nav-item { flex-direction: row; gap: 8px; padding: 0 14px; font-size: var(--t-14); color: var(--cor-texto-2); }
     .nav-item[aria-current="page"]::before { top: auto; bottom: -1px; left: 14px; right: 14px; width: auto; margin: 0; height: 2px; border-radius: 0; }
-    .nav-badge { position: static; margin-left: 2px; }
+    .nav-icone { display: flex; align-items: center; gap: 6px; }
+    .nav-badge { position: static; margin: 0; order: 2; }
     .saldo-grupo { border-radius: var(--r-botao); height: 44px; }
     .saldo-btn { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; padding: 0 14px; line-height: 1.1; border-radius: var(--r-botao) 0 0 var(--r-botao); }
     .saldo-btn .rot { display: block; }
@@ -917,3 +918,10 @@ button.config-item:hover { background: var(--cor-superficie-2); }
     border-color: var(--cor-destaque-linha); background: var(--cor-destaque-suave); color: var(--cor-texto);
 }
 .btn[aria-busy="true"] { cursor: progress; }
+
+@media (min-width: 900px) {
+    /* Aviso de resultado acima do painel de ações, sem cobrir a mesa */
+    .jogo-resultado { top: auto; bottom: 240px; left: auto; right: 24px; margin: 0; }
+}
+
+.assento.eu .assento-posicoes { left: auto; right: -14px; }

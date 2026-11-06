@@ -100,7 +100,7 @@ export default function Jogador({
 
                 {/* Cartas abertas de outro jogador (showdown): leque sobre o avatar */}
                 {!souEu && temAbertas && (
-                    <div style={{ position: 'absolute', left: '50%', top: '38%', transform: 'translateX(-50%)', display: 'flex', gap: '2px', zIndex: 4 }}>
+                    <div style={{ position: 'absolute', left: '50%', bottom: '55%', transform: 'translateX(-50%)', display: 'flex', gap: '2px', zIndex: 4 }}>
                         {parseadas.map((c, i) => c
                             ? <CartaFace key={i} carta={c} largura={larguraAberta} tema={temaCartas} indice />
                             : <CartaVerso key={i} largura={larguraAberta} tema={temaCartas} />)}
