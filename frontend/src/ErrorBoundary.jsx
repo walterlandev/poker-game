@@ -26,7 +26,7 @@ const estilos = {
     texto:  { fontSize: 14, opacity: 0.8, maxWidth: 320, lineHeight: 1.4 },
     botao:  {
         padding: '12px 28px', fontSize: 16, fontWeight: 700, border: 'none',
-        borderRadius: 10, background: '#f5b400', color: '#111', cursor: 'pointer',
+        borderRadius: 10, background: '#f5b400', color: 'var(--cor-superficie)', cursor: 'pointer',
     },
 };
 

@@ -126,11 +126,11 @@ function forcaPin(pin) {
     if (/[^A-Za-z0-9]/.test(pin))     pontos++;
 
     const niveis = [
-        { label: 'Muito fraco', cor: '#EF4444' },
+        { label: 'Muito fraco', cor: 'var(--cor-perigo-texto)' },
         { label: 'Fraco',       cor: '#F97316' },
-        { label: 'Razoável',    cor: '#F59E0B' },
-        { label: 'Forte',       cor: '#22C55E' },
-        { label: 'Muito forte', cor: '#7C3AED' },
+        { label: 'Razoável',    cor: 'var(--cor-destaque-texto)' },
+        { label: 'Forte',       cor: 'var(--cor-positivo-texto)' },
+        { label: 'Muito forte', cor: 'var(--cor-destaque)' },
     ];
 
     return niveis[Math.min(pontos, niveis.length - 1)];
@@ -295,13 +295,13 @@ export default function CriarPin({ usuario, socket, onConcluido }) {
                     <div key={i} style={estilos.requisitoItem}>
                         <span style={{
                             fontSize: '13px',
-                            color:    req.ok ? '#22C55E' : 'rgba(255,255,255,0.25)',
+                            color:    req.ok ? 'var(--cor-positivo-texto)' : 'var(--cor-texto-3)',
                         }}>
                             {req.ok ? '✓' : '○'}
                         </span>
                         <span style={{
                             fontSize: '12px',
-                            color:    req.ok ? '#22C55E' : 'rgba(255,255,255,0.40)',
+                            color:    req.ok ? 'var(--cor-positivo-texto)' : 'var(--cor-texto-3)',
                             textDecoration: req.ok ? 'line-through' : 'none',
                         }}>
                             {req.texto}
@@ -323,10 +323,10 @@ export default function CriarPin({ usuario, socket, onConcluido }) {
                         style={{
                             ...estilos.input,
                             borderColor: erros.length > 0
-                                ? 'rgba(239,68,68,0.5)'
+                                ? 'var(--cor-perigo-linha)'
                                 : pinValido && pin.length > 0
-                                    ? 'rgba(34,197,94,0.5)'
-                                    : 'rgba(255,255,255,0.1)',
+                                    ? 'var(--cor-positivo)'
+                                    : 'var(--cor-linha)',
                         }}
                         autoComplete="new-password"
                     />
@@ -347,7 +347,7 @@ export default function CriarPin({ usuario, socket, onConcluido }) {
                             {[0,1,2,3,4].map(i => (
                                 <div key={i} style={{
                                     ...estilos.forcaSegmento,
-                                    background: i < forcaPin(pin) ? forca.cor : 'rgba(255,255,255,0.08)',
+                                    background: i < forcaPin(pin) ? forca.cor : 'var(--cor-linha)',
                                 }} />
                             ))}
                         </div>
@@ -372,10 +372,10 @@ export default function CriarPin({ usuario, socket, onConcluido }) {
                             ...estilos.input,
                             paddingRight: '40px',
                             borderColor:  erroConfirm
-                                ? 'rgba(239,68,68,0.5)'
+                                ? 'var(--cor-perigo-linha)'
                                 : pinsBatem
-                                    ? 'rgba(34,197,94,0.5)'
-                                    : 'rgba(255,255,255,0.1)',
+                                    ? 'var(--cor-positivo)'
+                                    : 'var(--cor-linha)',
                         }}
                         autoComplete="new-password"
                     />
@@ -389,7 +389,7 @@ export default function CriarPin({ usuario, socket, onConcluido }) {
                     </button>
                 </div>
                 {erroConfirm && <p style={estilos.erroTexto}>{erroConfirm}</p>}
-                {pinsBatem && <p style={{ fontSize: '11px', color: '#22C55E', margin: '2px 0 0' }}>✓ PINs conferem</p>}
+                {pinsBatem && <p style={{ fontSize: '11px', color: 'var(--cor-positivo-texto)', margin: '2px 0 0' }}>✓ PINs conferem</p>}
             </div>
 
             {/* ---- Aviso de segurança ---- */}
@@ -451,13 +451,13 @@ const estilos = {
     titulo: {
         fontSize:   '20px',
         fontWeight: '700',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         margin:     0,
     },
 
     subtitulo: {
         fontSize:   '13px',
-        color:      'rgba(255,255,255,0.40)',
+        color:      'var(--cor-texto-3)',
         margin:     0,
         lineHeight: 1.5,
     },
@@ -468,8 +468,8 @@ const estilos = {
         flexDirection: 'column',
         gap:           '6px',
         padding:       '12px',
-        background:    'rgba(255,255,255,0.03)',
-        border:        '1px solid rgba(255,255,255,0.06)',
+        background:    'var(--cor-superficie)',
+        border:        '1px solid var(--cor-superficie)',
         borderRadius:  '10px',
     },
 
@@ -488,7 +488,7 @@ const estilos = {
     label: {
         fontSize:      '11px',
         fontWeight:    '500',
-        color:         'rgba(255,255,255,0.45)',
+        color:         'var(--cor-texto-3)',
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
     },
@@ -500,10 +500,10 @@ const estilos = {
     input: {
         width:        '100%',
         padding:      '11px 40px 11px 12px',
-        background:   'rgba(255,255,255,0.06)',
-        border:       '1px solid rgba(255,255,255,0.1)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '8px',
-        color:        '#F8FAFC',
+        color:        'var(--cor-texto)',
         fontSize:     '14px',
         outline:      'none',
         boxSizing:    'border-box',
@@ -527,7 +527,7 @@ const estilos = {
 
     erroTexto: {
         fontSize: '11px',
-        color:    '#FCA5A5',
+        color:    'var(--cor-perigo-texto)',
         margin:   0,
     },
 
@@ -550,34 +550,34 @@ const estilos = {
         gap:          '8px',
         alignItems:   'flex-start',
         padding:      '10px 12px',
-        background:   'rgba(245,158,11,0.06)',
-        border:       '1px solid rgba(245,158,11,0.15)',
+        background:   'var(--cor-destaque-suave)',
+        border:       '1px solid var(--cor-destaque-suave)',
         borderRadius: '8px',
     },
 
     avisoTexto: {
         fontSize:   '11px',
-        color:      'rgba(255,255,255,0.40)',
+        color:      'var(--cor-texto-3)',
         margin:     0,
         lineHeight: 1.5,
     },
 
     erroGeral: {
         padding:      '10px 12px',
-        background:   'rgba(239,68,68,0.1)',
-        border:       '1px solid rgba(239,68,68,0.3)',
+        background:   'var(--cor-perigo-suave)',
+        border:       '1px solid var(--cor-perigo-linha)',
         borderRadius: '8px',
         fontSize:     '13px',
-        color:        '#FCA5A5',
+        color:        'var(--cor-perigo-texto)',
     },
 
     btnSalvar: {
         width:        '100%',
         padding:      '14px',
-        background:   'linear-gradient(135deg, #7C3AED, #4F46E5)',
+        background:   'var(--cor-destaque)',
         border:       'none',
         borderRadius: '10px',
-        color:        'white',
+        color:        'var(--cor-texto-inverso)',
         fontSize:     '15px',
         fontWeight:   '600',
         transition:   'opacity 0.2s',
@@ -599,13 +599,13 @@ const estilos = {
     sucessoTitulo: {
         fontSize:   '22px',
         fontWeight: '800',
-        color:      '#4ADE80',
+        color:      'var(--cor-positivo-texto)',
         margin:     0,
     },
 
     sucessoSub: {
         fontSize:   '13px',
-        color:      'rgba(255,255,255,0.45)',
+        color:      'var(--cor-texto-3)',
         margin:     0,
         lineHeight: 1.5,
     },

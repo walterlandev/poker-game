@@ -221,7 +221,7 @@ export default function SendBC({ saldo, usuario, socket, onFeedback }) {
             <div style={estilos.infoTaxa}>
                 <span style={{ fontSize: '13px' }}>ℹ️</span>
                 <p style={estilos.infoTaxaTexto}>
-                    Taxa de envio: <strong style={{ color: '#F59E0B' }}>
+                    Taxa de envio: <strong style={{ color: 'var(--cor-destaque-texto)' }}>
                         {TAXAS.ENVIO * 100}%
                     </strong> sobre o valor enviado
                     (mínimo ₿C {fmtBC(TAXAS.ENVIO_MIN)}).
@@ -347,13 +347,13 @@ export default function SendBC({ saldo, usuario, socket, onFeedback }) {
                             <LinhaPreview
                                 label="Destinatário recebe"
                                 valor={`₿C ${fmtBC(preview.bcEnviado)}`}
-                                cor="#22C55E"
+                                cor="var(--cor-positivo-texto)"
                                 destaque
                             />
                             <LinhaPreview
                                 label={`Taxa de envio (${TAXAS.ENVIO * 100}%)`}
                                 valor={`₿C ${fmtBC(preview.taxaBC)}`}
-                                cor="#F59E0B"
+                                cor="var(--cor-destaque-texto)"
                             />
                             <div style={estilos.previewDivisor} />
                             <LinhaPreview
@@ -364,14 +364,14 @@ export default function SendBC({ saldo, usuario, socket, onFeedback }) {
                             <LinhaPreview
                                 label="Equivale a"
                                 valor={`R$ ${fmt(bcParaBRL(preview.totalDebitado))}`}
-                                cor="rgba(255,255,255,0.35)"
+                                cor="var(--cor-texto-3)"
                             />
                             {/* Saldo após envio */}
                             <div style={estilos.previewDivisor} />
                             <LinhaPreview
                                 label="Seu saldo após envio"
                                 valor={`₿C ${fmtBC(Math.max(0, saldo - preview.totalDebitado))}`}
-                                cor={saldo - preview.totalDebitado < 0 ? '#EF4444' : 'rgba(255,255,255,0.5)'}
+                                cor={saldo - preview.totalDebitado < 0 ? 'var(--cor-perigo-texto)' : 'var(--cor-texto-2)'}
                             />
                         </div>
                     )}
@@ -402,9 +402,9 @@ export default function SendBC({ saldo, usuario, socket, onFeedback }) {
                             style={{
                                 ...estilos.btnEnviar,
                                 background: preview
-                                    ? 'linear-gradient(135deg, #7C3AED, #6D28D9)'
-                                    : 'rgba(255,255,255,0.08)',
-                                color:  preview ? '#fff' : 'rgba(255,255,255,0.3)',
+                                    ? 'var(--cor-destaque)'
+                                    : 'var(--cor-linha)',
+                                color:  preview ? '#fff' : 'var(--cor-texto-3)',
                                 cursor: preview ? 'pointer' : 'not-allowed',
                             }}
                         >
@@ -463,7 +463,7 @@ function LinhaPreview({ label, valor, cor, destaque }) {
         <div style={estilos.linhaPreview}>
             <span style={{
                 fontSize:   destaque ? '13px' : '12px',
-                color:      'rgba(255,255,255,0.45)',
+                color:      'var(--cor-texto-3)',
                 fontWeight: destaque ? '500' : '400',
             }}>
                 {label}
@@ -471,7 +471,7 @@ function LinhaPreview({ label, valor, cor, destaque }) {
             <span style={{
                 fontSize:   destaque ? '14px' : '13px',
                 fontWeight: destaque ? '700'  : '500',
-                color:      cor || '#F8FAFC',
+                color:      cor || 'var(--cor-texto)',
             }}>
                 {valor}
             </span>
@@ -502,13 +502,13 @@ const estilos = {
     titulo: {
         fontSize:   '15px',
         fontWeight: '700',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         margin:     0,
     },
 
     subtitulo: {
         fontSize:  '11px',
-        color:     'rgba(255,255,255,0.35)',
+        color:     'var(--cor-texto-3)',
         margin:    '3px 0 0',
     },
 
@@ -516,8 +516,8 @@ const estilos = {
         display:       'flex',
         flexDirection: 'column',
         alignItems:    'flex-end',
-        background:    'rgba(245,158,11,0.08)',
-        border:        '1px solid rgba(245,158,11,0.20)',
+        background:    'var(--cor-destaque-suave)',
+        border:        '1px solid var(--cor-destaque-suave)',
         borderRadius:  '8px',
         padding:       '6px 10px',
         flexShrink:    0,
@@ -525,7 +525,7 @@ const estilos = {
 
     saldoChipLabel: {
         fontSize:  '9px',
-        color:     'rgba(245,158,11,0.65)',
+        color:     'var(--cor-destaque-linha)',
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
     },
@@ -533,7 +533,7 @@ const estilos = {
     saldoChipValor: {
         fontSize:   '13px',
         fontWeight: '700',
-        color:      '#F59E0B',
+        color:      'var(--cor-destaque-texto)',
     },
 
     infoTaxa: {
@@ -541,14 +541,14 @@ const estilos = {
         gap:          '8px',
         alignItems:   'flex-start',
         padding:      '10px 12px',
-        background:   'rgba(245,158,11,0.06)',
-        border:       '1px solid rgba(245,158,11,0.15)',
+        background:   'var(--cor-destaque-suave)',
+        border:       '1px solid var(--cor-destaque-suave)',
         borderRadius: '8px',
     },
 
     infoTaxaTexto: {
         fontSize:   '12px',
-        color:      'rgba(255,255,255,0.45)',
+        color:      'var(--cor-texto-3)',
         margin:     0,
         lineHeight: 1.5,
     },
@@ -562,7 +562,7 @@ const estilos = {
     secaoLabel: {
         fontSize:   '12px',
         fontWeight: '600',
-        color:      'rgba(255,255,255,0.50)',
+        color:      'var(--cor-texto-2)',
         margin:     0,
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
@@ -572,8 +572,8 @@ const estilos = {
     inputGroup: {
         display:      'flex',
         alignItems:   'center',
-        background:   'rgba(255,255,255,0.05)',
-        border:       '1px solid rgba(255,255,255,0.10)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '8px',
         overflow:     'hidden',
     },
@@ -582,9 +582,9 @@ const estilos = {
         padding:    '0 12px',
         fontSize:   '13px',
         fontWeight: '700',
-        color:      '#A78BFA',
-        background: 'rgba(124,58,237,0.08)',
-        borderRight:'1px solid rgba(255,255,255,0.08)',
+        color:      'var(--cor-destaque-texto)',
+        background: 'var(--cor-destaque-suave)',
+        borderRight:'1px solid var(--cor-linha)',
         alignSelf:  'stretch',
         display:    'flex',
         alignItems: 'center',
@@ -597,7 +597,7 @@ const estilos = {
         background: 'transparent',
         border:     'none',
         outline:    'none',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         fontSize:   '15px',
         fontWeight: '500',
         fontFamily: 'inherit',
@@ -608,7 +608,7 @@ const estilos = {
         padding:    '0 12px',
         background: 'transparent',
         border:     'none',
-        color:      'rgba(255,255,255,0.30)',
+        color:      'var(--cor-texto-3)',
         cursor:     'pointer',
         fontSize:   '14px',
         alignSelf:  'stretch',
@@ -619,19 +619,19 @@ const estilos = {
 
     buscandoTexto: {
         fontSize:  '12px',
-        color:     'rgba(255,255,255,0.35)',
+        color:     'var(--cor-texto-3)',
         margin:    0,
     },
 
     erroTexto: {
         fontSize:  '12px',
-        color:     '#FCA5A5',
+        color:     'var(--cor-perigo-texto)',
         margin:    0,
     },
 
     dicaBusca: {
         fontSize:  '11px',
-        color:     'rgba(255,255,255,0.20)',
+        color:     'var(--cor-linha-forte)',
         margin:    0,
     },
 
@@ -640,8 +640,8 @@ const estilos = {
         display:      'flex',
         alignItems:   'center',
         gap:          '12px',
-        background:   'rgba(124,58,237,0.08)',
-        border:       '1px solid rgba(124,58,237,0.25)',
+        background:   'var(--cor-destaque-suave)',
+        border:       '1px solid var(--cor-destaque-linha)',
         borderRadius: '10px',
         padding:      '12px',
     },
@@ -650,8 +650,8 @@ const estilos = {
         width:          '40px',
         height:         '40px',
         borderRadius:   '50%',
-        background:     'rgba(124,58,237,0.25)',
-        border:         '1px solid rgba(124,58,237,0.40)',
+        background:     'var(--cor-destaque-linha)',
+        border:         '1px solid var(--cor-destaque-linha)',
         display:        'flex',
         alignItems:     'center',
         justifyContent: 'center',
@@ -668,28 +668,28 @@ const estilos = {
     avatarLetra: {
         fontSize:   '18px',
         fontWeight: '700',
-        color:      '#A78BFA',
+        color:      'var(--cor-destaque-texto)',
     },
 
     destinatarioNome: {
         fontSize:   '14px',
         fontWeight: '700',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         margin:     0,
     },
 
     destinatarioUid: {
         fontSize:  '10px',
-        color:     'rgba(255,255,255,0.30)',
+        color:     'var(--cor-texto-3)',
         margin:    '2px 0 0',
         fontFamily:'monospace',
     },
 
     btnTrocar: {
         background:   'transparent',
-        border:       '1px solid rgba(124,58,237,0.35)',
+        border:       '1px solid var(--cor-destaque-linha)',
         borderRadius: '6px',
-        color:        '#A78BFA',
+        color:        'var(--cor-destaque-texto)',
         fontSize:     '11px',
         fontWeight:   '600',
         padding:      '5px 10px',
@@ -706,10 +706,10 @@ const estilos = {
     },
 
     btnAtalho: {
-        background:   'rgba(255,255,255,0.05)',
-        border:       '1px solid rgba(255,255,255,0.10)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '6px',
-        color:        'rgba(255,255,255,0.55)',
+        color:        'var(--cor-texto-2)',
         fontSize:     '11px',
         padding:      '5px 10px',
         fontFamily:   'inherit',
@@ -719,8 +719,8 @@ const estilos = {
 
     // Preview de cálculo
     preview: {
-        background:    'rgba(255,255,255,0.03)',
-        border:        '1px solid rgba(255,255,255,0.07)',
+        background:    'var(--cor-superficie)',
+        border:        '1px solid var(--cor-linha)',
         borderRadius:  '10px',
         padding:       '14px',
         display:       'flex',
@@ -736,16 +736,16 @@ const estilos = {
 
     previewDivisor: {
         height:     '1px',
-        background: 'rgba(255,255,255,0.06)',
+        background: 'var(--cor-superficie)',
     },
 
     // Textarea de mensagem
     textarea: {
-        background:   'rgba(255,255,255,0.05)',
-        border:       '1px solid rgba(255,255,255,0.10)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '8px',
         padding:      '10px 12px',
-        color:        '#F8FAFC',
+        color:        'var(--cor-texto)',
         fontSize:     '13px',
         fontFamily:   'inherit',
         resize:       'none',
@@ -757,7 +757,7 @@ const estilos = {
 
     contadorMensagem: {
         fontSize:  '10px',
-        color:     'rgba(255,255,255,0.20)',
+        color:     'var(--cor-linha-forte)',
         margin:    0,
         textAlign: 'right',
     },
@@ -783,14 +783,14 @@ const estilos = {
         alignItems:     'center',
         gap:            '8px',
         padding:        '20px',
-        background:     'rgba(255,255,255,0.03)',
-        border:         '1px solid rgba(255,255,255,0.07)',
+        background:     'var(--cor-superficie)',
+        border:         '1px solid var(--cor-linha)',
         borderRadius:   '10px',
     },
 
     enviandoTexto: {
         fontSize:  '13px',
-        color:     'rgba(255,255,255,0.40)',
+        color:     'var(--cor-texto-3)',
         margin:    0,
     },
 
@@ -800,15 +800,15 @@ const estilos = {
         gap:          '8px',
         alignItems:   'flex-start',
         padding:      '10px 12px',
-        background:   'rgba(239,68,68,0.05)',
-        border:       '1px solid rgba(239,68,68,0.15)',
+        background:   'var(--cor-perigo-suave)',
+        border:       '1px solid var(--cor-perigo-suave)',
         borderRadius: '8px',
         marginTop:    '4px',
     },
 
     avisoTexto: {
         fontSize:   '11px',
-        color:      'rgba(255,255,255,0.35)',
+        color:      'var(--cor-texto-3)',
         margin:     0,
         lineHeight: 1.5,
     },

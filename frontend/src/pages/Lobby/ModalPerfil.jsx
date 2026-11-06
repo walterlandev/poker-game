@@ -279,10 +279,10 @@ export default function ModalPerfil({ usuario, socket, onFechar, onAtualizar }) 
                         <div style={{
                             ...estilos.feedback,
                             background: feedback.tipo === 'sucesso'
-                                ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                                ? 'var(--cor-positivo-suave)' : 'var(--cor-perigo-suave)',
                             border: feedback.tipo === 'sucesso'
-                                ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(239,68,68,0.3)',
-                            color: feedback.tipo === 'sucesso' ? '#4ADE80' : '#FCA5A5',
+                                ? '1px solid var(--cor-positivo)' : '1px solid var(--cor-perigo-linha)',
+                            color: feedback.tipo === 'sucesso' ? 'var(--cor-positivo-texto)' : 'var(--cor-perigo-texto)',
                         }}>
                             {feedback.tipo === 'sucesso' ? '✓' : '✕'} {feedback.mensagem}
                         </div>
@@ -337,10 +337,10 @@ export default function ModalPerfil({ usuario, socket, onFechar, onAtualizar }) 
                                     style={{
                                         ...estilos.avatarOpcao,
                                         border: avatar === url && !fotoLocal
-                                            ? '2px solid #7C3AED'
+                                            ? '2px solid var(--cor-destaque)'
                                             : '2px solid transparent',
                                         boxShadow: avatar === url && !fotoLocal
-                                            ? '0 0 8px rgba(124,58,237,0.5)'
+                                            ? '0 0 8px var(--cor-destaque-linha)'
                                             : 'none',
                                     }}
                                 >
@@ -361,9 +361,9 @@ export default function ModalPerfil({ usuario, socket, onFechar, onAtualizar }) 
                         </div>
                         <button onClick={handleCopiarId} style={{
                             ...estilos.btnCopiar,
-                            background: idCopiado ? 'rgba(34,197,94,0.15)' : 'rgba(124,58,237,0.15)',
-                            border:     idCopiado ? '1px solid rgba(34,197,94,0.4)' : '1px solid rgba(124,58,237,0.3)',
-                            color:      idCopiado ? '#4ADE80' : '#A78BFA',
+                            background: idCopiado ? 'var(--cor-positivo-suave)' : 'var(--cor-destaque-suave)',
+                            border:     idCopiado ? '1px solid var(--cor-positivo)' : '1px solid var(--cor-destaque-linha)',
+                            color:      idCopiado ? 'var(--cor-positivo-texto)' : 'var(--cor-destaque-texto)',
                         }}>
                             {idCopiado ? '✓ Copiado!' : '📋 Copiar'}
                         </button>
@@ -411,18 +411,18 @@ export default function ModalPerfil({ usuario, socket, onFechar, onAtualizar }) 
                                         style={{
                                             ...estilos.temaBadge,
                                             border: usuario?.tema === temaId
-                                                ? '1px solid rgba(124,58,237,0.6)'
-                                                : '1px solid rgba(255,255,255,0.10)',
+                                                ? '1px solid var(--cor-destaque-linha)'
+                                                : '1px solid var(--cor-linha)',
                                             background: usuario?.tema === temaId
-                                                ? 'rgba(124,58,237,0.15)'
-                                                : 'rgba(255,255,255,0.04)',
+                                                ? 'var(--cor-destaque-suave)'
+                                                : 'var(--cor-superficie)',
                                         }}
                                     >
                                         <span style={{ fontSize: '13px' }}>🎨</span>
                                         <span style={{
                                             fontSize:   '12px',
                                             fontWeight: usuario?.tema === temaId ? '600' : '400',
-                                            color:      usuario?.tema === temaId ? '#A78BFA' : 'rgba(255,255,255,0.6)',
+                                            color:      usuario?.tema === temaId ? 'var(--cor-destaque-texto)' : 'var(--cor-texto-2)',
                                         }}>
                                             {NOMES_TEMAS[temaId] || temaId}
                                         </span>
@@ -487,15 +487,15 @@ function Campo({ label, valor, onChange, placeholder, tipo = 'text', icone }) {
 }
 
 const estilosC = {
-    label: { fontSize:'12px', color:'rgba(255,255,255,0.5)', fontWeight:'500' },
+    label: { fontSize:'12px', color:'var(--cor-texto-2)', fontWeight:'500' },
     input: {
-        background:   'rgba(255,255,255,0.06)',
-        border:       '1px solid rgba(255,255,255,0.1)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '8px',
         padding:      '10px 12px',
-        color:        '#F8FAFC',
+        color:        'var(--cor-texto)',
         fontSize:     '14px',
-        fontFamily:   'sans-serif',
+        fontFamily:   'var(--fonte)',
         outline:      'none',
         width:        '100%',
         boxSizing:    'border-box',
@@ -505,7 +505,7 @@ const estilosC = {
 const estilos = {
     overlay: {
         position: 'fixed', inset:0,
-        background: 'rgba(0,0,0,0.7)',
+        background: 'var(--cor-veu)',
         zIndex: 200, backdropFilter:'blur(4px)',
     },
     modal: {
@@ -513,8 +513,8 @@ const estilos = {
         top:           '50%',
         left:          '50%',
         transform:     'translate(-50%, -50%)',
-        background:    '#111827',
-        border:        '1px solid rgba(255,255,255,0.1)',
+        background:    'var(--cor-superficie)',
+        border:        '1px solid var(--cor-linha)',
         borderRadius:  '16px',
         width:         '90%',
         maxWidth:      '480px',
@@ -523,21 +523,21 @@ const estilos = {
         flexDirection: 'column',
         zIndex:        201,
         overflow:      'hidden',
-        fontFamily:    'sans-serif',
-        color:         '#F8FAFC',
+        fontFamily:    'var(--fonte)',
+        color:         'var(--cor-texto)',
     },
     header: {
         display:        'flex',
         alignItems:     'center',
         justifyContent: 'space-between',
         padding:        '16px 20px',
-        borderBottom:   '1px solid rgba(255,255,255,0.08)',
+        borderBottom:   '1px solid var(--cor-linha)',
         flexShrink:     0,
     },
     titulo: { fontSize:'18px', fontWeight:'700', margin:0 },
     btnFechar: {
-        background:'rgba(255,255,255,0.06)', border:'none',
-        borderRadius:'8px', color:'rgba(255,255,255,0.6)',
+        background:'var(--cor-superficie)', border:'none',
+        borderRadius:'8px', color:'var(--cor-texto-2)',
         fontSize:'16px', width:'32px', height:'32px',
         cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
     },
@@ -561,8 +561,8 @@ const estilos = {
     },
     avatarAtual: {
         width:'80px', height:'80px', borderRadius:'50%',
-        border:'3px solid #7C3AED', objectFit:'cover',
-        boxShadow:'0 0 16px rgba(124,58,237,0.4)',
+        border:'3px solid var(--cor-destaque)', objectFit:'cover',
+        boxShadow:'0 0 16px var(--cor-destaque-linha)',
         display: 'block',
     },
     btnCamera: {
@@ -572,8 +572,8 @@ const estilos = {
         width:          '28px',
         height:         '28px',
         borderRadius:   '50%',
-        background:     '#7C3AED',
-        border:         '2px solid #111827',
+        background:     'var(--cor-destaque)',
+        border:         '2px solid var(--cor-superficie)',
         display:        'flex',
         alignItems:     'center',
         justifyContent: 'center',
@@ -584,26 +584,26 @@ const estilos = {
 
     // Botão explícito de upload
     btnUpload: {
-        background:   'rgba(124,58,237,0.10)',
-        border:       '1px solid rgba(124,58,237,0.30)',
+        background:   'var(--cor-destaque-suave)',
+        border:       '1px solid var(--cor-destaque-linha)',
         borderRadius: '8px',
-        color:        '#A78BFA',
+        color:        'var(--cor-destaque-texto)',
         fontSize:     '12px',
         fontWeight:   '500',
         padding:      '7px 14px',
         cursor:       'pointer',
-        fontFamily:   'sans-serif',
+        fontFamily:   'var(--fonte)',
         WebkitTapHighlightColor: 'transparent',
     },
 
     fotoLocalAviso: {
         fontSize:  '11px',
-        color:     '#4ADE80',
+        color:     'var(--cor-positivo-texto)',
         margin:    0,
     },
 
     labelSecao: {
-        fontSize:'12px', color:'rgba(255,255,255,0.4)',
+        fontSize:'12px', color:'var(--cor-texto-3)',
         margin:0, textTransform:'uppercase', letterSpacing:'0.06em',
     },
     avatarGrid: {
@@ -622,20 +622,20 @@ const estilos = {
         alignItems:   'center',
         gap:          '10px',
         padding:      '12px 14px',
-        background:   'rgba(124,58,237,0.06)',
-        border:       '1px solid rgba(124,58,237,0.20)',
+        background:   'var(--cor-destaque-suave)',
+        border:       '1px solid var(--cor-destaque-suave)',
         borderRadius: '10px',
     },
     idTextos: { flex: 1, minWidth: 0 },
     idLabel: {
         fontSize:     '11px',
-        color:        'rgba(255,255,255,0.40)',
+        color:        'var(--cor-texto-3)',
         margin:       0,
         marginBottom: '3px',
     },
     idValor: {
         fontSize:   '11px',
-        color:      '#A78BFA',
+        color:      'var(--cor-destaque-texto)',
         margin:     0,
         fontFamily: 'monospace',
         wordBreak:  'break-all',
@@ -647,7 +647,7 @@ const estilos = {
         cursor:       'pointer',
         fontSize:     '12px',
         fontWeight:   '600',
-        fontFamily:   'sans-serif',
+        fontFamily:   'var(--fonte)',
         transition:   'all 0.2s',
         whiteSpace:   'nowrap',
     },
@@ -677,43 +677,43 @@ const estilos = {
     },
     temaBadgeAtivo: {
         fontSize:     '9px',
-        background:   'rgba(124,58,237,0.25)',
-        color:        '#A78BFA',
+        background:   'var(--cor-destaque-linha)',
+        color:        'var(--cor-destaque-texto)',
         padding:      '1px 5px',
         borderRadius: '4px',
         fontWeight:   '600',
     },
 
     btnSenha: {
-        background:   'rgba(255,255,255,0.06)',
-        border:       '1px solid rgba(255,255,255,0.1)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '8px',
-        color:        'rgba(255,255,255,0.6)',
+        color:        'var(--cor-texto-2)',
         fontSize:     '13px',
         padding:      '10px',
         cursor:       'pointer',
-        fontFamily:   'sans-serif',
+        fontFamily:   'var(--fonte)',
         textAlign:    'left',
         width:        '100%',
     },
     footer: {
         display:'flex', gap:'10px',
         padding:'14px 20px',
-        borderTop:'1px solid rgba(255,255,255,0.08)',
+        borderTop:'1px solid var(--cor-linha)',
         flexShrink:0,
     },
     btnCancelar: {
         flex:1, padding:'12px',
-        background:'rgba(255,255,255,0.06)',
-        border:'1px solid rgba(255,255,255,0.1)',
-        borderRadius:'10px', color:'rgba(255,255,255,0.6)',
-        fontSize:'14px', cursor:'pointer', fontFamily:'sans-serif',
+        background:'var(--cor-superficie)',
+        border:'1px solid var(--cor-linha)',
+        borderRadius:'10px', color:'var(--cor-texto-2)',
+        fontSize:'14px', cursor:'pointer', fontFamily:'var(--fonte)',
     },
     btnSalvar: {
         flex:2, padding:'12px',
-        background:'linear-gradient(135deg,#7C3AED,#4F46E5)',
+        background:'var(--cor-destaque)',
         border:'none', borderRadius:'10px',
-        color:'white', fontSize:'14px', fontWeight:'600',
-        cursor:'pointer', fontFamily:'sans-serif',
+        color:'var(--cor-texto-inverso)', fontSize:'14px', fontWeight:'600',
+        cursor:'pointer', fontFamily:'var(--fonte)',
     },
 };

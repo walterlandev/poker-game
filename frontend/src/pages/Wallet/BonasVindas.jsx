@@ -104,11 +104,11 @@ export default function ModalBoasVindas({ nomeJogador, socket, onResgatado }) {
                             <span style={estilos.valorBRL}>≈ R$ {fmt(BONUS.VALOR_BRL)}</span>
                         </div>
                         <div style={estilos.regras}>
-                            <RegraItem icone="✅" texto="Use em qualquer mesa do jogo"        cor="#22C55E" />
-                            <RegraItem icone="✅" texto="Válido enquanto tiver saldo"          cor="#22C55E" />
-                            <RegraItem icone="❌" texto="Não pode ser sacado"                  cor="#EF4444" />
-                            <RegraItem icone="❌" texto="Não pode ser enviado a outro jogador" cor="#EF4444" />
-                            <RegraItem icone="⚠️" texto="Some se você perder tudo nas mesas"  cor="#F59E0B" />
+                            <RegraItem icone="✅" texto="Use em qualquer mesa do jogo"        cor="var(--cor-positivo-texto)" />
+                            <RegraItem icone="✅" texto="Válido enquanto tiver saldo"          cor="var(--cor-positivo-texto)" />
+                            <RegraItem icone="❌" texto="Não pode ser sacado"                  cor="var(--cor-perigo-texto)" />
+                            <RegraItem icone="❌" texto="Não pode ser enviado a outro jogador" cor="var(--cor-perigo-texto)" />
+                            <RegraItem icone="⚠️" texto="Some se você perder tudo nas mesas"  cor="var(--cor-destaque-texto)" />
                         </div>
                         {erro && <p style={estilos.erroTexto}>⚠ {erro}</p>}
                         <button onClick={handleResgatar} style={estilos.btnResgatar}>
@@ -127,7 +127,7 @@ export default function ModalBoasVindas({ nomeJogador, socket, onResgatado }) {
                     <div style={estilos.centrado}>
                         <span style={{ fontSize: '40px' }}>⏳</span>
                         <p style={estilos.carregandoTexto}>Creditando seu bônus...</p>
-                        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>
+                        <p style={{ fontSize: '11px', color: 'var(--cor-texto-3)', margin: 0 }}>
                             Aguarde até 5 segundos...
                         </p>
                         <button onClick={handlePular} style={estilos.btnPular}>
@@ -145,10 +145,10 @@ export default function ModalBoasVindas({ nomeJogador, socket, onResgatado }) {
                             Boa sorte nas mesas!
                         </p>
                         <div style={estilos.sucessoValor}>
-                            <span style={{ color: '#F59E0B', fontWeight: '800', fontSize: '22px' }}>
+                            <span style={{ color: 'var(--cor-destaque-texto)', fontWeight: '800', fontSize: '22px' }}>
                                 ₿C {fmtBC(BONUS.VALOR_BC)}
                             </span>
-                            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>
+                            <span style={{ color: 'var(--cor-texto-3)', fontSize: '12px' }}>
                                 adicionados como bônus
                             </span>
                         </div>
@@ -178,12 +178,12 @@ export function BadgeBonus({ saldoBonus, saldoReal }) {
     return (
         <div style={estilos.badgeContainer}>
             <div style={estilos.badgeLinha}>
-                <div style={estilos.badgePonto('#22C55E')} />
+                <div style={estilos.badgePonto('var(--cor-positivo-texto)')} />
                 <span style={estilos.badgeLabel}>Saldo real</span>
                 <span style={estilos.badgeValorReal}>₿C {fmtBC(saldoReal)}</span>
             </div>
             <div style={estilos.badgeLinha}>
-                <div style={estilos.badgePonto('#F59E0B')} />
+                <div style={estilos.badgePonto('var(--cor-destaque-texto)')} />
                 <span style={estilos.badgeLabel}>Bônus</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <span style={estilos.badgeValorBonus}>₿C {fmtBC(saldoBonus)}</span>
@@ -240,98 +240,98 @@ const estilos = {
 
     overlay: {
         position: 'fixed', inset: 0,
-        background: 'rgba(0,0,0,0.75)',
+        background: 'var(--cor-veu)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 1000, padding: '20px',
         backdropFilter: 'blur(4px)',
     },
 
     modal: {
-        background: '#0F172A',
-        border: '1px solid rgba(245,158,11,0.25)',
+        background: 'var(--cor-superficie)',
+        border: '1px solid var(--cor-destaque-linha)',
         borderRadius: '20px',
         padding: '28px 24px',
         maxWidth: '360px', width: '100%',
         display: 'flex', flexDirection: 'column', gap: '16px',
-        boxShadow: '0 0 60px rgba(245,158,11,0.10)',
+        boxShadow: '0 0 60px var(--cor-destaque-suave)',
         position: 'relative', overflow: 'hidden',
     },
 
     iconeBox: { display: 'flex', justifyContent: 'center', position: 'relative' },
-    iconeGrande: { fontSize: '56px', filter: 'drop-shadow(0 0 20px rgba(245,158,11,0.5))' },
+    iconeGrande: { fontSize: '56px', filter: 'drop-shadow(0 0 20px var(--cor-destaque-linha))' },
     brilho: {
         position: 'absolute', top: '50%', left: '50%',
         transform: 'translate(-50%, -50%)',
         width: '80px', height: '80px', borderRadius: '50%',
-        background: 'rgba(245,158,11,0.08)', pointerEvents: 'none',
+        background: 'var(--cor-destaque-suave)', pointerEvents: 'none',
     },
 
-    bemVindo:  { fontSize: '20px', fontWeight: '800', color: '#F8FAFC', margin: 0, textAlign: 'center' },
-    subtitulo: { fontSize: '13px', color: 'rgba(255,255,255,0.45)', margin: 0, textAlign: 'center', lineHeight: 1.5 },
+    bemVindo:  { fontSize: '20px', fontWeight: '800', color: 'var(--cor-texto)', margin: 0, textAlign: 'center' },
+    subtitulo: { fontSize: '13px', color: 'var(--cor-texto-3)', margin: 0, textAlign: 'center', lineHeight: 1.5 },
 
     valorDestaque: {
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
         padding: '16px',
-        background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
+        background: 'var(--cor-destaque-suave)', border: '1px solid var(--cor-destaque-linha)',
         borderRadius: '14px',
     },
 
-    simboloBC: { fontSize: '13px', fontWeight: '700', color: '#F59E0B' },
-    valorBC:   { fontSize: '36px', fontWeight: '900', color: '#F59E0B', lineHeight: 1 },
-    valorBRL:  { fontSize: '13px', color: 'rgba(255,255,255,0.35)', marginTop: '2px' },
+    simboloBC: { fontSize: '13px', fontWeight: '700', color: 'var(--cor-destaque-texto)' },
+    valorBC:   { fontSize: '36px', fontWeight: '900', color: 'var(--cor-destaque-texto)', lineHeight: 1 },
+    valorBRL:  { fontSize: '13px', color: 'var(--cor-texto-3)', marginTop: '2px' },
 
     regras: {
         display: 'flex', flexDirection: 'column', gap: '8px',
         padding: '12px',
-        background: 'rgba(255,255,255,0.03)',
-        borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)',
+        background: 'var(--cor-superficie)',
+        borderRadius: '10px', border: '1px solid var(--cor-superficie)',
     },
 
     regraItem:  { display: 'flex', alignItems: 'flex-start', gap: '8px' },
     regraTexto: { fontSize: '12px', lineHeight: 1.4 },
-    erroTexto:  { fontSize: '12px', color: '#FCA5A5', margin: 0, textAlign: 'center' },
+    erroTexto:  { fontSize: '12px', color: 'var(--cor-perigo-texto)', margin: 0, textAlign: 'center' },
 
     btnResgatar: {
         width: '100%', padding: '14px',
-        background: 'linear-gradient(135deg, #D97706, #F59E0B)',
+        background: 'var(--cor-destaque)',
         border: 'none', borderRadius: '12px',
-        color: '#fff', fontSize: '15px', fontWeight: '700',
+        color: 'var(--cor-texto-inverso)', fontSize: '15px', fontWeight: '700',
         cursor: 'pointer', fontFamily: 'inherit',
-        boxShadow: '0 4px 20px rgba(245,158,11,0.30)',
+        boxShadow: '0 4px 20px var(--cor-destaque-linha)',
         WebkitTapHighlightColor: 'transparent',
     },
 
     btnPular: {
         background: 'transparent', border: 'none',
-        color: 'rgba(255,255,255,0.30)', fontSize: '12px',
+        color: 'var(--cor-texto-3)', fontSize: '12px',
         cursor: 'pointer', fontFamily: 'inherit',
         padding: '4px', textAlign: 'center',
         WebkitTapHighlightColor: 'transparent',
     },
 
-    rodapeAviso: { fontSize: '10px', color: 'rgba(255,255,255,0.20)', margin: 0, textAlign: 'center' },
+    rodapeAviso: { fontSize: '10px', color: 'var(--cor-linha-forte)', margin: 0, textAlign: 'center' },
 
     centrado: {
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         gap: '14px', padding: '10px 0', textAlign: 'center',
     },
 
-    carregandoTexto: { fontSize: '14px', color: 'rgba(255,255,255,0.45)', margin: 0 },
-    sucessoTitulo:   { fontSize: '22px', fontWeight: '800', color: '#4ADE80', margin: 0 },
-    sucessoSub:      { fontSize: '13px', color: 'rgba(255,255,255,0.45)', margin: 0, lineHeight: 1.5 },
+    carregandoTexto: { fontSize: '14px', color: 'var(--cor-texto-3)', margin: 0 },
+    sucessoTitulo:   { fontSize: '22px', fontWeight: '800', color: 'var(--cor-positivo-texto)', margin: 0 },
+    sucessoSub:      { fontSize: '13px', color: 'var(--cor-texto-3)', margin: 0, lineHeight: 1.5 },
 
     sucessoValor: {
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
         padding: '14px 24px',
-        background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.20)',
+        background: 'var(--cor-destaque-suave)', border: '1px solid var(--cor-destaque-suave)',
         borderRadius: '12px',
     },
 
     btnJogar: {
         width: '100%', padding: '13px',
-        background: 'linear-gradient(135deg, #16A34A, #22C55E)',
+        background: 'var(--cor-positivo)',
         border: 'none', borderRadius: '12px',
-        color: '#fff', fontSize: '14px', fontWeight: '700',
+        color: 'var(--cor-sobre-positivo)', fontSize: '14px', fontWeight: '700',
         cursor: 'pointer', fontFamily: 'inherit',
         WebkitTapHighlightColor: 'transparent',
     },
@@ -340,35 +340,35 @@ const estilos = {
     badgeContainer: {
         position: 'relative', display: 'flex', flexDirection: 'column', gap: '6px',
         padding: '10px 12px',
-        background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)',
+        background: 'var(--cor-destaque-suave)', border: '1px solid var(--cor-destaque-suave)',
         borderRadius: '10px',
     },
 
     badgeLinha:      { display: 'flex', alignItems: 'center', gap: '7px' },
     badgePonto: (cor) => ({ width: '7px', height: '7px', borderRadius: '50%', background: cor, flexShrink: 0 }),
-    badgeLabel:      { flex: 1, fontSize: '11px', color: 'rgba(255,255,255,0.40)' },
-    badgeValorReal:  { fontSize: '12px', fontWeight: '700', color: '#4ADE80' },
-    badgeValorBonus: { fontSize: '12px', fontWeight: '700', color: '#F59E0B' },
+    badgeLabel:      { flex: 1, fontSize: '11px', color: 'var(--cor-texto-3)' },
+    badgeValorReal:  { fontSize: '12px', fontWeight: '700', color: 'var(--cor-positivo-texto)' },
+    badgeValorBonus: { fontSize: '12px', fontWeight: '700', color: 'var(--cor-destaque-texto)' },
 
     btnInfo: {
         background: 'transparent', border: 'none',
-        color: 'rgba(245,158,11,0.50)', cursor: 'pointer',
+        color: 'var(--cor-destaque-linha)', cursor: 'pointer',
         fontSize: '12px', padding: '0', lineHeight: 1, fontFamily: 'inherit',
     },
 
-    barraTotal:   { display: 'flex', height: '4px', borderRadius: '2px', overflow: 'hidden', background: 'rgba(255,255,255,0.06)', gap: '1px' },
-    barraReal:    { height: '100%', background: '#22C55E', borderRadius: '2px 0 0 2px', transition: 'width 0.4s ease' },
-    barraBonus:   { height: '100%', background: '#F59E0B', borderRadius: '0 2px 2px 0', transition: 'width 0.4s ease' },
-    barraLegenda: { fontSize: '9px', color: 'rgba(255,255,255,0.20)', margin: 0, textAlign: 'right' },
+    barraTotal:   { display: 'flex', height: '4px', borderRadius: '2px', overflow: 'hidden', background: 'var(--cor-superficie)', gap: '1px' },
+    barraReal:    { height: '100%', background: 'var(--cor-positivo-texto)', borderRadius: '2px 0 0 2px', transition: 'width 0.4s ease' },
+    barraBonus:   { height: '100%', background: 'var(--cor-destaque-texto)', borderRadius: '0 2px 2px 0', transition: 'width 0.4s ease' },
+    barraLegenda: { fontSize: '9px', color: 'var(--cor-linha-forte)', margin: 0, textAlign: 'right' },
 
     tooltip: {
         position: 'absolute', bottom: 'calc(100% + 8px)', right: '0',
-        width: '220px', background: '#1E293B',
-        border: '1px solid rgba(245,158,11,0.25)', borderRadius: '10px',
+        width: '220px', background: 'var(--cor-superficie-2)',
+        border: '1px solid var(--cor-destaque-linha)', borderRadius: '10px',
         padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '5px',
         zIndex: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
     },
 
-    tooltipTitulo: { fontSize: '12px', fontWeight: '700', color: '#F59E0B', margin: 0 },
-    tooltipTexto:  { fontSize: '11px', color: 'rgba(255,255,255,0.50)', margin: 0, lineHeight: 1.4 },
+    tooltipTitulo: { fontSize: '12px', fontWeight: '700', color: 'var(--cor-destaque-texto)', margin: 0 },
+    tooltipTexto:  { fontSize: '11px', color: 'var(--cor-texto-2)', margin: 0, lineHeight: 1.4 },
 };

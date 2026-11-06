@@ -256,7 +256,7 @@ export default function Cadastro({ onAutenticado, onLoginExistente, onIrParaLogi
                 <h2 style={estilos.titulo}>Criar conta</h2>
                 <p style={estilos.subtitulo}>
                     Ganhe{' '}
-                    <span style={{ color: '#F59E0B', fontWeight: '700' }}>
+                    <span style={{ color: 'var(--cor-destaque-texto)', fontWeight: '700' }}>
                         ₿C {BONUS.VALOR_BC.toLocaleString('pt-BR')}
                     </span>
                     {' '}de boas-vindas!
@@ -303,8 +303,8 @@ export default function Cadastro({ onAutenticado, onLoginExistente, onIrParaLogi
                         style={{
                             ...estilos.input,
                             borderColor: erros.nome
-                                ? 'rgba(239,68,68,0.5)'
-                                : 'rgba(255,255,255,0.1)',
+                                ? 'var(--cor-perigo-linha)'
+                                : 'var(--cor-linha)',
                         }}
                         autoComplete="username"
                     />
@@ -325,8 +325,8 @@ export default function Cadastro({ onAutenticado, onLoginExistente, onIrParaLogi
                         style={{
                             ...estilos.input,
                             borderColor: erros.email
-                                ? 'rgba(239,68,68,0.5)'
-                                : 'rgba(255,255,255,0.1)',
+                                ? 'var(--cor-perigo-linha)'
+                                : 'var(--cor-linha)',
                         }}
                         autoComplete="email"
                     />
@@ -345,8 +345,8 @@ export default function Cadastro({ onAutenticado, onLoginExistente, onIrParaLogi
                                 ...estilos.input,
                                 paddingRight: '40px',
                                 borderColor:  erros.senha
-                                    ? 'rgba(239,68,68,0.5)'
-                                    : 'rgba(255,255,255,0.1)',
+                                    ? 'var(--cor-perigo-linha)'
+                                    : 'var(--cor-linha)',
                             }}
                             autoComplete="new-password"
                         />
@@ -379,10 +379,10 @@ export default function Cadastro({ onAutenticado, onLoginExistente, onIrParaLogi
                                 ...estilos.input,
                                 paddingRight: '40px',
                                 borderColor:  erros.confirmarSenha
-                                    ? 'rgba(239,68,68,0.5)'
+                                    ? 'var(--cor-perigo-linha)'
                                     : form.confirmarSenha && form.confirmarSenha === form.senha
-                                        ? 'rgba(34,197,94,0.5)'
-                                        : 'rgba(255,255,255,0.1)',
+                                        ? 'var(--cor-positivo)'
+                                        : 'var(--cor-linha)',
                             }}
                             autoComplete="new-password"
                         />
@@ -465,11 +465,11 @@ function ForcaSenha({ senha }) {
     if (/[^A-Za-z0-9]/.test(senha))  pontos++;
 
     const niveis = [
-        { label: 'Fraca',       cor: '#EF4444' },
-        { label: 'Razoável',    cor: '#F59E0B' },
-        { label: 'Boa',         cor: '#3B82F6' },
-        { label: 'Forte',       cor: '#22C55E' },
-        { label: 'Muito forte', cor: '#7C3AED' },
+        { label: 'Fraca',       cor: 'var(--cor-perigo-texto)' },
+        { label: 'Razoável',    cor: 'var(--cor-destaque-texto)' },
+        { label: 'Boa',         cor: 'var(--cor-info)' },
+        { label: 'Forte',       cor: 'var(--cor-positivo-texto)' },
+        { label: 'Muito forte', cor: 'var(--cor-destaque)' },
     ];
 
     const nivel = niveis[Math.min(pontos, niveis.length - 1)];
@@ -483,7 +483,7 @@ function ForcaSenha({ senha }) {
                         key={i}
                         style={{
                             ...estilos.forcaSegmento,
-                            background: i < pontos ? nivel.cor : 'rgba(255,255,255,0.1)',
+                            background: i < pontos ? nivel.cor : 'var(--cor-linha)',
                         }}
                     />
                 ))}
@@ -517,13 +517,13 @@ const estilos = {
     titulo: {
         fontSize:   '22px',
         fontWeight: '700',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         margin:     0,
     },
 
     subtitulo: {
         fontSize:  '13px',
-        color:     'rgba(255,255,255,0.4)',
+        color:     'var(--cor-texto-3)',
         margin:    '4px 0 0',
     },
 
@@ -534,7 +534,7 @@ const estilos = {
         background:     '#FFFFFF',
         border:         'none',
         borderRadius:   '10px',
-        color:          '#1a1a1a',
+        color:          'var(--cor-superficie)',
         fontSize:       '14px',
         fontWeight:     '500',
         cursor:         'pointer',
@@ -556,12 +556,12 @@ const estilos = {
     linhaDivisor: {
         flex:       1,
         height:     '1px',
-        background: 'rgba(255,255,255,0.08)',
+        background: 'var(--cor-linha)',
     },
 
     textoDivisor: {
         fontSize:   '11px',
-        color:      'rgba(255,255,255,0.25)',
+        color:      'var(--cor-texto-3)',
         flexShrink: 0,
         whiteSpace: 'nowrap',
     },
@@ -585,7 +585,7 @@ const estilos = {
     label: {
         fontSize:      '11px',
         fontWeight:    '500',
-        color:         'rgba(255,255,255,0.45)',
+        color:         'var(--cor-texto-3)',
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
     },
@@ -599,10 +599,10 @@ const estilos = {
     input: {
         width:        '100%',
         padding:      '11px 12px',
-        background:   'rgba(255,255,255,0.06)',
-        border:       '1px solid rgba(255,255,255,0.1)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '8px',
-        color:        '#F8FAFC',
+        color:        'var(--cor-texto)',
         fontSize:     '14px',
         outline:      'none',
         boxSizing:    'border-box',
@@ -630,34 +630,34 @@ const estilos = {
         right:     '10px',
         bottom:    '-18px',
         fontSize:  '10px',
-        color:     'rgba(255,255,255,0.25)',
+        color:     'var(--cor-texto-3)',
     },
 
     // Texto de erro por campo
     erroTexto: {
         fontSize: '11px',
-        color:    '#FCA5A5',
+        color:    'var(--cor-perigo-texto)',
         margin:   0,
     },
 
     // Box de erro geral do servidor
     erroGeral: {
         padding:      '10px 12px',
-        background:   'rgba(239,68,68,0.1)',
-        border:       '1px solid rgba(239,68,68,0.3)',
+        background:   'var(--cor-perigo-suave)',
+        border:       '1px solid var(--cor-perigo-linha)',
         borderRadius: '8px',
         fontSize:     '13px',
-        color:        '#FCA5A5',
+        color:        'var(--cor-perigo-texto)',
     },
 
     // Botão principal de cadastro
     btnCadastrar: {
         width:        '100%',
         padding:      '13px',
-        background:   'linear-gradient(135deg, #D97706, #F59E0B)',
+        background:   'var(--cor-destaque)',
         border:       'none',
         borderRadius: '10px',
-        color:        'white',
+        color:        'var(--cor-texto-inverso)',
         fontSize:     '14px',
         fontWeight:   '600',
         cursor:       'pointer',
@@ -669,7 +669,7 @@ const estilos = {
     // Link para ir ao login
     linkLogin: {
         fontSize:      '13px',
-        color:         'rgba(255,255,255,0.4)',
+        color:         'var(--cor-texto-3)',
         textAlign:     'center',
         margin:        0,
         paddingBottom: '4px',
@@ -678,7 +678,7 @@ const estilos = {
     btnLink: {
         background: 'none',
         border:     'none',
-        color:      '#7C3AED',
+        color:      'var(--cor-destaque)',
         fontSize:   '13px',
         fontWeight: '600',
         cursor:     'pointer',

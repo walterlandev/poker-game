@@ -225,17 +225,17 @@ export default function PacotesBC({ saldoAtual, usuario, socket, onFeedback }) {
                     ) : (
                         <div style={estilos.qrcodePlaceholder}>
                             <span style={{ fontSize: '48px' }}>📷</span>
-                            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', margin: '8px 0 0' }}>
+                            <p style={{ fontSize: '12px', color: 'var(--cor-texto-3)', margin: '8px 0 0' }}>
                                 Carregando QR Code...
                             </p>
                         </div>
                     )}
 
                     <div style={estilos.qrcodeResumo}>
-                        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>
+                        <span style={{ color: 'var(--cor-texto-2)', fontSize: '13px' }}>
                             ₿C {fmtBC(calculo?.bcRecebido || 0)} · {fichasMesa} fichas
                         </span>
-                        <span style={{ color: '#F59E0B', fontWeight: '700', fontSize: '15px' }}>
+                        <span style={{ color: 'var(--cor-destaque-texto)', fontWeight: '700', fontSize: '15px' }}>
                             R$ {fmt(calculo?.totalBRL || 0)}
                         </span>
                     </div>
@@ -287,7 +287,7 @@ export default function PacotesBC({ saldoAtual, usuario, socket, onFeedback }) {
             <div style={estilos.avisoMoeda}>
                 <span style={{ fontSize: '14px' }}>ℹ️</span>
                 <p style={estilos.avisoTexto}>
-                    R$ 1,00 = <strong style={{ color: '#F59E0B' }}>₿C 1.000</strong> = <strong style={{ color: '#A78BFA' }}>1 ficha</strong> na mesa
+                    R$ 1,00 = <strong style={{ color: 'var(--cor-destaque-texto)' }}>₿C 1.000</strong> = <strong style={{ color: 'var(--cor-destaque-texto)' }}>1 ficha</strong> na mesa
                     · Taxa: {TAXAS.DEPOSITO * 100}% · Saque a qualquer momento
                 </p>
             </div>
@@ -304,13 +304,13 @@ export default function PacotesBC({ saldoAtual, usuario, socket, onFeedback }) {
                                 onClick={() => handleValorRapido(v.brl)}
                                 style={{
                                     ...estilos.btnRapido,
-                                    background: ativo ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.05)',
-                                    border:     ativo ? '1px solid rgba(245,158,11,0.50)' : '1px solid rgba(255,255,255,0.08)',
-                                    color:      ativo ? '#F59E0B' : 'rgba(255,255,255,0.6)',
+                                    background: ativo ? 'var(--cor-destaque-suave)' : 'var(--cor-superficie)',
+                                    border:     ativo ? '1px solid var(--cor-destaque-linha)' : '1px solid var(--cor-linha)',
+                                    color:      ativo ? 'var(--cor-destaque-texto)' : 'var(--cor-texto-2)',
                                 }}
                             >
                                 <span style={{ fontSize: '13px', fontWeight: '700' }}>{v.label}</span>
-                                <span style={{ fontSize: '10px', color: ativo ? '#F59E0B' : 'rgba(255,255,255,0.3)' }}>
+                                <span style={{ fontSize: '10px', color: ativo ? 'var(--cor-destaque-texto)' : 'var(--cor-texto-3)' }}>
                                     {v.fichas} fichas
                                 </span>
                             </button>
@@ -366,14 +366,14 @@ export default function PacotesBC({ saldoAtual, usuario, socket, onFeedback }) {
                     <LinhaPreview
                         label={`Taxa (${calculo.taxaPerc}%)`}
                         valor={`+ R$ ${fmt(calculo.taxaBRL)}`}
-                        cor="#F59E0B"
+                        cor="var(--cor-destaque-texto)"
                     />
                     <div style={estilos.previewDivisor} />
                     <LinhaPreview label="Total cobrado"             valor={`R$ ${fmt(calculo.totalBRL)}`}           destaque />
                     <LinhaPreview
                         label="Saldo após depósito"
                         valor={`₿C ${fmtBC(saldoAtual + calculo.bcRecebido)}`}
-                        cor="#4ADE80"
+                        cor="var(--cor-positivo-texto)"
                     />
                 </div>
             )}
@@ -394,9 +394,9 @@ export default function PacotesBC({ saldoAtual, usuario, socket, onFeedback }) {
                                 title={m.disponivel ? undefined : 'Pagamento por cartão ainda não está disponível'}
                                 style={{
                                     ...estilos.btnMetodo,
-                                    background: metodo === m.id ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.04)',
-                                    border:     metodo === m.id ? '1px solid rgba(124,58,237,0.4)' : '1px solid rgba(255,255,255,0.08)',
-                                    color:      metodo === m.id ? '#A78BFA' : 'rgba(255,255,255,0.5)',
+                                    background: metodo === m.id ? 'var(--cor-destaque-suave)' : 'var(--cor-superficie)',
+                                    border:     metodo === m.id ? '1px solid var(--cor-destaque-linha)' : '1px solid var(--cor-linha)',
+                                    color:      metodo === m.id ? 'var(--cor-destaque-texto)' : 'var(--cor-texto-2)',
                                     opacity:    m.disponivel ? 1 : 0.45,
                                     cursor:     m.disponivel ? 'pointer' : 'not-allowed',
                                 }}
@@ -418,8 +418,8 @@ export default function PacotesBC({ saldoAtual, usuario, socket, onFeedback }) {
                 disabled={!calculo}
                 style={{
                     ...estilos.btnConfirmar,
-                    background: calculo ? 'linear-gradient(135deg, #7C3AED, #4F46E5)' : 'rgba(255,255,255,0.08)',
-                    color:      calculo ? '#fff' : 'rgba(255,255,255,0.3)',
+                    background: calculo ? 'var(--cor-destaque)' : 'var(--cor-linha)',
+                    color:      calculo ? '#fff' : 'var(--cor-texto-3)',
                     cursor:     calculo ? 'pointer' : 'not-allowed',
                 }}
             >
@@ -457,7 +457,7 @@ function LinhaPreview({ label, valor, cor, destaque }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{
                 fontSize:   destaque ? '13px' : '12px',
-                color:      'rgba(255,255,255,0.45)',
+                color:      'var(--cor-texto-3)',
                 fontWeight: destaque ? '500' : '400',
             }}>
                 {label}
@@ -465,7 +465,7 @@ function LinhaPreview({ label, valor, cor, destaque }) {
             <span style={{
                 fontSize:   destaque ? '14px' : '13px',
                 fontWeight: destaque ? '700' : '500',
-                color:      cor || '#F8FAFC',
+                color:      cor || 'var(--cor-texto)',
             }}>
                 {valor}
             </span>
@@ -491,14 +491,14 @@ const estilos = {
         gap:          '8px',
         alignItems:   'flex-start',
         padding:      '10px 12px',
-        background:   'rgba(59,130,246,0.08)',
-        border:       '1px solid rgba(59,130,246,0.2)',
+        background:   'color-mix(in srgb, var(--cor-info) 8%, transparent)',
+        border:       '1px solid color-mix(in srgb, var(--cor-info) 20%, transparent)',
         borderRadius: '8px',
     },
 
     avisoTexto: {
         fontSize:   '11px',
-        color:      'rgba(255,255,255,0.5)',
+        color:      'var(--cor-texto-2)',
         margin:     0,
         lineHeight: 1.5,
     },
@@ -506,7 +506,7 @@ const estilos = {
     secaoLabel: {
         fontSize:      '11px',
         fontWeight:    '600',
-        color:         'rgba(255,255,255,0.35)',
+        color:         'var(--cor-texto-3)',
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
         margin:        '0 0 8px',
@@ -537,8 +537,8 @@ const estilos = {
     inputGroup: {
         display:      'flex',
         alignItems:   'center',
-        background:   'rgba(255,255,255,0.05)',
-        border:       '1px solid rgba(255,255,255,0.10)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '8px',
         overflow:     'hidden',
     },
@@ -547,9 +547,9 @@ const estilos = {
         padding:     '0 12px',
         fontSize:    '14px',
         fontWeight:  '700',
-        color:       '#F59E0B',
-        background:  'rgba(245,158,11,0.08)',
-        borderRight: '1px solid rgba(255,255,255,0.08)',
+        color:       'var(--cor-destaque-texto)',
+        background:  'var(--cor-destaque-suave)',
+        borderRight: '1px solid var(--cor-linha)',
         alignSelf:   'stretch',
         display:     'flex',
         alignItems:  'center',
@@ -561,7 +561,7 @@ const estilos = {
         background: 'transparent',
         border:     'none',
         outline:    'none',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         fontSize:   '16px',
         fontWeight: '600',
         fontFamily: 'inherit',
@@ -570,21 +570,21 @@ const estilos = {
     inputSufixo: {
         padding:   '0 12px',
         fontSize:  '11px',
-        color:     '#A78BFA',
+        color:     'var(--cor-destaque-texto)',
         fontWeight:'600',
         whiteSpace:'nowrap',
     },
 
     erroTexto: {
         fontSize:  '11px',
-        color:     '#FCA5A5',
+        color:     'var(--cor-perigo-texto)',
         margin:    '4px 0 0',
     },
 
     // Preview
     preview: {
-        background:    'rgba(255,255,255,0.03)',
-        border:        '1px solid rgba(255,255,255,0.07)',
+        background:    'var(--cor-superficie)',
+        border:        '1px solid var(--cor-linha)',
         borderRadius:  '10px',
         padding:       '14px',
         display:       'flex',
@@ -601,32 +601,32 @@ const estilos = {
     previewFichasNum: {
         fontSize:   '36px',
         fontWeight: '900',
-        color:      '#A78BFA',
+        color:      'var(--cor-destaque-texto)',
         lineHeight:  1,
     },
 
     previewFichasLabel: {
         fontSize:   '14px',
         fontWeight: '600',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         margin:     0,
     },
 
     previewFichasSub: {
         fontSize:  '11px',
-        color:     'rgba(255,255,255,0.35)',
+        color:     'var(--cor-texto-3)',
         margin:    '2px 0 0',
     },
 
     previewDivisor: {
         height:     '1px',
-        background: 'rgba(255,255,255,0.06)',
+        background: 'var(--cor-superficie)',
     },
 
     // Método de pagamento
     labelMetodo: {
         fontSize:      '11px',
-        color:         'rgba(255,255,255,0.35)',
+        color:         'var(--cor-texto-3)',
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
         margin:        0,
@@ -654,8 +654,8 @@ const estilos = {
 
     badgePix: {
         fontSize:     '9px',
-        background:   'rgba(34,197,94,0.2)',
-        color:        '#4ADE80',
+        background:   'var(--cor-positivo-suave)',
+        color:        'var(--cor-positivo-texto)',
         padding:      '1px 5px',
         borderRadius: '4px',
         fontWeight:   '600',
@@ -675,7 +675,7 @@ const estilos = {
 
     avisoSeguro: {
         fontSize:  '11px',
-        color:     'rgba(255,255,255,0.25)',
+        color:     'var(--cor-texto-3)',
         textAlign: 'center',
         margin:    0,
     },
@@ -693,13 +693,13 @@ const estilos = {
     estadoTitulo: {
         fontSize:   '16px',
         fontWeight: '700',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         margin:     0,
     },
 
     estadoSub: {
         fontSize:  '13px',
-        color:     'rgba(255,255,255,0.40)',
+        color:     'var(--cor-texto-3)',
         margin:    0,
     },
 
@@ -709,8 +709,8 @@ const estilos = {
         flexDirection:  'column',
         alignItems:     'center',
         gap:            '14px',
-        background:     '#111827',
-        border:         '1px solid rgba(255,255,255,0.08)',
+        background:     'var(--cor-superficie)',
+        border:         '1px solid var(--cor-linha)',
         borderRadius:   '14px',
         padding:        '20px 16px',
     },
@@ -718,13 +718,13 @@ const estilos = {
     qrcodeTitulo: {
         fontSize:   '16px',
         fontWeight: '700',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         margin:     0,
     },
 
     qrcodeSub: {
         fontSize:  '12px',
-        color:     'rgba(255,255,255,0.40)',
+        color:     'var(--cor-texto-3)',
         margin:    0,
         textAlign: 'center',
     },
@@ -733,14 +733,14 @@ const estilos = {
         width:        '200px',
         height:       '200px',
         borderRadius: '12px',
-        border:       '3px solid rgba(255,255,255,0.1)',
+        border:       '3px solid var(--cor-linha)',
     },
 
     qrcodePlaceholder: {
         width:          '200px',
         height:         '200px',
         borderRadius:   '12px',
-        border:         '2px dashed rgba(255,255,255,0.15)',
+        border:         '2px dashed var(--cor-linha-forte)',
         display:        'flex',
         flexDirection:  'column',
         alignItems:     'center',
@@ -753,17 +753,17 @@ const estilos = {
         alignItems:     'center',
         width:          '100%',
         padding:        '10px 12px',
-        background:     'rgba(255,255,255,0.04)',
+        background:     'var(--cor-superficie)',
         borderRadius:   '8px',
     },
 
     btnCopiarPix: {
         width:        '100%',
         padding:      '11px',
-        background:   'rgba(34,197,94,0.12)',
-        border:       '1px solid rgba(34,197,94,0.30)',
+        background:   'var(--cor-positivo-suave)',
+        border:       '1px solid var(--cor-positivo)',
         borderRadius: '8px',
-        color:        '#4ADE80',
+        color:        'var(--cor-positivo-texto)',
         fontSize:     '13px',
         fontWeight:   '600',
         cursor:       'pointer',
@@ -773,16 +773,16 @@ const estilos = {
 
     qrcodeAviso: {
         fontSize:  '11px',
-        color:     'rgba(255,255,255,0.30)',
+        color:     'var(--cor-texto-3)',
         margin:    0,
         textAlign: 'center',
     },
 
     btnCancelarQr: {
         background:   'transparent',
-        border:       '1px solid rgba(255,255,255,0.10)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '8px',
-        color:        'rgba(255,255,255,0.35)',
+        color:        'var(--cor-texto-3)',
         fontSize:     '12px',
         padding:      '8px 20px',
         cursor:       'pointer',

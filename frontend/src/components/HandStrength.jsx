@@ -123,16 +123,16 @@ const NIVEL_MAP = {
 
 /** Cor temática por categoria */
 const COR_MAP = {
-    'Straight Flush': '#a855f7',
-    'Quadra':         '#dc2626',
+    'Straight Flush': 'var(--cor-destaque)',
+    'Quadra':         'var(--cor-perigo-texto)',
     'Full House':     '#ec4899',
-    'Flush':          '#ef4444',
+    'Flush':          'var(--cor-perigo-texto)',
     'Sequência':      '#f97316',
-    'Trinca':         '#f59e0b',
-    'Dois Pares':     '#8b5cf6',
-    'Par':            '#3b82f6',
-    'Carta Alta':     '#6b7280',
-    'Pré-Flop':       '#4b5563',
+    'Trinca':         'var(--cor-destaque-texto)',
+    'Dois Pares':     'var(--cor-destaque)',
+    'Par':            'var(--cor-info)',
+    'Carta Alta':     'var(--cor-texto-3)',
+    'Pré-Flop':       'var(--cor-texto-3)',
 };
 
 // ================================================================
@@ -242,7 +242,7 @@ export default function HandStrength({
 
         const pts   = melhorMao([...cartasMao, ...cartasMesa]);
         const nome  = nomeDaMao(pts);
-        const cor   = COR_MAP[nome] || '#6b7280';
+        const cor   = COR_MAP[nome] || 'var(--cor-texto-3)';
         const nivel = NIVEL_MAP[nome] || 0;
         const mc    = monteCarlo(cartasMao, cartasMesa, nOponentes);
         const subiu = nivel > nivelRef.current
@@ -288,8 +288,8 @@ export default function HandStrength({
     return (
         <div className="hs-root">
             <div ref={containerRef} style={{
-                background:   '#111827',
-                border:       `1px solid ${cor}44`,
+                background:   'var(--cor-superficie)',
+                border:       `1px solid color-mix(in srgb, ${cor} 27%, transparent)`,
                 borderRadius: '12px',
                 padding:      '12px 14px',
                 width:        '188px',
@@ -299,7 +299,7 @@ export default function HandStrength({
                 {/* Label */}
                 <div style={{
                     fontSize:      '10px',
-                    color:         'rgba(255,255,255,0.28)',
+                    color:         'var(--cor-texto-3)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.08em',
                     marginBottom:  '8px',
@@ -315,7 +315,7 @@ export default function HandStrength({
                     <svg width="80" height="80" viewBox="0 0 80 80"
                         style={{ transform: 'rotate(-90deg)' }}>
                         <circle className="hs-ring-bg" cx="40" cy="40" r="34"
-                            stroke="rgba(255,255,255,0.07)" />
+                            stroke="var(--cor-linha)" />
                         <circle className="hs-ring-fill" cx="40" cy="40" r="34"
                             stroke={cor}
                             strokeDasharray={CIRC}
@@ -340,7 +340,7 @@ export default function HandStrength({
                     }}>
                         {win}%
                     </span>
-                    <span style={{ fontSize:'11px', color:'rgba(255,255,255,0.30)' }}>
+                    <span style={{ fontSize:'11px', color:'var(--cor-texto-3)' }}>
                         de vitória
                     </span>
                 </div>
@@ -356,7 +356,7 @@ export default function HandStrength({
                     fontWeight:    '600',
                     background:    cor + '22',
                     color:         cor,
-                    border:        `1px solid ${cor}44`,
+                    border:        `1px solid color-mix(in srgb, ${cor} 27%, transparent)`,
                     marginBottom:  '8px',
                 }}>
                     {nome}
@@ -366,7 +366,7 @@ export default function HandStrength({
                 <div style={{
                     width:        '100%',
                     height:       '5px',
-                    background:   'rgba(255,255,255,0.07)',
+                    background:   'var(--cor-linha)',
                     borderRadius: '3px',
                     overflow:     'hidden',
                     marginBottom: '8px',
@@ -381,9 +381,9 @@ export default function HandStrength({
                     justifyContent: 'space-between',
                 }}>
                     {[
-                        { label: 'Vitória', val: win  + '%', c: '#4ade80' },
-                        { label: 'Empate',  val: tie  + '%', c: 'rgba(255,255,255,0.45)' },
-                        { label: 'Derrota', val: loss + '%', c: '#f87171' },
+                        { label: 'Vitória', val: win  + '%', c: 'var(--cor-positivo-texto)' },
+                        { label: 'Empate',  val: tie  + '%', c: 'var(--cor-texto-3)' },
+                        { label: 'Derrota', val: loss + '%', c: 'var(--cor-perigo-texto)' },
                     ].map(({ label, val, c }) => (
                         <div key={label} style={{
                             display:       'flex',
@@ -396,7 +396,7 @@ export default function HandStrength({
                             </span>
                             <span style={{
                                 fontSize:      '9px',
-                                color:         'rgba(255,255,255,0.25)',
+                                color:         'var(--cor-texto-3)',
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.06em',
                             }}>

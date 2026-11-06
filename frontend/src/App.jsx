@@ -254,21 +254,21 @@ export default function App() {
     if (tela === TELAS.CARREGANDO) return (
         <div style={{
             minHeight:      '100vh',
-            background:     '#0a0f1e',
+            background:     'var(--cor-fundo)',
             display:        'flex',
             flexDirection:  'column',
             alignItems:     'center',
             justifyContent: 'center',
             gap:            '32px',
-            fontFamily:     'sans-serif',
+            fontFamily:     'var(--fonte)',
         }}>
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'8px' }}>
                 <img src="/logo.png" alt="Poker Game"
                     style={{ width:'80px', height:'80px', objectFit:'contain' }} />
-                <h1 style={{ fontSize:'32px', fontWeight:'800', color:'#F8FAFC', margin:0 }}>
+                <h1 style={{ fontSize:'32px', fontWeight:'800', color:'var(--cor-texto)', margin:0 }}>
                     Poker Game
                 </h1>
-                <p style={{ fontSize:'13px', color:'#D97706', margin:0 }}>
+                <p style={{ fontSize:'13px', color:'var(--cor-destaque-texto)', margin:0 }}>
                     Powered by BC Bitchager
                 </p>
             </div>
@@ -276,12 +276,12 @@ export default function App() {
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'12px' }}>
                 <div style={{
                     width:'36px', height:'36px',
-                    border:'3px solid rgba(255,255,255,0.1)',
-                    borderTop:'3px solid #7C3AED',
+                    border:'3px solid var(--cor-linha)',
+                    borderTop:'3px solid var(--cor-destaque)',
                     borderRadius:'50%',
                     animation:'girar 0.8s linear infinite',
                 }} />
-                <p style={{ fontSize:'14px', color:'rgba(255,255,255,0.4)', margin:0 }}>
+                <p style={{ fontSize:'14px', color:'var(--cor-texto-3)', margin:0 }}>
                     Verificando sessão...
                 </p>
             </div>
@@ -294,21 +294,21 @@ export default function App() {
                 {erroGlobal && (
                     <div style={{
                         position:   'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
-                        background: 'rgba(239,68,68,0.12)',
-                        border:     '1px solid rgba(239,68,68,0.35)',
+                        background: 'var(--cor-perigo-suave)',
+                        border:     '1px solid var(--cor-perigo-linha)',
                         borderTop:  'none',
                         borderRadius: '0 0 10px 10px',
                         padding:    '12px 20px',
                         display:    'flex', alignItems: 'center', gap: '10px',
-                        fontFamily: 'sans-serif',
+                        fontFamily: 'var(--fonte)',
                     }}>
                         <span style={{ fontSize: '18px' }}>⚠️</span>
-                        <p style={{ margin: 0, fontSize: '13px', color: '#FCA5A5', flex: 1 }}>
+                        <p style={{ margin: 0, fontSize: '13px', color: 'var(--cor-perigo-texto)', flex: 1 }}>
                             {erroGlobal}
                         </p>
                         <button
                             onClick={() => setErroGlobal(null)}
-                            style={{ background: 'none', border: 'none', color: '#FCA5A5', cursor: 'pointer', fontSize: '18px', padding: '0 4px' }}
+                            style={{ background: 'none', border: 'none', color: 'var(--cor-perigo-texto)', cursor: 'pointer', fontSize: '18px', padding: '0 4px' }}
                         >×</button>
                     </div>
                 )}

@@ -287,7 +287,7 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
                         <div style={{
                             ...estilos.barraPreenchimento,
                             width: `${percDiario}%`,
-                            background: percDiario > 80 ? '#EF4444' : '#F59E0B',
+                            background: percDiario > 80 ? 'var(--cor-perigo-texto)' : 'var(--cor-destaque-texto)',
                         }} />
                     </div>
                     <p style={estilos.limiteRestante}>
@@ -366,8 +366,8 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
                     <div style={estilos.blockchainStatus}>
                         <span style={{
                             ...estilos.blockchainBadge,
-                            background: statusBlockchain.valida ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
-                            color:      statusBlockchain.valida ? '#4ADE80' : '#FCA5A5',
+                            background: statusBlockchain.valida ? 'var(--cor-positivo-suave)' : 'var(--cor-perigo-suave)',
+                            color:      statusBlockchain.valida ? 'var(--cor-positivo-texto)' : 'var(--cor-perigo-texto)',
                         }}>
                             {statusBlockchain.valida ? '✓ Cadeia íntegra' : '✕ Adulteração detectada'}
                         </span>
@@ -386,14 +386,14 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
                 <BotaoAcao
                     icone="⬇️"
                     label="Depositar"
-                    cor="#22C55E"
+                    cor="var(--cor-positivo-texto)"
                     ativo={acao === 'deposito'}
                     onClick={() => toggleAcao('deposito')}
                 />
                 <BotaoAcao
                     icone="⬆️"
                     label="Sacar"
-                    cor="#F59E0B"
+                    cor="var(--cor-destaque-texto)"
                     ativo={acao === 'saque'}
                     onClick={() => toggleAcao('saque')}
                 />
@@ -439,10 +439,10 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
                     {previewDeposito && (
                         <div style={estilos.preview}>
                             <LinhaPreview label="Valor depositado"  valor={`R$ ${fmt(previewDeposito.valorBRL)}`} />
-                            <LinhaPreview label={`Taxa (${previewDeposito.taxaPerc}%)`} valor={`+ R$ ${fmt(previewDeposito.taxaBRL)}`} cor="#EF4444" />
+                            <LinhaPreview label={`Taxa (${previewDeposito.taxaPerc}%)`} valor={`+ R$ ${fmt(previewDeposito.taxaBRL)}`} cor="var(--cor-perigo-texto)" />
                             <div style={estilos.previewDivisor} />
                             <LinhaPreview label="Total cobrado"     valor={`R$ ${fmt(previewDeposito.totalBRL)}`}    destaque />
-                            <LinhaPreview label="₿C creditados"     valor={`₿C ${fmtBC(previewDeposito.bcRecebido)}`} cor="#22C55E" destaque />
+                            <LinhaPreview label="₿C creditados"     valor={`₿C ${fmtBC(previewDeposito.bcRecebido)}`} cor="var(--cor-positivo-texto)" destaque />
                         </div>
                     )}
 
@@ -462,8 +462,8 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
                         disabled={!previewDeposito}
                         style={{
                             ...estilos.btnConfirmar,
-                            background: previewDeposito ? '#22C55E' : 'rgba(255,255,255,0.08)',
-                            color:      previewDeposito ? '#fff'    : 'rgba(255,255,255,0.3)',
+                            background: previewDeposito ? 'var(--cor-positivo-texto)' : 'var(--cor-linha)',
+                            color:      previewDeposito ? '#fff'    : 'var(--cor-texto-3)',
                             cursor:     previewDeposito ? 'pointer' : 'not-allowed',
                         }}
                     >
@@ -539,9 +539,9 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
                         <div style={estilos.preview}>
                             <LinhaPreview label="₿C debitados"      valor={`₿C ${fmtBC(previewSaque.bcDebitado)}`} />
                             <LinhaPreview label="Equivale a"         valor={`R$ ${fmt(previewSaque.brlBruto)}`} />
-                            <LinhaPreview label={`Taxa (${previewSaque.taxaPerc}%)`} valor={`- R$ ${fmt(previewSaque.taxaBRL)}`} cor="#EF4444" />
+                            <LinhaPreview label={`Taxa (${previewSaque.taxaPerc}%)`} valor={`- R$ ${fmt(previewSaque.taxaBRL)}`} cor="var(--cor-perigo-texto)" />
                             <div style={estilos.previewDivisor} />
-                            <LinhaPreview label="Você recebe"        valor={`R$ ${fmt(previewSaque.brlLiquido)}`} cor="#22C55E" destaque />
+                            <LinhaPreview label="Você recebe"        valor={`R$ ${fmt(previewSaque.brlLiquido)}`} cor="var(--cor-positivo-texto)" destaque />
                         </div>
                     )}
 
@@ -550,8 +550,8 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
                         disabled={!previewSaque || !chavePix.trim()}
                         style={{
                             ...estilos.btnConfirmar,
-                            background: previewSaque && chavePix.trim() ? '#F59E0B' : 'rgba(255,255,255,0.08)',
-                            color:      previewSaque && chavePix.trim() ? '#fff'    : 'rgba(255,255,255,0.3)',
+                            background: previewSaque && chavePix.trim() ? 'var(--cor-destaque-texto)' : 'var(--cor-linha)',
+                            color:      previewSaque && chavePix.trim() ? '#fff'    : 'var(--cor-texto-3)',
                             cursor:     previewSaque && chavePix.trim() ? 'pointer' : 'not-allowed',
                         }}
                     >
@@ -607,7 +607,7 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
                     </div>
 
                     <div style={estilos.pixResumo}>
-                        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>
+                        <span style={{ color: 'var(--cor-texto-2)', fontSize: '13px' }}>
                             R$ {fmt(pixPendente.totalBRL)} → ₿C {fmtBC(pixPendente.bcCreditar)}
                         </span>
                     </div>
@@ -637,9 +637,9 @@ export default function WalletCard({ saldo, sacadoHoje, usuario, socket, onFeedb
                                 }}
                                 style={{
                                     ...estilos.pixBtnCopiar,
-                                    background: pixCopiado ? 'rgba(34,197,94,0.15)' : 'rgba(124,58,237,0.15)',
-                                    color:      pixCopiado ? '#4ADE80' : '#A78BFA',
-                                    border:     pixCopiado ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(124,58,237,0.3)',
+                                    background: pixCopiado ? 'var(--cor-positivo-suave)' : 'var(--cor-destaque-suave)',
+                                    color:      pixCopiado ? 'var(--cor-positivo-texto)' : 'var(--cor-destaque-texto)',
+                                    border:     pixCopiado ? '1px solid var(--cor-positivo)' : '1px solid var(--cor-destaque-linha)',
                                 }}
                             >
                                 {pixCopiado ? '✓ Copiado!' : '📋 Copiar código'}
@@ -685,9 +685,9 @@ function BotaoAcao({ icone, label, cor, ativo, onClick }) {
             onClick={onClick}
             style={{
                 ...estilos.botaoAcao,
-                background: ativo ? `${cor}18` : 'rgba(255,255,255,0.04)',
-                border:     ativo ? `1px solid ${cor}50` : '1px solid rgba(255,255,255,0.08)',
-                color:      ativo ? cor : 'rgba(255,255,255,0.5)',
+                background: ativo ? `color-mix(in srgb, ${cor} 9%, transparent)` : 'var(--cor-superficie)',
+                border:     ativo ? `1px solid color-mix(in srgb, ${cor} 31%, transparent)` : '1px solid var(--cor-linha)',
+                color:      ativo ? cor : 'var(--cor-texto-2)',
             }}
         >
             <span style={{ fontSize: '20px' }}>{icone}</span>
@@ -714,7 +714,7 @@ function LinhaPreview({ label, valor, cor, destaque }) {
         <div style={estilos.linhaPreview}>
             <span style={{
                 fontSize:   destaque ? '13px' : '12px',
-                color:      'rgba(255,255,255,0.45)',
+                color:      'var(--cor-texto-3)',
                 fontWeight: destaque ? '500' : '400',
             }}>
                 {label}
@@ -722,7 +722,7 @@ function LinhaPreview({ label, valor, cor, destaque }) {
             <span style={{
                 fontSize:   destaque ? '14px' : '13px',
                 fontWeight: destaque ? '700'  : '500',
-                color:      cor || '#F8FAFC',
+                color:      cor || 'var(--cor-texto)',
             }}>
                 {valor}
             </span>
@@ -737,9 +737,9 @@ function MetodoPag({ icone, label, destaque }) {
             onClick={() => setAtivo(true)}
             style={{
                 ...estilos.metodoPag,
-                background: ativo ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.04)',
-                border:     ativo ? '1px solid rgba(124,58,237,0.4)' : '1px solid rgba(255,255,255,0.08)',
-                color:      ativo ? '#A78BFA' : 'rgba(255,255,255,0.4)',
+                background: ativo ? 'var(--cor-destaque-suave)' : 'var(--cor-superficie)',
+                border:     ativo ? '1px solid var(--cor-destaque-linha)' : '1px solid var(--cor-linha)',
+                color:      ativo ? 'var(--cor-destaque-texto)' : 'var(--cor-texto-3)',
             }}
         >
             <span style={{ fontSize: '18px' }}>{icone}</span>
@@ -764,8 +764,8 @@ const estilos = {
 
     // Card principal de saldo
     cardSaldo: {
-        background:   '#111827',
-        border:       '1px solid rgba(245,158,11,0.20)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-destaque-suave)',
         borderRadius: '14px',
         padding:      '18px',
         display:      'flex',
@@ -783,15 +783,15 @@ const estilos = {
         display:        'flex',
         alignItems:     'center',
         justifyContent: 'center',
-        background:     'rgba(245,158,11,0.12)',
-        border:         '1px solid rgba(245,158,11,0.25)',
+        background:     'var(--cor-destaque-suave)',
+        border:         '1px solid var(--cor-destaque-linha)',
         borderRadius:   '10px',
         padding:        '10px 12px',
     },
 
     saldoLabel: {
         fontSize:  '11px',
-        color:     'rgba(255,255,255,0.35)',
+        color:     'var(--cor-texto-3)',
         margin:    0,
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
@@ -800,14 +800,14 @@ const estilos = {
     saldoBig: {
         fontSize:   '28px',
         fontWeight: '800',
-        color:      '#F59E0B',
+        color:      'var(--cor-destaque-texto)',
         margin:     '2px 0 0',
         lineHeight:  1,
     },
 
     saldoEquiv: {
         fontSize: '12px',
-        color:    'rgba(255,255,255,0.35)',
+        color:    'var(--cor-texto-3)',
         margin:   '4px 0 0',
     },
 
@@ -825,17 +825,17 @@ const estilos = {
 
     limiteLabel: {
         fontSize: '11px',
-        color:    'rgba(255,255,255,0.35)',
+        color:    'var(--cor-texto-3)',
     },
 
     limiteValor: {
         fontSize: '11px',
-        color:    'rgba(255,255,255,0.5)',
+        color:    'var(--cor-texto-2)',
     },
 
     barraFundo: {
         height:       '4px',
-        background:   'rgba(255,255,255,0.08)',
+        background:   'var(--cor-linha)',
         borderRadius: '2px',
         overflow:     'hidden',
     },
@@ -848,14 +848,14 @@ const estilos = {
 
     limiteRestante: {
         fontSize: '10px',
-        color:    'rgba(255,255,255,0.25)',
+        color:    'var(--cor-texto-3)',
         margin:   0,
     },
 
     // Card de cotação / explicação
     cardCotacao: {
-        background:   'rgba(59,130,246,0.05)',
-        border:       '1px solid rgba(59,130,246,0.15)',
+        background:   'color-mix(in srgb, var(--cor-info) 5%, transparent)',
+        border:       '1px solid color-mix(in srgb, var(--cor-info) 15%, transparent)',
         borderRadius: '12px',
         padding:      '14px',
         display:      'flex',
@@ -866,7 +866,7 @@ const estilos = {
     cotacaoTitulo: {
         fontSize:   '13px',
         fontWeight: '600',
-        color:      '#93C5FD',
+        color:      'var(--cor-info)',
         margin:     0,
     },
 
@@ -885,7 +885,7 @@ const estilos = {
     infoTitulo: {
         fontSize:   '10px',
         fontWeight: '600',
-        color:      'rgba(255,255,255,0.4)',
+        color:      'var(--cor-texto-3)',
         margin:     0,
         textTransform: 'uppercase',
         letterSpacing: '0.04em',
@@ -894,13 +894,13 @@ const estilos = {
     infoTexto: {
         fontSize:   '12px',
         fontWeight: '700',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         margin:     '2px 0 0',
     },
 
     infoSub: {
         fontSize: '10px',
-        color:    'rgba(255,255,255,0.3)',
+        color:    'var(--cor-texto-3)',
         margin:   '1px 0 0',
     },
 
@@ -909,21 +909,21 @@ const estilos = {
         gap:        '8px',
         alignItems: 'flex-start',
         padding:    '8px 10px',
-        background: 'rgba(255,255,255,0.03)',
+        background: 'var(--cor-superficie)',
         borderRadius:'8px',
     },
 
     cotacaoAvisoTexto: {
         fontSize:   '11px',
-        color:      'rgba(255,255,255,0.40)',
+        color:      'var(--cor-texto-3)',
         margin:     0,
         lineHeight: 1.5,
     },
 
     // Painel de verificação da blockchain
     blockchainCard: {
-        background:   'rgba(124,58,237,0.05)',
-        border:       '1px solid rgba(124,58,237,0.18)',
+        background:   'var(--cor-destaque-suave)',
+        border:       '1px solid var(--cor-destaque-suave)',
         borderRadius: '12px',
         padding:      '14px',
         display:      'flex',
@@ -939,21 +939,21 @@ const estilos = {
     blockchainTitulo: {
         fontSize:   '13px',
         fontWeight: '600',
-        color:      '#C4B5FD',
+        color:      'var(--cor-destaque-texto)',
         margin:     0,
     },
     blockchainSub: {
         fontSize:   '11px',
-        color:      'rgba(255,255,255,0.35)',
+        color:      'var(--cor-texto-3)',
         margin:     '3px 0 0',
         lineHeight: 1.5,
         maxWidth:   '320px',
     },
     btnVerificar: {
-        background:   'rgba(124,58,237,0.15)',
-        border:       '1px solid rgba(124,58,237,0.35)',
+        background:   'var(--cor-destaque-suave)',
+        border:       '1px solid var(--cor-destaque-linha)',
         borderRadius: '8px',
-        color:        '#C4B5FD',
+        color:        'var(--cor-destaque-texto)',
         fontSize:     '12px',
         fontWeight:   '600',
         padding:      '7px 12px',
@@ -976,7 +976,7 @@ const estilos = {
     },
     blockchainInfo: {
         fontSize: '11px',
-        color:    'rgba(255,255,255,0.35)',
+        color:    'var(--cor-texto-3)',
     },
 
     // Botões de ação depósito/saque
@@ -1002,8 +1002,8 @@ const estilos = {
 
     // Formulário de depósito / saque
     formCard: {
-        background:   '#111827',
-        border:       '1px solid rgba(255,255,255,0.08)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '12px',
         padding:      '16px',
         display:      'flex',
@@ -1014,21 +1014,21 @@ const estilos = {
     formTitulo: {
         fontSize:   '14px',
         fontWeight: '700',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         margin:     0,
     },
 
     formDica: {
         fontSize:  '11px',
-        color:     'rgba(255,255,255,0.30)',
+        color:     'var(--cor-texto-3)',
         margin:    0,
     },
 
     inputGroup: {
         display:    'flex',
         alignItems: 'center',
-        background: 'rgba(255,255,255,0.05)',
-        border:     '1px solid rgba(255,255,255,0.10)',
+        background: 'var(--cor-superficie)',
+        border:     '1px solid var(--cor-linha)',
         borderRadius:'8px',
         overflow:   'hidden',
     },
@@ -1037,9 +1037,9 @@ const estilos = {
         padding:    '0 12px',
         fontSize:   '13px',
         fontWeight: '700',
-        color:      '#F59E0B',
-        background: 'rgba(245,158,11,0.08)',
-        borderRight:'1px solid rgba(255,255,255,0.08)',
+        color:      'var(--cor-destaque-texto)',
+        background: 'var(--cor-destaque-suave)',
+        borderRight:'1px solid var(--cor-linha)',
         alignSelf:  'stretch',
         display:    'flex',
         alignItems: 'center',
@@ -1051,7 +1051,7 @@ const estilos = {
         background:  'transparent',
         border:      'none',
         outline:     'none',
-        color:       '#F8FAFC',
+        color:       'var(--cor-texto)',
         fontSize:    '16px',
         fontWeight:  '600',
         fontFamily:  'inherit',
@@ -1059,15 +1059,15 @@ const estilos = {
 
     erroTexto: {
         fontSize:  '12px',
-        color:     '#FCA5A5',
+        color:     'var(--cor-perigo-texto)',
         margin:    0,
     },
 
     btnTudo: {
         background:   'transparent',
-        border:       '1px solid rgba(245,158,11,0.25)',
+        border:       '1px solid var(--cor-destaque-linha)',
         borderRadius: '6px',
-        color:        '#F59E0B',
+        color:        'var(--cor-destaque-texto)',
         fontSize:     '11px',
         padding:      '6px 10px',
         cursor:       'pointer',
@@ -1077,8 +1077,8 @@ const estilos = {
 
     // Preview de cálculo
     preview: {
-        background:   'rgba(255,255,255,0.03)',
-        border:       '1px solid rgba(255,255,255,0.06)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-superficie)',
         borderRadius: '8px',
         padding:      '12px',
         display:      'flex',
@@ -1094,12 +1094,12 @@ const estilos = {
 
     previewDivisor: {
         height:     '1px',
-        background: 'rgba(255,255,255,0.06)',
+        background: 'var(--cor-superficie)',
     },
 
     labelMetodo: {
         fontSize:      '11px',
-        color:         'rgba(255,255,255,0.35)',
+        color:         'var(--cor-texto-3)',
         margin:        0,
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
@@ -1127,8 +1127,8 @@ const estilos = {
 
     badgePix: {
         fontSize:     '9px',
-        background:   'rgba(34,197,94,0.2)',
-        color:        '#4ADE80',
+        background:   'var(--cor-positivo-suave)',
+        color:        'var(--cor-positivo-texto)',
         padding:      '1px 5px',
         borderRadius: '4px',
         fontWeight:   '600',
@@ -1148,8 +1148,8 @@ const estilos = {
 
     // PIX QR Code panel
     pixCard: {
-        background:    '#111827',
-        border:        '1px solid rgba(34,197,94,0.30)',
+        background:    'var(--cor-superficie)',
+        border:        '1px solid var(--cor-positivo)',
         borderRadius:  '14px',
         padding:       '16px',
         display:       'flex',
@@ -1166,13 +1166,13 @@ const estilos = {
     pixTitulo: {
         fontSize:   '14px',
         fontWeight: '700',
-        color:      '#4ADE80',
+        color:      'var(--cor-positivo-texto)',
         margin:     0,
     },
 
     pixSub: {
         fontSize: '11px',
-        color:    'rgba(255,255,255,0.40)',
+        color:    'var(--cor-texto-3)',
         margin:   '2px 0 0',
     },
 
@@ -1180,7 +1180,7 @@ const estilos = {
         marginLeft:   'auto',
         background:   'transparent',
         border:       'none',
-        color:        'rgba(255,255,255,0.4)',
+        color:        'var(--cor-texto-3)',
         fontSize:     '20px',
         cursor:       'pointer',
         lineHeight:   1,
@@ -1200,7 +1200,7 @@ const estilos = {
         width:        '180px',
         height:       '180px',
         borderRadius: '8px',
-        border:       '3px solid rgba(255,255,255,0.08)',
+        border:       '3px solid var(--cor-linha)',
     },
 
     pixCopiaWrap: {
@@ -1211,9 +1211,9 @@ const estilos = {
 
     pixCodigoTexto: {
         fontSize:     '9px',
-        color:        'rgba(255,255,255,0.40)',
-        background:   'rgba(255,255,255,0.04)',
-        border:       '1px solid rgba(255,255,255,0.08)',
+        color:        'var(--cor-texto-3)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '6px',
         padding:      '8px',
         wordBreak:    'break-all',
@@ -1236,7 +1236,7 @@ const estilos = {
 
     pixAviso: {
         fontSize:   '11px',
-        color:      'rgba(255,255,255,0.30)',
+        color:      'var(--cor-texto-3)',
         textAlign:  'center',
         margin:     0,
     },

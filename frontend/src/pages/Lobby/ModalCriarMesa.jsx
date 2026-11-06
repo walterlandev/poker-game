@@ -254,8 +254,8 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
                             style={{
                                 ...estilos.input,
                                 borderColor: erros.nome
-                                    ? 'rgba(239,68,68,0.5)'
-                                    : 'rgba(255,255,255,0.1)',
+                                    ? 'var(--cor-perigo-linha)'
+                                    : 'var(--cor-linha)',
                             }}
                         />
                     </Campo>
@@ -270,12 +270,12 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
                                     style={{
                                         ...estilos.btnOpcao,
                                         background: form.buyIn === v
-                                            ? 'rgba(124,58,237,0.3)'
-                                            : 'rgba(255,255,255,0.05)',
+                                            ? 'var(--cor-destaque-linha)'
+                                            : 'var(--cor-superficie)',
                                         border: form.buyIn === v
-                                            ? '1px solid rgba(124,58,237,0.6)'
-                                            : '1px solid rgba(255,255,255,0.1)',
-                                        color: form.buyIn === v ? '#A78BFA' : 'rgba(255,255,255,0.5)',
+                                            ? '1px solid var(--cor-destaque-linha)'
+                                            : '1px solid var(--cor-linha)',
+                                        color: form.buyIn === v ? 'var(--cor-destaque-texto)' : 'var(--cor-texto-2)',
                                     }}
                                 >
                                     {fmt(v)}
@@ -292,8 +292,8 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
                                 ...estilos.input,
                                 marginTop: '8px',
                                 borderColor: erros.buyIn
-                                    ? 'rgba(239,68,68,0.5)'
-                                    : 'rgba(255,255,255,0.1)',
+                                    ? 'var(--cor-perigo-linha)'
+                                    : 'var(--cor-linha)',
                             }}
                         />
                     </Campo>
@@ -311,12 +311,12 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
                                     style={{
                                         ...estilos.btnOpcao,
                                         background: form.smallBlind === v
-                                            ? 'rgba(34,197,94,0.2)'
-                                            : 'rgba(255,255,255,0.05)',
+                                            ? 'var(--cor-positivo-suave)'
+                                            : 'var(--cor-superficie)',
                                         border: form.smallBlind === v
-                                            ? '1px solid rgba(34,197,94,0.5)'
-                                            : '1px solid rgba(255,255,255,0.1)',
-                                        color: form.smallBlind === v ? '#22C55E' : 'rgba(255,255,255,0.5)',
+                                            ? '1px solid var(--cor-positivo)'
+                                            : '1px solid var(--cor-linha)',
+                                        color: form.smallBlind === v ? 'var(--cor-positivo-texto)' : 'var(--cor-texto-2)',
                                     }}
                                 >
                                     {v}
@@ -359,7 +359,7 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
                             onClick={() => setMesaPrivada(p => !p)}
                             style={{
                                 ...estilos.toggle,
-                                background: mesaPrivada ? '#7C3AED' : 'rgba(255,255,255,0.1)',
+                                background: mesaPrivada ? 'var(--cor-destaque)' : 'var(--cor-linha)',
                             }}
                             role="switch"
                             aria-checked={mesaPrivada}
@@ -383,8 +383,8 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
                                 style={{
                                     ...estilos.input,
                                     borderColor: erros.senha
-                                        ? 'rgba(239,68,68,0.5)'
-                                        : 'rgba(255,255,255,0.1)',
+                                        ? 'var(--cor-perigo-linha)'
+                                        : 'var(--cor-linha)',
                                 }}
                             />
                         </Campo>
@@ -401,18 +401,18 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
                         </div>
                         <div style={estilos.resumoLinha}>
                             <span style={estilos.resumoLabel}>Custo (buy-in)</span>
-                            <span style={{ ...estilos.resumoValor, color: '#EF4444' }}>
+                            <span style={{ ...estilos.resumoValor, color: 'var(--cor-perigo-texto)' }}>
                                 − ₿C {fmt(form.buyIn)}
                             </span>
                         </div>
                         <div style={estilos.separador} />
                         <div style={estilos.resumoLinha}>
-                            <span style={{ ...estilos.resumoLabel, fontWeight: '600', color: '#F8FAFC' }}>
+                            <span style={{ ...estilos.resumoLabel, fontWeight: '600', color: 'var(--cor-texto)' }}>
                                 Saldo após criar
                             </span>
                             <span style={{
                                 ...estilos.resumoValor,
-                                color: (saldoTotal - form.buyIn) < 0 ? '#EF4444' : '#22C55E',
+                                color: (saldoTotal - form.buyIn) < 0 ? 'var(--cor-perigo-texto)' : 'var(--cor-positivo-texto)',
                                 fontWeight: '700',
                             }}>
                                 ₿C {fmt(Math.max(0, saldoTotal - form.buyIn))}
@@ -480,7 +480,7 @@ const estilos = {
     overlay: {
         position:   'fixed',
         inset:      0,
-        background: 'rgba(0,0,0,0.7)',
+        background: 'var(--cor-veu)',
         zIndex:     300,
         backdropFilter: 'blur(2px)',
     },
@@ -494,7 +494,7 @@ const estilos = {
         width:         '100%',
         maxWidth:      '480px',
         maxHeight:     '90vh',
-        background:    '#111827',
+        background:    'var(--cor-superficie)',
         borderRadius:  '20px 20px 0 0',
         zIndex:        301,
         display:       'flex',
@@ -509,28 +509,28 @@ const estilos = {
         alignItems:     'flex-start',
         justifyContent: 'space-between',
         padding:        '18px 16px 14px',
-        borderBottom:   '1px solid rgba(255,255,255,0.06)',
+        borderBottom:   '1px solid var(--cor-superficie)',
         flexShrink:     0,
     },
 
     titulo: {
         fontSize:   '18px',
         fontWeight: '700',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         margin:     0,
     },
 
     subtitulo: {
         fontSize:  '12px',
-        color:     'rgba(255,255,255,0.4)',
+        color:     'var(--cor-texto-3)',
         margin:    '4px 0 0',
     },
 
     btnFechar: {
-        background:   'rgba(255,255,255,0.08)',
-        border:       '1px solid rgba(255,255,255,0.1)',
+        background:   'var(--cor-linha)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '8px',
-        color:        'rgba(255,255,255,0.6)',
+        color:        'var(--cor-texto-2)',
         width:        '32px',
         height:       '32px',
         display:      'flex',
@@ -554,12 +554,12 @@ const estilos = {
 
     // Erro geral
     erroGeral: {
-        background:   'rgba(239,68,68,0.1)',
-        border:       '1px solid rgba(239,68,68,0.3)',
+        background:   'var(--cor-perigo-suave)',
+        border:       '1px solid var(--cor-perigo-linha)',
         borderRadius: '8px',
         padding:      '10px 12px',
         fontSize:     '13px',
-        color:        '#FCA5A5',
+        color:        'var(--cor-perigo-texto)',
     },
 
     // Campo do formulário
@@ -572,14 +572,14 @@ const estilos = {
     campoLabel: {
         fontSize:   '12px',
         fontWeight: '500',
-        color:      'rgba(255,255,255,0.5)',
+        color:      'var(--cor-texto-2)',
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
     },
 
     campoErro: {
         fontSize: '12px',
-        color:    '#FCA5A5',
+        color:    'var(--cor-perigo-texto)',
         margin:   0,
     },
 
@@ -587,10 +587,10 @@ const estilos = {
     input: {
         width:        '100%',
         padding:      '10px 12px',
-        background:   'rgba(255,255,255,0.05)',
-        border:       '1px solid rgba(255,255,255,0.1)',
+        background:   'var(--cor-superficie)',
+        border:       '1px solid var(--cor-linha)',
         borderRadius: '8px',
-        color:        '#F8FAFC',
+        color:        'var(--cor-texto)',
         fontSize:     '14px',
         outline:      'none',
         boxSizing:    'border-box',
@@ -624,7 +624,7 @@ const estilos = {
 
     sliderLabel: {
         fontSize:  '12px',
-        color:     'rgba(255,255,255,0.4)',
+        color:     'var(--cor-texto-3)',
         minWidth:  '12px',
         textAlign: 'center',
     },
@@ -632,14 +632,14 @@ const estilos = {
     // Slider
     slider: {
         flex:        1,
-        accentColor: '#7C3AED',
+        accentColor: 'var(--cor-destaque)',
         cursor:      'pointer',
     },
 
     // Dica sobre os bots
     dicaBots: {
         fontSize: '11px',
-        color:    'rgba(255,255,255,0.3)',
+        color:    'var(--cor-texto-3)',
         margin:   '4px 0 0',
         fontStyle: 'italic',
     },
@@ -651,21 +651,21 @@ const estilos = {
         justifyContent: 'space-between',
         gap:            '12px',
         padding:        '12px',
-        background:     'rgba(255,255,255,0.03)',
+        background:     'var(--cor-superficie)',
         borderRadius:   '10px',
-        border:         '1px solid rgba(255,255,255,0.06)',
+        border:         '1px solid var(--cor-superficie)',
     },
 
     toggleLabel: {
         fontSize:   '14px',
         fontWeight: '500',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
         margin:     0,
     },
 
     toggleDesc: {
         fontSize: '11px',
-        color:    'rgba(255,255,255,0.35)',
+        color:    'var(--cor-texto-3)',
         margin:   '2px 0 0',
     },
 
@@ -697,8 +697,8 @@ const estilos = {
 
     // Box de resumo do custo
     resumoCusto: {
-        background:    'rgba(255,255,255,0.03)',
-        border:        '1px solid rgba(255,255,255,0.06)',
+        background:    'var(--cor-superficie)',
+        border:        '1px solid var(--cor-superficie)',
         borderRadius:  '10px',
         padding:       '12px',
         display:       'flex',
@@ -714,24 +714,24 @@ const estilos = {
 
     resumoLabel: {
         fontSize: '13px',
-        color:    'rgba(255,255,255,0.45)',
+        color:    'var(--cor-texto-3)',
     },
 
     resumoValor: {
         fontSize:   '13px',
         fontWeight: '500',
-        color:      '#F8FAFC',
+        color:      'var(--cor-texto)',
     },
 
     separador: {
         height:     '1px',
-        background: 'rgba(255,255,255,0.06)',
+        background: 'var(--cor-superficie)',
     },
 
     // Rodapé com botão de criar
     rodape: {
         padding:     '12px 16px',
-        borderTop:   '1px solid rgba(255,255,255,0.06)',
+        borderTop:   '1px solid var(--cor-superficie)',
         flexShrink:  0,
     },
 
@@ -739,10 +739,10 @@ const estilos = {
     btnCriar: {
         width:        '100%',
         padding:      '14px',
-        background:   'linear-gradient(135deg, #7C3AED, #4F46E5)',
+        background:   'var(--cor-destaque)',
         border:       'none',
         borderRadius: '12px',
-        color:        'white',
+        color:        'var(--cor-texto-inverso)',
         fontSize:     '15px',
         fontWeight:   '600',
         transition:   'opacity 0.2s',

@@ -47,11 +47,11 @@ export default function Loja({ usuario, socket }) {
                     <h2 style={estilos.titulo}>Loja</h2>
                     <p style={estilos.subtitulo}>
                         Saldo:{' '}
-                        <span style={{ color: '#F59E0B', fontWeight: '700' }}>
+                        <span style={{ color: 'var(--cor-destaque-texto)', fontWeight: '700' }}>
                             ₿C {Number(saldoTotal).toLocaleString('pt-BR')}
                         </span>
                         {temBonus && (
-                            <span style={{ color: '#F59E0B', fontSize: '11px', opacity: 0.7 }}>
+                            <span style={{ color: 'var(--cor-destaque-texto)', fontSize: '11px', opacity: 0.7 }}>
                                 {' '}(₿C {Number(usuario.saldoBonus).toLocaleString('pt-BR')} bônus)
                             </span>
                         )}
@@ -64,9 +64,9 @@ export default function Loja({ usuario, socket }) {
             {feedback && (
                 <div style={{
                     ...estilos.feedback,
-                    background: feedback.tipo === 'sucesso' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
-                    border:     feedback.tipo === 'sucesso' ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(239,68,68,0.3)',
-                    color:      feedback.tipo === 'sucesso' ? '#4ADE80' : '#FCA5A5',
+                    background: feedback.tipo === 'sucesso' ? 'var(--cor-positivo-suave)' : 'var(--cor-perigo-suave)',
+                    border:     feedback.tipo === 'sucesso' ? '1px solid var(--cor-positivo)' : '1px solid var(--cor-perigo-linha)',
+                    color:      feedback.tipo === 'sucesso' ? 'var(--cor-positivo-texto)' : 'var(--cor-perigo-texto)',
                 }}>
                     {feedback.tipo === 'sucesso' ? '✓' : '✕'} {feedback.mensagem}
                 </div>
@@ -82,9 +82,9 @@ export default function Loja({ usuario, socket }) {
                             onClick={() => setTabAtiva(tab.id)}
                             style={{
                                 ...estilos.tab,
-                                background: ativa ? 'rgba(124,58,237,0.15)' : 'transparent',
-                                border:     ativa ? '1px solid rgba(124,58,237,0.4)' : '1px solid rgba(255,255,255,0.06)',
-                                color:      ativa ? '#A78BFA' : 'rgba(255,255,255,0.4)',
+                                background: ativa ? 'var(--cor-destaque-suave)' : 'transparent',
+                                border:     ativa ? '1px solid var(--cor-destaque-linha)' : '1px solid var(--cor-superficie)',
+                                color:      ativa ? 'var(--cor-destaque-texto)' : 'var(--cor-texto-3)',
                                 fontWeight: ativa ? '600' : '400',
                             }}
                         >
@@ -136,9 +136,9 @@ export default function Loja({ usuario, socket }) {
 const estilos = {
     container:   { display: 'flex', flexDirection: 'column', gap: '14px' },
     cabecalho:   { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-    titulo:      { fontSize: '20px', fontWeight: '700', color: '#F8FAFC', margin: 0 },
-    subtitulo:   { fontSize: '13px', color: 'rgba(255,255,255,0.4)', margin: '4px 0 0' },
+    titulo:      { fontSize: '20px', fontWeight: '700', color: 'var(--cor-texto)', margin: 0 },
+    subtitulo:   { fontSize: '13px', color: 'var(--cor-texto-3)', margin: '4px 0 0' },
     feedback:    { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: '500' },
-    tab:         { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px', borderRadius: '8px', cursor: 'pointer', outline: 'none', fontFamily: 'sans-serif', fontSize: '13px', WebkitTapHighlightColor: 'transparent' },
-    colunaTitle: { fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.4)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.06em' },
+    tab:         { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px', borderRadius: '8px', cursor: 'pointer', outline: 'none', fontFamily: 'var(--fonte)', fontSize: '13px', WebkitTapHighlightColor: 'transparent' },
+    colunaTitle: { fontSize: '12px', fontWeight: '600', color: 'var(--cor-texto-3)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.06em' },
 };

@@ -33,6 +33,7 @@
     --cor-texto-2:        #B8A893;
     --cor-texto-3:        #A08F7B;   /* AA sobre tabaco e couro */
     --cor-foco:           #D9A441;
+    --cor-info:           #8FB3C9;
 
     /* Destaque único (latão): preenchimento e texto são tokens separados */
     --cor-destaque:        #D9A441;  /* preenchimento: faixa, Raise, Criar mesa */
@@ -112,6 +113,7 @@
     --cor-texto-2:        #4A3E34;
     --cor-texto-3:        #5B4D41;
     --cor-foco:           #7A510C;
+    --cor-info:           #2F5D7A;
 
     --cor-destaque:        #C99532;
     --cor-destaque-forte:  #D6A443;

@@ -26,10 +26,10 @@ import { useState } from 'react';
 
 // Medalha para os 3 primeiros lugares
 function medalha(posicao) {
-    if (posicao === 1) return { emoji: '🥇', cor: '#F59E0B' };
-    if (posicao === 2) return { emoji: '🥈', cor: '#94A3B8' };
-    if (posicao === 3) return { emoji: '🥉', cor: '#D97706' };
-    return { emoji: null, cor: 'rgba(255,255,255,0.2)' };
+    if (posicao === 1) return { emoji: '🥇', cor: 'var(--cor-destaque-texto)' };
+    if (posicao === 2) return { emoji: '🥈', cor: 'var(--cor-texto-2)' };
+    if (posicao === 3) return { emoji: '🥉', cor: 'var(--cor-destaque-texto)' };
+    return { emoji: null, cor: 'var(--cor-linha-forte)' };
 }
 
 // Formata número grande de forma compacta
@@ -98,14 +98,14 @@ export default function Ranking({ ranking = [], meuUid }) {
                     onClick={() => setCategoria('saldo')}
                     icone="₿C"
                     label="Top Bitchager"
-                    cor="#F59E0B"
+                    cor="var(--cor-destaque-texto)"
                 />
                 <BotaoCategoria
                     ativo={categoria === 'pontos'}
                     onClick={() => setCategoria('pontos')}
                     icone="⭐"
                     label="Top Pontos"
-                    cor="#7C3AED"
+                    cor="var(--cor-destaque)"
                 />
             </div>
 
@@ -185,10 +185,10 @@ function Podio({ top3, categoria, meuUid }) {
                         <div style={{
                             ...estilos.podioAvatar,
                             border: euSou
-                                ? '2px solid #7C3AED'
+                                ? '2px solid var(--cor-destaque)'
                                 : `2px solid ${med.cor}`,
                             boxShadow: euSou
-                                ? '0 0 12px rgba(124,58,237,0.4)'
+                                ? '0 0 12px var(--cor-destaque-linha)'
                                 : 'none',
                         }}>
                             {jogador.avatar
@@ -203,7 +203,7 @@ function Podio({ top3, categoria, meuUid }) {
                         {/* Nome */}
                         <p style={{
                             ...estilos.podioNome,
-                            color: euSou ? '#A78BFA' : '#F8FAFC',
+                            color: euSou ? 'var(--cor-destaque-texto)' : 'var(--cor-texto)',
                         }}>
                             {jogador.nome.split(' ')[0]}
                         </p>
@@ -219,8 +219,8 @@ function Podio({ top3, categoria, meuUid }) {
                             height:     alturas[i] + 'px',
                             background: i === 1
                                 ? `linear-gradient(to bottom, ${med.cor}30, ${med.cor}10)`
-                                : `rgba(255,255,255,0.03)`,
-                            borderTop: `2px solid ${med.cor}50`,
+                                : `var(--cor-superficie)`,
+                            borderTop: `2px solid color-mix(in srgb, ${med.cor} 31%, transparent)`,
                         }}>
                             <span style={{ fontSize: '20px', fontWeight: '700', color: med.cor }}>
                                 {jogador.posicao}
@@ -250,11 +250,11 @@ function LinhaRanking({ jogador, categoria, euSou }) {
         <div style={{
             ...estilos.linha,
             background: euSou
-                ? 'rgba(124,58,237,0.1)'
-                : 'rgba(255,255,255,0.02)',
+                ? 'var(--cor-destaque-suave)'
+                : 'var(--cor-hover-linha)',
             border: euSou
-                ? '1px solid rgba(124,58,237,0.3)'
-                : '1px solid rgba(255,255,255,0.04)',
+                ? '1px solid var(--cor-destaque-linha)'
+                : '1px solid var(--cor-superficie)',
         }}>
 
             {/* Posição */}
@@ -277,7 +277,7 @@ function LinhaRanking({ jogador, categoria, euSou }) {
             {/* Nome */}
             <span style={{
                 ...estilos.linhaNome,
-                color: euSou ? '#A78BFA' : '#F8FAFC',
+                color: euSou ? 'var(--cor-destaque-texto)' : 'var(--cor-texto)',
                 fontWeight: euSou ? '600' : '400',
                 flex: 1,
             }}>
@@ -303,11 +303,11 @@ function BotaoCategoria({ ativo, onClick, icone, label, cor }) {
             onClick={onClick}
             style={{
                 ...estilos.btnCategoria,
-                background: ativo ? `${cor}15` : 'transparent',
+                background: ativo ? `color-mix(in srgb, ${cor} 8%, transparent)` : 'transparent',
                 border:     ativo
-                    ? `1px solid ${cor}40`
-                    : '1px solid rgba(255,255,255,0.06)',
-                color: ativo ? cor : 'rgba(255,255,255,0.4)',
+                    ? `1px solid color-mix(in srgb, ${cor} 25%, transparent)`
+                    : '1px solid var(--cor-superficie)',
+                color: ativo ? cor : 'var(--cor-texto-3)',
             }}
         >
             <span style={{
@@ -381,7 +381,7 @@ const estilos = {
         display:        'flex',
         alignItems:     'center',
         justifyContent: 'center',
-        background:     'rgba(255,255,255,0.05)',
+        background:     'var(--cor-superficie)',
     },
 
     podioAvatarImg: {
@@ -451,7 +451,7 @@ const estilos = {
         borderRadius:   '50%',
         overflow:       'hidden',
         flexShrink:     0,
-        background:     'rgba(255,255,255,0.06)',
+        background:     'var(--cor-superficie)',
         display:        'flex',
         alignItems:     'center',
         justifyContent: 'center',
@@ -467,7 +467,7 @@ const estilos = {
     linhaValor: {
         fontSize:   '12px',
         fontWeight: '600',
-        color:      '#F59E0B',
+        color:      'var(--cor-destaque-texto)',
         flexShrink: 0,
         whiteSpace: 'nowrap',
     },
@@ -475,8 +475,8 @@ const estilos = {
     // Badge "você" ao lado do nome
     euBadge: {
         fontSize:     '10px',
-        background:   'rgba(124,58,237,0.2)',
-        color:        '#A78BFA',
+        background:   'var(--cor-destaque-suave)',
+        color:        'var(--cor-destaque-texto)',
         padding:      '1px 5px',
         borderRadius: '4px',
         marginLeft:   '4px',
@@ -500,12 +500,12 @@ const estilos = {
     linhaSeparador: {
         flex:       1,
         height:     '1px',
-        background: 'rgba(255,255,255,0.06)',
+        background: 'var(--cor-superficie)',
     },
 
     textSeparador: {
         fontSize:  '10px',
-        color:     'rgba(255,255,255,0.25)',
+        color:     'var(--cor-texto-3)',
         flexShrink: 0,
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
@@ -514,7 +514,7 @@ const estilos = {
     // Aviso de dados de exemplo
     avisoExemplo: {
         fontSize:  '11px',
-        color:     'rgba(255,255,255,0.2)',
+        color:     'var(--cor-linha-forte)',
         textAlign: 'center',
         margin:    '4px 0 0',
         fontStyle: 'italic',
