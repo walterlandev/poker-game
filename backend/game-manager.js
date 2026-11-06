@@ -72,10 +72,16 @@ export class GameManager {
         this.io                = io;
         this.timers            = new Map();
         this.tournamentManager = null;  // setado após criação via setTournamentManager()
+        this.salvarResultado   = salvarResultadoRodada;  // trocável nos testes
     }
 
     setTournamentManager(tm) {
         this.tournamentManager = tm;
+    }
+
+    /** fn({ mesaId, uid, saldo, origemBonus, torneioId }) — chamado antes de remover o jogador. */
+    setAoRemoverPorInatividade(fn) {
+        this.aoRemoverPorInatividade = fn;
     }
 
 
@@ -107,14 +113,20 @@ export class GameManager {
             jogadoresFiltrados[uid] = {
                 ...jogador,
                 avatar,
-                cartas: (uid === meuUid || mesa.fase === 'SHOWDOWN')
+                // Só abre as cartas num showdown de verdade: em vitória por
+                // W.O. ninguém precisa mostrar a mão (revelar entrega o blefe).
+                cartas: (uid === meuUid
+                        || (mesa.fase === 'SHOWDOWN' && mesa.resultadoMao?.tipo === 'showdown'))
                     ? jogador.cartas
                     : jogador.cartas.map(() => 'XX'),
             };
         });
 
+        // A senha da mesa privada só é checada no servidor (entrarMesa);
+        // nenhum cliente precisa dela, nem quem já está sentado.
+        const { senha, ...mesaPublica } = mesa;
         return {
-            ...mesa,
+            ...mesaPublica,
             baralho:   [],   // nunca expõe o baralho ao cliente
             jogadores: jogadoresFiltrados,
         };
@@ -134,7 +146,12 @@ export class GameManager {
     // ================================================================
 
     criarMesa(config, usuario) {
-        const mesaId = Math.random().toString(36).substring(2, 6).toUpperCase();
+        // mesas.set() com um id já em uso apagava a mesa existente (com as
+        // fichas de quem estava sentado nela) — sorteia de novo até ser único.
+        let mesaId;
+        do {
+            mesaId = Math.random().toString(36).substring(2, 6).toUpperCase();
+        } while (mesas.has(mesaId));
         // Nunca confiar em smallBlind vindo do cliente sem validar sinal/tipo —
         // um valor negativo faria _aplicarBlind() creditar fichas em vez de
         // debitar (mesmo exploit de "imprimir" ₿C do buyIn, ver CLAUDE.md).
@@ -166,6 +183,10 @@ export class GameManager {
             ultimaAcaoDescritiva: 'Mesa criada. Aguardando jogadores.',
             ordem:                [usuario.uid],
             senha:                config.senha ? String(config.senha) : null,
+            // Mesa de TREINO (com bots): fichas sem valor, nada é debitado nem
+            // creditado. Decidido pelo servidor (servico-mesas.js, pelo número
+            // de bots) — nunca pelo cliente — e não muda depois.
+            treino:               config.treino === true,
             contribuicoesEncerradas: [],
             jogadores: {
                 [usuario.uid]: this._criarJogador(usuario, config.buyIn || 1000, 'humano'),
@@ -185,7 +206,15 @@ export class GameManager {
             // Jogador já está na mesa (reconexão ou torneio) — garante que o socket
             // entre na sala para receber broadcasts de estado_mesa
             socket.join(mesaId);
-            return { sucesso: true, mesaId };
+            return { sucesso: true, mesaId, jaEstava: true };
+        }
+
+        // Mesa de torneio só tem quem o torneio sentou lá. Antes qualquer um
+        // com o id (previsível: T…_R0_M0) entrava pela rota de mesa comum,
+        // pagando fichasIniciais em ₿C reais que não iam para o prêmio, e
+        // podia "vencer" a mesa sem estar no bracket.
+        if (mesa.torneioId) {
+            return { sucesso: false, erro: 'Mesa de torneio: entre pelo torneio.' };
         }
 
         // Mesa privada: exige a senha certa pra quem ainda não está sentado.
@@ -226,16 +255,18 @@ export class GameManager {
         let proximoUid          = null;
         let vencedorPorAbandono = null;
 
-        if (maoAtiva) {
-            // O dinheiro que ele já apostou nesta mão continua contando pro
-            // pote (side pots) — só a elegibilidade de ganhar se perde,
-            // igual um fold comum. Sem guardar isso antes de apagar o
-            // jogador, essa contribuição "sumia" do cálculo do pote.
-            if (jogador.apostaTotal > 0) {
-                mesa.contribuicoesEncerradas = mesa.contribuicoesEncerradas || [];
-                mesa.contribuicoesEncerradas.push({ apostaTotal: jogador.apostaTotal });
-            }
+        // O dinheiro que ele já apostou nesta mão continua contando pro
+        // pote (side pots) — só a elegibilidade de ganhar se perde, igual
+        // um fold comum. Vale também para quem JÁ tinha dado fold antes de
+        // sair (sem cartas, maoAtiva falso): sem isso a aposta dele sumia
+        // das faixas do side pot e a diferença caía inteira no último pote.
+        const maoEmAndamento = mesa.fase !== 'AGUARDANDO' && mesa.fase !== 'SHOWDOWN';
+        if (maoEmAndamento && jogador.apostaTotal > 0) {
+            mesa.contribuicoesEncerradas = mesa.contribuicoesEncerradas || [];
+            mesa.contribuicoesEncerradas.push({ apostaTotal: jogador.apostaTotal, apostaBonus: jogador.apostaBonus || 0 });
+        }
 
+        if (maoAtiva) {
             jogador.status = 'fold';
             jogador.cartas = [];
 
@@ -285,6 +316,10 @@ export class GameManager {
             this._limparTimers(mesaId);
             mesas.delete(mesaId);
             this.io.emit('mesas_atualizadas');
+            // Mesa de torneio esvaziada: fecha sem vencedor para o torneio seguir.
+            if (mesa.torneioId && this.tournamentManager) {
+                this.tournamentManager.encerrarMesaSemVencedor(mesa.torneioId, mesaId);
+            }
             return;
         }
 
@@ -340,7 +375,12 @@ export class GameManager {
 
     adicionarBot(mesaId, rankPontosJogador = 0) {
         const mesa = mesas.get(mesaId);
-        if (!mesa || Object.keys(mesa.jogadores).length >= 9) return;
+        if (!mesa) return { sucesso: false, erro: 'Mesa não encontrada.' };
+        // Bot só em mesa de treino: os bots recompram fichas do nada, então
+        // numa mesa com dinheiro real quem ganhasse deles sacaria ₿C criado
+        // por eles. Mesa de torneio nunca é de treino.
+        if (!mesa.treino) return { sucesso: false, erro: 'Bots só jogam em mesa de treino (fichas sem valor). Crie uma mesa com bots para treinar.' };
+        if (Object.keys(mesa.jogadores).length >= 9) return { sucesso: false, erro: 'Mesa cheia.' };
 
         const index = Object.keys(mesa.jogadores).length;
         const bot   = BotManager.gerarBot(index, mesa.valorBuyIn, rankPontosJogador);
@@ -366,6 +406,7 @@ export class GameManager {
         // (aba Mesas) ficava desatualizado até algum outro evento disparar
         // — alguém podia tentar entrar numa mesa que só "parecia" ter vaga.
         this.io.emit('mesas_atualizadas');
+        return { sucesso: true };
     }
 
     _criarJogador(usuario, buyIn, tipo) {
@@ -397,6 +438,12 @@ export class GameManager {
     iniciarRodada(mesaId) {
         const mesa = mesas.get(mesaId);
         if (!mesa) return;
+
+        // Nunca recomeça por cima de uma mão em andamento: isso zerava
+        // apostaTotal/pote e cobrava blinds de novo — as fichas já no pote
+        // simplesmente sumiam. O evento 'iniciar_rodada' do host não checa
+        // a fase, e um reinício agendado em duplicidade cairia aqui também.
+        if (['PRE-FLOP', 'FLOP', 'TURN', 'RIVER'].includes(mesa.fase)) return;
 
         // Só interessa avisar o lobby quando a mesa estava "Aguardando"
         // (visível na lista pública) e está prestes a começar a jogar —
@@ -430,7 +477,27 @@ export class GameManager {
                 j.status = 'sitout';
                 j.cartas = [];
             }
+            // Quem fica de fora também zera as apostas: _calcularPotes soma
+            // apostaTotal de TODOS em mesa.jogadores, e o valor velho de quem
+            // quebrou na mão anterior inflava as faixas de side pot desta
+            // mão (o ajuste de "diferença" jogava o excesso, negativo, no
+            // último pote — dava até prêmio negativo / saldo negativo).
+            if (j && j.saldo <= 0) {
+                j.apostaRodada = 0;
+                j.apostaTotal  = 0;
+                j.apostaBonus  = 0;
+            }
         });
+
+        // Mesa de torneio que ficou com um só jogador com fichas (os outros
+        // saíram/caíram entre mãos): ele venceu a mesa. Sem isso a mesa
+        // ficava em AGUARDANDO para sempre e o torneio nunca terminava.
+        if (ativos.length === 1 && mesa.torneioId && this.tournamentManager) {
+            mesa.fase = 'AGUARDANDO';
+            this.emitirEstado(mesaId);
+            this.tournamentManager.notificarVencedorMesa(mesa.torneioId, mesaId, ativos[0]);
+            return;
+        }
 
         if (ativos.length < 2) {
             mesa.fase            = 'AGUARDANDO';
@@ -447,6 +514,8 @@ export class GameManager {
             j.status        = 'ativo';
             j.apostaRodada  = 0;
             j.apostaTotal   = 0;   // ← RESET obrigatório a cada mão
+            j.apostaBonus   = 0;   // parte de apostaTotal que saiu do bônus
+            j.nivelAoAgir   = null; // ainda não agiu nesta rua (blind não conta)
             j.cartas        = [baralho.pop(), baralho.pop()];
         });
 
@@ -488,6 +557,7 @@ export class GameManager {
         mesa.pote                 = mesa.jogadores[sbId].apostaRodada
                                   + mesa.jogadores[bbId].apostaRodada;
         mesa.maiorAposta          = mesa.bigBlind;
+        mesa.nivelReabertura      = mesa.bigBlind;   // o BB conta como aposta completa
         mesa.ultimoRaiseVal       = mesa.bigBlind;
         mesa.sbId                 = sbId;
         mesa.bbId                 = bbId;
@@ -496,6 +566,17 @@ export class GameManager {
         mesa.turno                = ativos[primeiroIdx];
         mesa.mensagemVitoria      = null;
         mesa.ultimaAcaoDescritiva = 'Nova rodada iniciada. Blinds apostados.';
+
+        // Blind que deixou o jogador all-in (ex.: heads-up com SB curto):
+        // quem sobra não tem contra quem apostar — a mão corre direto, sem
+        // dar a vez (e o relógio) a um jogador all-in.
+        if (this._ninguemMaisPrecisaAgir(mesa)) {
+            mesa.turno = null;
+            this.emitirEstado(mesaId);
+            this._agendarRunout(mesaId);
+            if (eraAguardando) this.io.emit('mesas_atualizadas');
+            return;
+        }
 
         // _gerenciarTurno primeiro: ele grava mesa.turnoExpiraEm (prazo real
         // do relógio) antes do estado ser transmitido, senão o primeiro
@@ -527,6 +608,30 @@ export class GameManager {
         return ativos[0];
     }
 
+    /**
+     * ORIGEM DAS FICHAS (bônus nunca vira saldo real): ao apostar, saem
+     * PRIMEIRO as fichas de bônus do jogador (origemBonus), depois as reais.
+     * A parte de bônus de cada aposta fica em jogador.apostaBonus e, no fim
+     * da mão, cada pote paga ao vencedor a parte de bônus das contribuições
+     * daquela faixa como bônus (ver _calcularPotes / _creditarPremio).
+     */
+    _consumirBonus(j, valor) {
+        const b = Math.min(valor, j.origemBonus || 0);
+        j.origemBonus = (j.origemBonus || 0) - b;
+        j.apostaBonus = (j.apostaBonus || 0) + b;
+    }
+
+    /** Credita um prêmio (fichas + parte bônus) e zera as apostas da mão já pagas. */
+    _creditarPremio(j, fichas, bonus) {
+        j.saldo      += fichas;
+        j.origemBonus = (j.origemBonus || 0) + Math.min(bonus, fichas);
+    }
+
+    _zerarBonusDoPote(mesa) {
+        Object.values(mesa.jogadores).forEach(j => { j.apostaBonus = 0; });
+        (mesa.contribuicoesEncerradas || []).forEach(c => { c.apostaBonus = 0; });
+    }
+
     _aplicarBlind(mesa, uid, valor) {
         const j          = mesa.jogadores[uid];
         if (!j) return;
@@ -534,6 +639,8 @@ export class GameManager {
         j.saldo          -= apostaReal;
         j.apostaRodada    = apostaReal;
         j.apostaTotal     = apostaReal;   // blind já conta no total da mão
+        j.apostaBonus     = 0;
+        this._consumirBonus(j, apostaReal);
         if (j.saldo === 0) j.status = 'all-in';
     }
 
@@ -607,6 +714,18 @@ export class GameManager {
             this.io.to(mesaId).emit('notificacao', {
                 mensagem: `${jogador.nome} foi removido por inatividade.`,
             });
+            // Quem devolve as fichas ao saldo real é o servidor
+            // (processarSaidaMesa só roda em sair_mesa/disconnect). Sem
+            // avisar, o jogador removido aqui perdia o stack inteiro: ele
+            // some de mesa.jogadores e um "Sair" depois credita 0.
+            this.aoRemoverPorInatividade?.({
+                mesaId,
+                uid,
+                saldo:       jogador.saldo,
+                origemBonus: jogador.origemBonus || 0,
+                torneioId:   mesa.torneioId || null,
+                treino:      !!mesa.treino,
+            });
             // sairMesa já trata a saída no meio de uma mão como desistência
             // (fold) e resolve corretamente quem age em seguida — setar
             // status/cartas aqui antes ANTES de chamar sairMesa fazia
@@ -672,6 +791,20 @@ export class GameManager {
             acao = 'CALL';
         }
 
+        // All-in incompleto não reabre a ação: quem já agiu nesta rua só
+        // pode aumentar se houve um raise COMPLETO depois da última ação
+        // dele (mesa.nivelReabertura = maior aposta do último raise
+        // completo; jogador.nivelAoAgir = maior aposta quando ele agiu).
+        if (acao === 'RAISE'
+            && jogador.nivelAoAgir != null
+            && (mesa.nivelReabertura || 0) <= jogador.nivelAoAgir) {
+            if (socketId) {
+                this.emitirErro(socketId, 'O all-in foi menor que um raise completo — você só pode pagar ou desistir.');
+                return;
+            }
+            acao = 'CALL';
+        }
+
         // Validação do raise mínimo (No-Limit: último raise + aposta atual)
         if (acao === 'RAISE') {
             const raiseMinimo    = apostaMesa + (mesa.ultimoRaiseVal || mesa.bigBlind);
@@ -722,7 +855,14 @@ export class GameManager {
         else if (acao === 'RAISE') {
             const aumentoReal = valorTotal - jaApostou;
 
-            if (jogador.saldo >= aumentoReal) {
+            // Estritamente maior: apostar o stack inteiro (é o que o botão
+            // All-in manda: RAISE saldo + apostaRodada) é ALL-IN, não raise
+            // comum. Com >=, o jogador ficava com saldo 0 mas status 'ativo'
+            // — recebia a vez e o relógio nas ruas seguintes (podia "dar
+            // all-in de novo", e levava fold automático por tempo, perdendo
+            // o pote) — e um all-in curto reabria a ação e encolhia o raise
+            // mínimo. O ramo abaixo já trata completo × incompleto.
+            if (jogador.saldo > aumentoReal) {
                 // Raise completo
                 const salto          = valorTotal - apostaMesa;
                 valorInvestido       = aumentoReal;
@@ -769,13 +909,16 @@ export class GameManager {
             jogador.saldo        -= valorInvestido;
             jogador.apostaRodada  = jaApostou + valorInvestido;
             jogador.apostaTotal   = (jogador.apostaTotal || 0) + valorInvestido;  // ← CRÍTICO
+            this._consumirBonus(jogador, valorInvestido);
             mesa.pote            += valorInvestido;
         }
 
         // Se o raise reabriu apostas, atualiza o marcador de primeira posição
         if (reabriuApostas) {
             mesa.primeiroJogador = uid;
+            mesa.nivelReabertura = mesa.maiorAposta;
         }
+        if (acao !== 'FOLD') jogador.nivelAoAgir = mesa.maiorAposta;
 
         mesa.ultimaAcao           = acao;
         mesa.ultimaAcaoDescritiva = fraseNarrativa;
@@ -841,6 +984,13 @@ export class GameManager {
             const uid = ordem[index];
             const j   = mesa.jogadores[uid];
 
+            // Sem aposta na mesa: a volta fecha ao passar pelo ASSENTO de
+            // quem abriu a rodada, mesmo que ele tenha dado fold (ou esteja
+            // all-in) — antes essa checagem vinha depois do "pula fold", e
+            // um fold de quem abriu a rodada (com check disponível) deixava
+            // a rodada de checks girando para sempre.
+            if (targetAp === 0 && uid === aggressor) return null;  // volta completa
+
             if (!j) continue;
             if (!j.cartas || j.cartas.length === 0) continue;
             if (j.status === 'fold' || j.status === 'sitout' || j.status === 'all-in') continue;
@@ -848,10 +998,7 @@ export class GameManager {
             const ap = j.apostaRodada || 0;
 
             // Sem aposta na mesa → todos checam, aguarda primeira volta
-            if (targetAp === 0) {
-                if (uid === aggressor) return null;  // volta completa
-                return uid;
-            }
+            if (targetAp === 0) return uid;
 
             // Jogador ainda não igualou → precisa agir
             if (ap < targetAp) return uid;
@@ -893,9 +1040,13 @@ export class GameManager {
 
         // Reseta apostas da rodada para todos
         mesa.ordem.forEach(uid => {
-            if (mesa.jogadores[uid]) mesa.jogadores[uid].apostaRodada = 0;
+            if (mesa.jogadores[uid]) {
+                mesa.jogadores[uid].apostaRodada = 0;
+                mesa.jogadores[uid].nivelAoAgir  = null;
+            }
         });
 
+        mesa.nivelReabertura = 0;
         mesa.maiorAposta    = 0;
         mesa.ultimoRaiseVal = mesa.bigBlind;
         mesa.fase           = novaFase;
@@ -915,12 +1066,21 @@ export class GameManager {
             mesa.ultimaAcaoDescritiva = `O ${novaFase} foi revelado.`;
         }
 
-        const primeiro = this._encontrarPrimeiroParaAgir(mesaId);
+        // Com no máximo um jogador ainda capaz de apostar, não há rodada de
+        // apostas: ele não tem contra quem apostar. Antes ele recebia a vez
+        // (e o relógio, e faltas por tempo) em cada rua até o showdown.
+        const primeiro = this._ninguemMaisPrecisaAgir(mesa)
+            ? null
+            : this._encontrarPrimeiroParaAgir(mesaId);
 
         if (!primeiro) {
-            // Todos all-in → avança automaticamente
+            // Todos all-in → avança automaticamente. Ninguém tem a vez: sem
+            // zerar o turno, ele ficava com quem agiu por último (já all-in)
+            // — o relógio aparecia "preso" nele e uma ação dele passava na
+            // checagem de vez, avançando uma rua extra fora do runout.
+            mesa.turno = null;
             this.emitirEstado(mesaId);
-            setTimeout(() => this._avancarFase(mesaId), 1_500);
+            this._agendarRunout(mesaId);
             return;
         }
 
@@ -929,6 +1089,21 @@ export class GameManager {
 
         this._gerenciarTurno(mesaId);
         this.emitirEstado(mesaId);
+    }
+
+    /**
+     * true quando nenhuma decisão de aposta resta: no máximo um jogador
+     * ainda pode apostar (tem cartas, não deu fold, não está all-in) e ele
+     * já cobre a maior aposta da rodada.
+     */
+    _ninguemMaisPrecisaAgir(mesa) {
+        const podemAgir = mesa.ordem
+            .map(uid => mesa.jogadores[uid])
+            .filter(j => j && j.cartas?.length > 0
+                && j.status !== 'fold' && j.status !== 'sitout' && j.status !== 'all-in');
+        if (podemAgir.length === 0) return true;
+        if (podemAgir.length > 1)   return false;
+        return (podemAgir[0].apostaRodada || 0) >= (mesa.maiorAposta || 0);
     }
 
     /**
@@ -986,6 +1161,7 @@ export class GameManager {
 
         const potes         = this._calcularPotes(mesa, elegiveis.map(e => e.uid));
         const premiados     = {};
+        const premiosBonus  = {};
         const descricoesMao = {};
 
         potes.forEach(pote => {
@@ -1008,21 +1184,42 @@ export class GameManager {
             const base      = Math.floor(valorPote / nVenc);
             const resto     = valorPote % nVenc;  // ficha(s) ímpar(es)
 
-            vencedores.forEach(uid => {
-                premiados[uid] = (premiados[uid] || 0) + base;
-            });
+            const parteDe = {};
+            vencedores.forEach(uid => { parteDe[uid] = base; });
 
             // Odd Chip: entregue ao vencedor mais à esquerda do dealer
             if (resto > 0) {
                 const uidOddChip = this._vencedorMaisProximoDoDealer(mesa, vencedores);
-                premiados[uidOddChip] = (premiados[uidOddChip] || 0) + resto;
+                parteDe[uidOddChip] += resto;
             }
+
+            // Parte bônus do pote dividida na proporção do que cada um levou;
+            // a sobra do arredondamento também vai como bônus (nunca cria real).
+            const bonusPote = Math.min(pote.bonus || 0, valorPote);
+            let   distribuido = 0;
+            const bonusDe = {};
+            vencedores.forEach(uid => {
+                bonusDe[uid] = valorPote > 0 ? Math.floor(bonusPote * parteDe[uid] / valorPote) : 0;
+                distribuido += bonusDe[uid];
+            });
+            for (const uid of vencedores) {
+                if (distribuido >= bonusPote) break;
+                const folga = Math.min(parteDe[uid] - bonusDe[uid], bonusPote - distribuido);
+                bonusDe[uid] += folga;
+                distribuido  += folga;
+            }
+
+            vencedores.forEach(uid => {
+                premiados[uid]    = (premiados[uid]    || 0) + parteDe[uid];
+                premiosBonus[uid] = (premiosBonus[uid] || 0) + bonusDe[uid];
+            });
         });
 
         // Credita os prêmios
         Object.entries(premiados).forEach(([uid, premio]) => {
-            mesa.jogadores[uid].saldo += premio;
+            this._creditarPremio(mesa.jogadores[uid], premio, premiosBonus[uid] || 0);
         });
+        this._zerarBonusDoPote(mesa);
 
         const potTotal = mesa.pote;  // salva antes de zerar
 
@@ -1072,7 +1269,8 @@ export class GameManager {
             fichasPerdidas: premiados[uid]  ? 0 : mesa.valorBuyIn,
             venceu:         !!premiados[uid],
         }));
-        salvarResultadoRodada(resultados);
+        // Mesa de treino não conta para ranking/estatística.
+        if (!mesa.treino) this.salvarResultado(resultados);
     }
 
     /**
@@ -1097,8 +1295,15 @@ export class GameManager {
     _calcularPotes(mesa, elegiveisUids) {
         const temAllIn = elegiveisUids.some(uid => mesa.jogadores[uid].status === 'all-in');
         if (!temAllIn) {
-            return [{ valor: mesa.pote, elegiveis: elegiveisUids }];
+            const bonus = Object.values(mesa.jogadores).reduce((s, j) => s + (j.apostaBonus || 0), 0)
+                        + (mesa.contribuicoesEncerradas || []).reduce((s, c) => s + (c.apostaBonus || 0), 0);
+            return [{ valor: mesa.pote, bonus, elegiveis: elegiveisUids }];
         }
+
+        // Parte bônus de uma contribuição dentro da faixa (lo, hi]: como o
+        // bônus sai primeiro, são as fichas da faixa abaixo de apostaBonus.
+        const bonusNaFaixa = (c, lo, hi) =>
+            Math.max(0, Math.min(hi, c.apostaBonus || 0, c.apostaTotal || 0) - lo);
 
         // Monta caps (limite de contribuição de cada all-in, baseado em apostaTotal)
         const caps = elegiveisUids
@@ -1112,6 +1317,7 @@ export class GameManager {
 
         const potes     = [];
         let   capAnter  = 0;
+        let   bonusSemDono = 0;   // bônus de faixa sem elegível: segue a diferença de fichas
 
         // IMPORTANTE: o valor de cada pote soma a contribuição de TODOS os
         // jogadores que apostaram nesta mão — inclusive quem já desistiu
@@ -1136,6 +1342,8 @@ export class GameManager {
                 const total = f.apostaTotal || 0;
                 return soma + Math.min(Math.max(total - capAnter, 0), cap - capAnter);
             }, 0);
+            const bonusDoPote = todosUids.reduce((s, uid) => s + bonusNaFaixa(mesa.jogadores[uid], capAnter, cap), 0)
+                              + fantasmas.reduce((s, f) => s + bonusNaFaixa(f, capAnter, cap), 0);
 
             if (valorDoPote <= 0) continue;
 
@@ -1155,7 +1363,9 @@ export class GameManager {
             });
 
             if (elegiveisNoPote.length > 0) {
-                potes.push({ valor: valorDoPote, elegiveis: elegiveisNoPote });
+                potes.push({ valor: valorDoPote, bonus: bonusDoPote, elegiveis: elegiveisNoPote });
+            } else {
+                bonusSemDono += bonusDoPote;
             }
 
             capAnter = cap;
@@ -1168,6 +1378,9 @@ export class GameManager {
         if (diff !== 0 && potes.length > 0) {
             potes[potes.length - 1].valor += diff;
         }
+        if (bonusSemDono > 0 && potes.length > 0) {
+            potes[potes.length - 1].bonus += bonusSemDono;
+        }
 
         return potes;
     }
@@ -1178,7 +1391,11 @@ export class GameManager {
 
         const j        = mesa.jogadores[vencedorUid];
         const potGanho = mesa.pote;
-        j.saldo       += potGanho;
+        // Leva o pote inteiro, cada ficha com a origem dela.
+        const bonusPote = Object.values(mesa.jogadores).reduce((s, x) => s + (x.apostaBonus || 0), 0)
+                        + (mesa.contribuicoesEncerradas || []).reduce((s, c) => s + (c.apostaBonus || 0), 0);
+        this._creditarPremio(j, potGanho, bonusPote);
+        this._zerarBonusDoPote(mesa);
 
         mesa.pote                 = 0;
         mesa.turno                = null;
@@ -1222,7 +1439,7 @@ export class GameManager {
             this._agendarProximaRodada(mesaId);
         }
 
-        salvarResultadoRodada([{
+        if (!mesa.treino) this.salvarResultado([{
             uid:            vencedorUid,
             nome:           j.nome,
             avatar:         j.avatar || '',
@@ -1230,6 +1447,19 @@ export class GameManager {
             fichasPerdidas: 0,
             venceu:         true,
         }]);
+    }
+
+    /**
+     * Agenda a próxima rua do runout (ninguém mais pode apostar). O timer
+     * fica registrado em this.timers para _limparTimers cancelá-lo — antes
+     * era um setTimeout solto: se a mão acabasse no meio (ex.: W.O. porque
+     * um all-in saiu da mesa), ele ainda disparava _avancarFase, refazia o
+     * showdown por cima do resultado e agendava um segundo reinício.
+     */
+    _agendarRunout(mesaId) {
+        const t = this.timers.get(mesaId) || {};
+        t.acao  = setTimeout(() => this._avancarFase(mesaId), 1_500);
+        this.timers.set(mesaId, t);
     }
 
     _agendarProximaRodada(mesaId) {
@@ -1308,8 +1538,11 @@ export class GameManager {
             return { sucesso: false, erro: 'Não pode fazer rebuy durante uma mão ativa.' };
         }
 
+        // Bônus que já foi perdido na mesa não conta mais: sem limitar ao
+        // stack atual, o origemBonus só acumulava e um rebuy pago com saldo
+        // REAL acabava devolvido como bônus (não sacável) na saída.
+        jogador.origemBonus = Math.min(jogador.origemBonus || 0, jogador.saldo) + (origemBonus || 0);
         jogador.saldo      += valor;
-        jogador.origemBonus = (jogador.origemBonus || 0) + (origemBonus || 0);
         if (jogador.status === 'eliminado') jogador.status = 'ativo';
 
         this.emitirEstado(mesaId);
@@ -1356,6 +1589,7 @@ export class GameManager {
             jogadores:            {},
             torneioId,              // ← liga ao torneio
             senha:                null,
+            treino:               false,
             contribuicoesEncerradas: [],
         };
 

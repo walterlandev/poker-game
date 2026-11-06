@@ -26,10 +26,13 @@ import { creditarSaidaMesa, buscarSaldo } from './firebase-admin.js';
 
 export class TournamentManager {
 
-    constructor(io, gameManager) {
+    // deps: só para os testes espionarem o crédito; em produção usa o Firestore.
+    constructor(io, gameManager, deps = {}) {
         this.io          = io;
         this.gameManager = gameManager;
         this.torneios    = new Map();
+        this.creditar    = deps.creditarSaidaMesa || creditarSaidaMesa;
+        this.buscarSaldo = deps.buscarSaldo       || buscarSaldo;
     }
 
 
@@ -49,7 +52,7 @@ export class TournamentManager {
             status:           'aberto',
             buyIn,
             fichasIniciais:   Math.max(1000, fichasIniciais),
-            maxRebuys:        Math.min(5, Math.max(0, config.maxRebuys     || 1)),
+            maxRebuys:        Math.min(5, Math.max(0, Number(config.maxRebuys ?? 1) || 0)),  // 0 = sem rebuy (|| 1 transformava 0 em 1)
             rebuyPeriod:      Math.min(180, Math.max(0, config.rebuyPeriod || 30)),
             maxJogadores:     Math.min(64, Math.max(4,  config.maxJogadores     || 16)),
             jogadoresPorMesa: Math.min(9,  Math.max(2,  config.jogadoresPorMesa || 6)),
@@ -59,6 +62,10 @@ export class TournamentManager {
             rodadaAtual:      0,
             campeao:          null,
             premioTotal:      buyIn,
+            // Parte do prêmio paga com saldo BÔNUS (soma de pagoBonus de
+            // todas as entradas e rebuys) — bônus nunca vira saldo real.
+            premioBonus:      Math.min(buyIn, host.pagoBonus || 0),
+            houveEliminacao:  false,
             iniciadoEm:       null,
             aguardandoRebuys: false,
             rebuyTimer:       null,
@@ -81,6 +88,8 @@ export class TournamentManager {
             status:   'aguardando',
             rebuys:   0,
             mesaAtual: null,
+            pagoBonus: usuario.pagoBonus || 0,   // quanto das entradas/rebuys dele foi bônus
+            abandonouNaRodada: null,
         };
     }
 
@@ -96,13 +105,14 @@ export class TournamentManager {
         if (torneio.status !== 'aberto')
             return { sucesso: false, erro: 'Torneio já iniciado.' };
         if (torneio.jogadores[usuario.uid])
-            return { sucesso: true, torneioId };
+            return { sucesso: true, torneioId, jaEstava: true };
         if (Object.keys(torneio.jogadores).length >= torneio.maxJogadores)
             return { sucesso: false, erro: 'Torneio lotado.' };
 
         torneio.jogadores[usuario.uid] = this._criarJogadorTorneio(usuario);
         torneio.ordem.push(usuario.uid);
         torneio.premioTotal += torneio.buyIn;
+        torneio.premioBonus += Math.min(torneio.buyIn, usuario.pagoBonus || 0);
 
         this.emitirEstadoTorneio(torneioId);
         return { sucesso: true, torneioId };
@@ -149,11 +159,17 @@ export class TournamentManager {
         const torneio = this.torneios.get(torneioId);
         if (!torneio) return;
 
-        const n      = torneio.jogadoresPorMesa;
-        const grupos = [];
-        for (let i = 0; i < jogadoresUids.length; i += n) {
-            grupos.push(jogadoresUids.slice(i, i + n));
-        }
+        // Distribui em mesas equilibradas e nunca com um jogador só. Fatiar
+        // de n em n deixava a sobra numa mesa própria (ex.: 3 jogadores, 2
+        // por mesa → 2 + 1): mesa de 1 nunca começa (iniciarRodada exige 2
+        // com fichas), nunca tem vencedor e o torneio travava pra sempre
+        // com o prêmio preso.
+        const n        = torneio.jogadoresPorMesa;
+        const total    = jogadoresUids.length;
+        let   numMesas = Math.ceil(total / n);
+        while (numMesas > 1 && Math.floor(total / numMesas) < 2) numMesas--;
+        const grupos = Array.from({ length: numMesas }, () => []);
+        jogadoresUids.forEach((uid, i) => grupos[i % numMesas].push(uid));
 
         const rodada = { mesas: [] };
 
@@ -205,6 +221,7 @@ export class TournamentManager {
         if (!mesaInfo || mesaInfo.vencedor) return;
 
         mesaInfo.vencedor = vencedorUid;
+        if (mesaInfo.jogadores.length > 1) torneio.houveEliminacao = true;
 
         // Marca vencedor; verifica rebuy para os eliminados
         const rebuyElegiveis = [];
@@ -259,7 +276,31 @@ export class TournamentManager {
         if (!j || j.status !== 'jogando') return;
 
         j.status = 'eliminado';
+        j.abandonouNaRodada = torneio.rodadaAtual;
         this.emitirEstadoTorneio(torneioId);
+    }
+
+    /**
+     * Todos os jogadores de uma mesa saíram (o GameManager apagou a mesa):
+     * ela fecha sem vencedor e a rodada segue com as outras mesas. Antes
+     * ninguém avisava o torneio, a mesa nunca tinha vencedor e o torneio
+     * ficava em andamento para sempre, com o prêmio preso.
+     */
+    encerrarMesaSemVencedor(torneioId, mesaId) {
+        const torneio = this.torneios.get(torneioId);
+        if (!torneio || torneio.status !== 'em_andamento') return;
+        const mesaInfo = torneio.rodadas[torneio.rodadaAtual]?.mesas.find(m => m.mesaId === mesaId);
+        if (!mesaInfo || mesaInfo.vencedor || mesaInfo.semVencedor) return;
+
+        mesaInfo.semVencedor = true;
+        mesaInfo.jogadores.forEach(uid => {
+            const j = torneio.jogadores[uid];
+            if (j && j.status === 'jogando') {
+                j.status = 'eliminado';
+                j.abandonouNaRodada = torneio.rodadaAtual;
+            }
+        });
+        this._verificarRodadaCompleta(torneioId);
     }
 
 
@@ -274,7 +315,7 @@ export class TournamentManager {
         const rodada = torneio.rodadas[torneio.rodadaAtual];
         if (!rodada) return;
 
-        const todasTerminadas = rodada.mesas.every(m => m.vencedor !== null);
+        const todasTerminadas = rodada.mesas.every(m => m.vencedor !== null || m.semVencedor);
         if (!todasTerminadas) {
             this.emitirEstadoTorneio(torneioId);
             return;
@@ -335,13 +376,20 @@ export class TournamentManager {
             // Winner-take-all: o campeão leva o prêmio inteiro (soma de
             // todas as entradas + rebuys) creditado direto no saldo real.
             if (campeaoUid && torneio.premioTotal > 0) {
-                await creditarSaidaMesa(campeaoUid, torneio.premioTotal);
+                // A parte paga com bônus (premioBonus) volta como bônus: bônus nunca vira real.
+                await this.creditar(campeaoUid, torneio.premioTotal, Math.min(torneio.premioTotal, torneio.premioBonus || 0));
                 this.io.to(`torneio:${torneioId}`).emit('torneio:premio_creditado', {
                     torneioId,
                     campeaoUid,
                     premio: torneio.premioTotal,
                 });
                 await this._notificarSaldoJogador(campeaoUid);
+            } else if (!campeaoUid && torneio.premioTotal > 0) {
+                await this._distribuirSemCampeao(torneio);
+                this.io.to(`torneio:${torneioId}`).emit('torneio:cancelado_sem_jogadores', {
+                    torneioId,
+                    mensagem: 'Torneio encerrado: todos os jogadores saíram. Os sobreviventes receberam de volta o que pagaram, mais a parte do que os eliminados pagaram.',
+                });
             }
 
             console.log(`🏆 Torneio ${torneioId} finalizado! Campeão: ${torneio.jogadores[campeaoUid]?.nome} — prêmio ₿C ${torneio.premioTotal}`);
@@ -359,6 +407,64 @@ export class TournamentManager {
         console.log(`🔄 Torneio ${torneioId}: rodada ${torneio.rodadaAtual + 1} com ${proximos.length} jogadores`);
         this._criarRodada(torneioId, proximos);
         this.emitirEstadoTorneio(torneioId);
+    }
+
+
+    /**
+     * Torneio que acabou sem campeão (todos abandonaram). Regras:
+     *  - Rodada 0 sem nenhuma eliminação jogando: cada um recebe de volta
+     *    exatamente o que pagou (entradas + rebuys), bônus como bônus.
+     *  - Depois disso, os sobreviventes (quem abandonou na rodada atual; sem
+     *    nenhum, todos da última rodada disputada):
+     *      1. recebem de volta o que ELES pagaram, na origem (bônus como
+     *         bônus, real como real);
+     *      2. dividem em partes iguais o pool do que os ELIMINADOS pagaram,
+     *         cada parte com a proporção bônus/real do pool — como se
+     *         tivessem ganhado essas fichas jogando.
+     *    Ninguém recebe saldo real que veio de outro sobrevivente, e
+     *    eliminado não recebe nada.
+     * Bônus e real são conservados separadamente: soma em bônus creditada
+     * = premioBonus, soma em real = premioTotal − premioBonus.
+     */
+    async _distribuirSemCampeao(torneio) {
+        const pagoDe = (j) => {
+            const total = torneio.buyIn * (1 + (j.rebuys || 0));
+            return { total, bonus: Math.min(total, j.pagoBonus || 0) };
+        };
+        if (!torneio.houveEliminacao && torneio.rodadaAtual === 0) {
+            for (const j of Object.values(torneio.jogadores)) {
+                const pago = pagoDe(j);
+                await this.creditar(j.uid, pago.total, pago.bonus);
+                await this._notificarSaldoJogador(j.uid);
+            }
+            return;
+        }
+        const rodada   = torneio.rodadas[torneio.rodadaAtual];
+        const naRodada = (rodada?.mesas || []).flatMap(m => m.jogadores);
+        const vivos    = naRodada.filter(uid => torneio.jogadores[uid]?.abandonouNaRodada === torneio.rodadaAtual);
+        const destino  = vivos.length ? vivos : naRodada;
+        if (!destino.length) return;
+
+        // Pool = o que os que não estão no destino (eliminados) pagaram
+        let poolTotal = 0, poolBonus = 0;
+        for (const j of Object.values(torneio.jogadores)) {
+            if (destino.includes(j.uid)) continue;
+            const pago = pagoDe(j);
+            poolTotal += pago.total;
+            poolBonus += pago.bonus;
+        }
+
+        const n = destino.length;
+        for (let i = 0; i < n; i++) {
+            const j     = torneio.jogadores[destino[i]];
+            const pago  = j ? pagoDe(j) : { total: 0, bonus: 0 };
+            // Sobras de divisão vão para os primeiros, nas duas contas; a
+            // parte bônus nunca passa da parte (poolBonus <= poolTotal).
+            const parte      = Math.floor(poolTotal / n) + (i < poolTotal % n ? 1 : 0);
+            const parteBonus = Math.floor(poolBonus / n) + (i < poolBonus % n ? 1 : 0);
+            await this.creditar(destino[i], pago.total + parte, pago.bonus + parteBonus);
+            await this._notificarSaldoJogador(destino[i]);
+        }
     }
 
 
@@ -405,16 +511,24 @@ export class TournamentManager {
         return { sucesso: true };
     }
 
-    processarRebuy(torneioId, uid) {
+    processarRebuy(torneioId, uid, pagoBonus = 0) {
         const torneio = this.torneios.get(torneioId);
         if (!torneio) return { sucesso: false, erro: 'Torneio não encontrado.' };
 
         const j = torneio.jogadores[uid];
         if (!j) return { sucesso: false, erro: 'Jogador não encontrado.' };
 
+        // Recheca aqui: entre o checarRebuy e este ponto houve o await do
+        // débito, e o torneio/jogador pode ter mudado (quem chama estorna).
+        const verificacao = this.checarRebuy(torneioId, uid);
+        if (!verificacao.sucesso) return verificacao;
+
         j.rebuys++;
         j.status = 'rebuy_pago';
+        const bonusRebuy = Math.min(torneio.buyIn, pagoBonus || 0);
+        j.pagoBonus = (j.pagoBonus || 0) + bonusRebuy;
         torneio.premioTotal += torneio.buyIn;
+        torneio.premioBonus = (torneio.premioBonus || 0) + bonusRebuy;
 
         // Verifica se ainda há pendências de rebuy
         const aindaPendente = Object.values(torneio.jogadores)
@@ -483,7 +597,7 @@ export class TournamentManager {
     // depois de um refresh.
     async _notificarSaldoJogador(uid) {
         try {
-            const saldos = await buscarSaldo(uid);
+            const saldos = await this.buscarSaldo(uid);
             for (const [, s] of this.io.sockets.sockets) {
                 if (s.data.uid === uid) {
                     s.emit('wallet:saldo_atualizado', {
