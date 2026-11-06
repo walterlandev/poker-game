@@ -43,6 +43,17 @@ test('todos saem de uma mesa de torneio: mesa fecha sem vencedor e o vencedor da
 const esperarCreditos = async () => { for (let i = 0; i < 20; i++) await new Promise(r => setImmediate(r)); };
 const porUid = creditos => Object.fromEntries(creditos.map(c => [c.uid, [c.valor, c.origemBonus]]));
 
+test('torneio misto: o campeão recebe em bônus a parte do prêmio que entrou como bônus', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { tm, torneioId, torneio, creditos } = montarTorneio(3, { maxRebuys: 0 }, { p0: 100, p2: 40 });
+    tm.iniciarTorneio(torneioId, 'p0');
+    const m0 = torneio.rodadas[0].mesas[0];
+    tm.notificarVencedorMesa(torneioId, m0.mesaId, 'p1');     // p1 pagou só real
+    await esperarCreditos();
+    assert.equal(torneio.campeao, 'p1');
+    assert.deepEqual(creditos, [{ uid: 'p1', valor: 300, origemBonus: 140 }]);
+});
+
 test('abandono na rodada 0, antes de qualquer eliminação: cada um recebe o que pagou, bônus como bônus', async (t) => {
     t.mock.timers.enable(TIMERS);
     const { gm, tm, torneioId, torneio, creditos } = montarTorneio(2, { maxRebuys: 0 }, { p0: 30, p1: 100 });

@@ -263,7 +263,7 @@ export class GameManager {
         const maoEmAndamento = mesa.fase !== 'AGUARDANDO' && mesa.fase !== 'SHOWDOWN';
         if (maoEmAndamento && jogador.apostaTotal > 0) {
             mesa.contribuicoesEncerradas = mesa.contribuicoesEncerradas || [];
-            mesa.contribuicoesEncerradas.push({ apostaTotal: jogador.apostaTotal });
+            mesa.contribuicoesEncerradas.push({ apostaTotal: jogador.apostaTotal, apostaBonus: jogador.apostaBonus || 0 });
         }
 
         if (maoAtiva) {
@@ -485,6 +485,7 @@ export class GameManager {
             if (j && j.saldo <= 0) {
                 j.apostaRodada = 0;
                 j.apostaTotal  = 0;
+                j.apostaBonus  = 0;
             }
         });
 
@@ -513,6 +514,7 @@ export class GameManager {
             j.status        = 'ativo';
             j.apostaRodada  = 0;
             j.apostaTotal   = 0;   // ← RESET obrigatório a cada mão
+            j.apostaBonus   = 0;   // parte de apostaTotal que saiu do bônus
             j.nivelAoAgir   = null; // ainda não agiu nesta rua (blind não conta)
             j.cartas        = [baralho.pop(), baralho.pop()];
         });
@@ -606,6 +608,30 @@ export class GameManager {
         return ativos[0];
     }
 
+    /**
+     * ORIGEM DAS FICHAS (bônus nunca vira saldo real): ao apostar, saem
+     * PRIMEIRO as fichas de bônus do jogador (origemBonus), depois as reais.
+     * A parte de bônus de cada aposta fica em jogador.apostaBonus e, no fim
+     * da mão, cada pote paga ao vencedor a parte de bônus das contribuições
+     * daquela faixa como bônus (ver _calcularPotes / _creditarPremio).
+     */
+    _consumirBonus(j, valor) {
+        const b = Math.min(valor, j.origemBonus || 0);
+        j.origemBonus = (j.origemBonus || 0) - b;
+        j.apostaBonus = (j.apostaBonus || 0) + b;
+    }
+
+    /** Credita um prêmio (fichas + parte bônus) e zera as apostas da mão já pagas. */
+    _creditarPremio(j, fichas, bonus) {
+        j.saldo      += fichas;
+        j.origemBonus = (j.origemBonus || 0) + Math.min(bonus, fichas);
+    }
+
+    _zerarBonusDoPote(mesa) {
+        Object.values(mesa.jogadores).forEach(j => { j.apostaBonus = 0; });
+        (mesa.contribuicoesEncerradas || []).forEach(c => { c.apostaBonus = 0; });
+    }
+
     _aplicarBlind(mesa, uid, valor) {
         const j          = mesa.jogadores[uid];
         if (!j) return;
@@ -613,6 +639,8 @@ export class GameManager {
         j.saldo          -= apostaReal;
         j.apostaRodada    = apostaReal;
         j.apostaTotal     = apostaReal;   // blind já conta no total da mão
+        j.apostaBonus     = 0;
+        this._consumirBonus(j, apostaReal);
         if (j.saldo === 0) j.status = 'all-in';
     }
 
@@ -881,6 +909,7 @@ export class GameManager {
             jogador.saldo        -= valorInvestido;
             jogador.apostaRodada  = jaApostou + valorInvestido;
             jogador.apostaTotal   = (jogador.apostaTotal || 0) + valorInvestido;  // ← CRÍTICO
+            this._consumirBonus(jogador, valorInvestido);
             mesa.pote            += valorInvestido;
         }
 
@@ -1132,6 +1161,7 @@ export class GameManager {
 
         const potes         = this._calcularPotes(mesa, elegiveis.map(e => e.uid));
         const premiados     = {};
+        const premiosBonus  = {};
         const descricoesMao = {};
 
         potes.forEach(pote => {
@@ -1154,21 +1184,42 @@ export class GameManager {
             const base      = Math.floor(valorPote / nVenc);
             const resto     = valorPote % nVenc;  // ficha(s) ímpar(es)
 
-            vencedores.forEach(uid => {
-                premiados[uid] = (premiados[uid] || 0) + base;
-            });
+            const parteDe = {};
+            vencedores.forEach(uid => { parteDe[uid] = base; });
 
             // Odd Chip: entregue ao vencedor mais à esquerda do dealer
             if (resto > 0) {
                 const uidOddChip = this._vencedorMaisProximoDoDealer(mesa, vencedores);
-                premiados[uidOddChip] = (premiados[uidOddChip] || 0) + resto;
+                parteDe[uidOddChip] += resto;
             }
+
+            // Parte bônus do pote dividida na proporção do que cada um levou;
+            // a sobra do arredondamento também vai como bônus (nunca cria real).
+            const bonusPote = Math.min(pote.bonus || 0, valorPote);
+            let   distribuido = 0;
+            const bonusDe = {};
+            vencedores.forEach(uid => {
+                bonusDe[uid] = valorPote > 0 ? Math.floor(bonusPote * parteDe[uid] / valorPote) : 0;
+                distribuido += bonusDe[uid];
+            });
+            for (const uid of vencedores) {
+                if (distribuido >= bonusPote) break;
+                const folga = Math.min(parteDe[uid] - bonusDe[uid], bonusPote - distribuido);
+                bonusDe[uid] += folga;
+                distribuido  += folga;
+            }
+
+            vencedores.forEach(uid => {
+                premiados[uid]    = (premiados[uid]    || 0) + parteDe[uid];
+                premiosBonus[uid] = (premiosBonus[uid] || 0) + bonusDe[uid];
+            });
         });
 
         // Credita os prêmios
         Object.entries(premiados).forEach(([uid, premio]) => {
-            mesa.jogadores[uid].saldo += premio;
+            this._creditarPremio(mesa.jogadores[uid], premio, premiosBonus[uid] || 0);
         });
+        this._zerarBonusDoPote(mesa);
 
         const potTotal = mesa.pote;  // salva antes de zerar
 
@@ -1244,8 +1295,15 @@ export class GameManager {
     _calcularPotes(mesa, elegiveisUids) {
         const temAllIn = elegiveisUids.some(uid => mesa.jogadores[uid].status === 'all-in');
         if (!temAllIn) {
-            return [{ valor: mesa.pote, elegiveis: elegiveisUids }];
+            const bonus = Object.values(mesa.jogadores).reduce((s, j) => s + (j.apostaBonus || 0), 0)
+                        + (mesa.contribuicoesEncerradas || []).reduce((s, c) => s + (c.apostaBonus || 0), 0);
+            return [{ valor: mesa.pote, bonus, elegiveis: elegiveisUids }];
         }
+
+        // Parte bônus de uma contribuição dentro da faixa (lo, hi]: como o
+        // bônus sai primeiro, são as fichas da faixa abaixo de apostaBonus.
+        const bonusNaFaixa = (c, lo, hi) =>
+            Math.max(0, Math.min(hi, c.apostaBonus || 0, c.apostaTotal || 0) - lo);
 
         // Monta caps (limite de contribuição de cada all-in, baseado em apostaTotal)
         const caps = elegiveisUids
@@ -1259,6 +1317,7 @@ export class GameManager {
 
         const potes     = [];
         let   capAnter  = 0;
+        let   bonusSemDono = 0;   // bônus de faixa sem elegível: segue a diferença de fichas
 
         // IMPORTANTE: o valor de cada pote soma a contribuição de TODOS os
         // jogadores que apostaram nesta mão — inclusive quem já desistiu
@@ -1283,6 +1342,8 @@ export class GameManager {
                 const total = f.apostaTotal || 0;
                 return soma + Math.min(Math.max(total - capAnter, 0), cap - capAnter);
             }, 0);
+            const bonusDoPote = todosUids.reduce((s, uid) => s + bonusNaFaixa(mesa.jogadores[uid], capAnter, cap), 0)
+                              + fantasmas.reduce((s, f) => s + bonusNaFaixa(f, capAnter, cap), 0);
 
             if (valorDoPote <= 0) continue;
 
@@ -1302,7 +1363,9 @@ export class GameManager {
             });
 
             if (elegiveisNoPote.length > 0) {
-                potes.push({ valor: valorDoPote, elegiveis: elegiveisNoPote });
+                potes.push({ valor: valorDoPote, bonus: bonusDoPote, elegiveis: elegiveisNoPote });
+            } else {
+                bonusSemDono += bonusDoPote;
             }
 
             capAnter = cap;
@@ -1315,6 +1378,9 @@ export class GameManager {
         if (diff !== 0 && potes.length > 0) {
             potes[potes.length - 1].valor += diff;
         }
+        if (bonusSemDono > 0 && potes.length > 0) {
+            potes[potes.length - 1].bonus += bonusSemDono;
+        }
 
         return potes;
     }
@@ -1325,7 +1391,11 @@ export class GameManager {
 
         const j        = mesa.jogadores[vencedorUid];
         const potGanho = mesa.pote;
-        j.saldo       += potGanho;
+        // Leva o pote inteiro, cada ficha com a origem dela.
+        const bonusPote = Object.values(mesa.jogadores).reduce((s, x) => s + (x.apostaBonus || 0), 0)
+                        + (mesa.contribuicoesEncerradas || []).reduce((s, c) => s + (c.apostaBonus || 0), 0);
+        this._creditarPremio(j, potGanho, bonusPote);
+        this._zerarBonusDoPote(mesa);
 
         mesa.pote                 = 0;
         mesa.turno                = null;

@@ -376,7 +376,8 @@ export class TournamentManager {
             // Winner-take-all: o campeão leva o prêmio inteiro (soma de
             // todas as entradas + rebuys) creditado direto no saldo real.
             if (campeaoUid && torneio.premioTotal > 0) {
-                await this.creditar(campeaoUid, torneio.premioTotal);
+                // A parte paga com bônus (premioBonus) volta como bônus: bônus nunca vira real.
+                await this.creditar(campeaoUid, torneio.premioTotal, Math.min(torneio.premioTotal, torneio.premioBonus || 0));
                 this.io.to(`torneio:${torneioId}`).emit('torneio:premio_creditado', {
                     torneioId,
                     campeaoUid,

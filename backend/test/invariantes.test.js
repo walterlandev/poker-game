@@ -32,7 +32,12 @@ for (const semente of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
         const total = stacks.reduce((a, b) => a + b, 0);
         let saiuComFichas = 0;
         let acoes = 0, maos = 0, acoesNaMao = 0;
-        gm.setAoRemoverPorInatividade(info => { saiuComFichas += info.saldo; });
+        // Origem: parte de cada stack é bônus. Bônus total do sistema (nos
+        // stacks + no pote + o que saiu como bônus) nunca muda numa mão.
+        Object.values(mesa.jogadores).forEach(j => { j.origemBonus = Math.floor(r() * (j.saldo + 1)); });
+        const bonusInicial = bonusNaMesa(mesa);
+        let saiuComBonus = 0;
+        gm.setAoRemoverPorInatividade(info => { saiuComFichas += info.saldo; saiuComBonus += Math.min(info.origemBonus, info.saldo); });
 
         gm.iniciarRodada(mesaId);
         for (let passo = 0; passo < 4000 && gm.getMesa(mesaId); passo++) {
@@ -40,6 +45,8 @@ for (const semente of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
             assert.equal(totalFichas(mesa) + saiuComFichas, total, `${ctx}: fichas não conservadas`);
             checarTurno(mesa, ctx);
             for (const j of Object.values(mesa.jogadores)) assert.ok(j.saldo >= 0, `${ctx}: saldo negativo (${j.uid}: ${j.saldo})`);
+            for (const j of Object.values(mesa.jogadores)) assert.ok((j.origemBonus || 0) <= j.saldo, `${ctx}: origemBonus > stack (${j.uid})`);
+            assert.equal(bonusNaMesa(mesa) + saiuComBonus, bonusInicial, `${ctx}: bônus total mudou (bônus virou real ou o contrário)`);
 
             if (EM_JOGO.includes(mesa.fase) && mesa.turno) {
                 acoesNaMao++;
@@ -60,6 +67,7 @@ for (const semente of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
                 if (x < 0.07 && Object.keys(mesa.jogadores).length > 2) {
                     const quem = mesa.ordem[Math.floor(r() * mesa.ordem.length)];
                     saiuComFichas += mesa.jogadores[quem].saldo;
+                    saiuComBonus  += Math.min(mesa.jogadores[quem].origemBonus || 0, mesa.jogadores[quem].saldo);
                     gm.sairMesa(mesaId, quem);
                     continue;
                 }
@@ -102,6 +110,11 @@ for (const semente of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
         if (process.env.FUZZ_LOG) console.log(`semente ${semente}: ${n} jogadores, ${maos} mãos, ${acoes} ações, fase final ${mesa.fase}`);
         assert.ok(acoes > 0);
     });
+}
+
+function bonusNaMesa(mesa) {
+    return Object.values(mesa.jogadores).reduce((s, j) => s + (j.origemBonus || 0) + (j.apostaBonus || 0), 0)
+        + (mesa.contribuicoesEncerradas || []).reduce((s, c) => s + (c.apostaBonus || 0), 0);
 }
 
 function totalFichas(mesa) {
