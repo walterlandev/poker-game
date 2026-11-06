@@ -151,6 +151,54 @@ test('duplo "Entrar no torneio" debita uma vez só', async (t) => {
     assert.equal(tm.getTorneio(torneioId).premioTotal, 200);
 });
 
+// ── criar_torneio / torneio_rebuy: mesma trava e estorno ─────────────
+test('duplo "Criar torneio" cria um torneio só e debita uma vez', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { servico, tm, debitos, creditos } = montar();
+    const h = sock('host_t');
+    await Promise.all([servico.criarTorneio(h, { buyIn: 100 }), servico.criarTorneio(h, { buyIn: 100 })]);
+    assert.equal([...tm.torneios.values()].filter(x => x.host === 'host_t').length, 1);
+    assert.equal(liquido(debitos, creditos, 'host_t'), 100);
+});
+
+/** Torneio de 2 em que p_b foi eliminado na rodada 0 e pode fazer rebuy. */
+function torneioComRebuy(tm) {
+    const { torneioId } = tm.criarTorneio({ buyIn: 100, maxRebuys: 2 }, { uid: 'p_a', nome: 'p_a' });
+    tm.entrarTorneio(torneioId, { uid: 'p_b', nome: 'p_b' });
+    tm.iniciarTorneio(torneioId, 'p_a');
+    const torneio = tm.getTorneio(torneioId);
+    tm.notificarVencedorMesa(torneioId, torneio.rodadas[0].mesas[0].mesaId, 'p_a');
+    assert.equal(torneio.jogadores.p_b.status, 'rebuy_disponivel');
+    return { torneioId, torneio };
+}
+
+test('rebuy de torneio duplicado é processado uma vez só', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { servico, tm, debitos, creditos } = montar();
+    const { torneioId, torneio } = torneioComRebuy(tm);
+    const b = sock('p_b');
+    await Promise.all([servico.rebuyTorneio(b, { torneioId }), servico.rebuyTorneio(b, { torneioId })]);
+    assert.equal(torneio.jogadores.p_b.rebuys, 1);
+    assert.equal(torneio.premioTotal, 300);
+    assert.equal(liquido(debitos, creditos, 'p_b'), 100);
+});
+
+test('rebuy de torneio que deixa de valer durante o débito é estornado', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    let tmRef, idRef;
+    const ctx = montar({ aoDebitar: (uid) => {
+        // o torneio terminou enquanto o débito rodava
+        if (uid === 'p_b') tmRef.getTorneio(idRef).status = 'finalizado';
+    } });
+    tmRef = ctx.tm;
+    const { torneioId, torneio } = torneioComRebuy(ctx.tm);
+    idRef = torneioId;
+    await ctx.servico.rebuyTorneio(sock('p_b'), { torneioId });
+    assert.equal(torneio.jogadores.p_b.rebuys, 0);
+    assert.equal(torneio.premioTotal, 200);
+    assert.equal(liquido(ctx.debitos, ctx.creditos, 'p_b'), 0);
+});
+
 // ── #19: mesa com bots = mesa de TREINO (fichas sem valor) ──────────
 /** criarMesa espera 300 ms entre bots: avança o relógio falso até terminar. */
 async function criarComBots(t, servico, socket, config) {

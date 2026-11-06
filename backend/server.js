@@ -462,52 +462,7 @@ io.on('connection', (socket) => {
     // ----------------------------------------------------------------
     // criar_torneio
     // ----------------------------------------------------------------
-    socket.on('criar_torneio', async (config) => {
-        if (!socket.data.uid) {
-            socket.emit('erro', { mensagem: 'Autentique-se primeiro.' });
-            return;
-        }
-
-        const buyIn = config.buyIn || 500;
-        const fichasIniciais = config.fichasIniciais || buyIn * 20;
-
-        // Debita buy-in do host
-        const debito = await debitarEntradaMesa(socket.data.uid, buyIn);
-        if (!debito.sucesso) {
-            socket.emit('erro', { mensagem: debito.erro });
-            return;
-        }
-
-        const host = {
-            uid:    socket.data.uid,
-            nome:   socket.data.nome,
-            avatar: socket.data.avatar || '',
-            tema:   socket.data.tema,
-            pagoBonus: debito.debitarBonus || 0,   // origem do buy-in (bônus nunca vira real)
-        };
-
-        const resultado = tournamentManager.criarTorneio(
-            { ...config, buyIn: debito.fichasDebitadas },
-            host,
-        );
-        if (!resultado.sucesso) {
-            await creditarSaidaMesa(socket.data.uid, debito.fichasDebitadas, debito.debitarBonus);
-            socket.emit('erro', { mensagem: resultado.erro });
-            return;
-        }
-
-        const { torneioId } = resultado;
-        socket.join(`torneio:${torneioId}`);
-        socket.data.torneioId = torneioId;
-
-        socket.emit('torneio:criado', { torneioId });
-        await emitirSaldoAtualizado(socket, socket.data.uid);
-
-        // Notifica lobby sobre a atualização dos torneios
-        io.emit('torneios_atualizados', tournamentManager.listarTorneios());
-
-        console.log(`🏆 Torneio ${torneioId} criado por ${host.nome}`);
-    });
+    socket.on('criar_torneio', (config) => servicoMesas.criarTorneio(socket, config || {}));
 
 
     // ----------------------------------------------------------------
@@ -555,40 +510,7 @@ io.on('connection', (socket) => {
     // ----------------------------------------------------------------
     // torneio_rebuy — jogador paga para re-entrar no próximo round
     // ----------------------------------------------------------------
-    socket.on('torneio_rebuy', async ({ torneioId }) => {
-        if (!socket.data.uid) {
-            socket.emit('erro', { mensagem: 'Autentique-se primeiro.' });
-            return;
-        }
-        if (!torneioId) {
-            socket.emit('erro', { mensagem: 'ID do torneio inválido.' });
-            return;
-        }
-
-        const verificacao = tournamentManager.checarRebuy(torneioId, socket.data.uid);
-        if (!verificacao.sucesso) {
-            socket.emit('erro', { mensagem: verificacao.erro });
-            return;
-        }
-
-        const torneio = tournamentManager.getTorneio(torneioId);
-        const debito  = await debitarEntradaMesa(socket.data.uid, torneio.buyIn);
-        if (!debito.sucesso) {
-            socket.emit('erro', { mensagem: debito.erro });
-            return;
-        }
-
-        const resultado = tournamentManager.processarRebuy(torneioId, socket.data.uid, debito.debitarBonus || 0);
-        if (!resultado.sucesso) {
-            await creditarSaidaMesa(socket.data.uid, debito.fichasDebitadas, debito.debitarBonus);
-            socket.emit('erro', { mensagem: resultado.erro });
-            return;
-        }
-
-        await emitirSaldoAtualizado(socket, socket.data.uid);
-        socket.emit('torneio:rebuy_confirmado', { torneioId });
-        console.log(`🔄 Rebuy: ${socket.data.nome} no torneio ${torneioId}`);
-    });
+    socket.on('torneio_rebuy', (dados) => servicoMesas.rebuyTorneio(socket, dados || {}));
 
 });
 

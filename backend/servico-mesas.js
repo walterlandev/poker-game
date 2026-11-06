@@ -189,6 +189,63 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         return torneioId;
     }
 
+    async function criarTorneio(socket, config = {}) {
+        if (!socket.data.uid) { socket.emit('erro', { mensagem: 'Autentique-se primeiro.' }); return; }
+        const uid   = socket.data.uid;
+        const buyIn = config.buyIn || 500;
+
+        const debito = await debitar(uid, buyIn);
+        if (!debito.sucesso) { socket.emit('erro', { mensagem: debito.erro }); return; }
+
+        const host = {
+            uid,
+            nome:      socket.data.nome,
+            avatar:    socket.data.avatar || '',
+            tema:      socket.data.tema,
+            pagoBonus: debito.debitarBonus || 0,   // origem do buy-in (bônus nunca vira real)
+        };
+        const resultado = tournamentManager.criarTorneio({ ...config, buyIn: debito.fichasDebitadas }, host);
+        if (!resultado.sucesso) {
+            await creditar(uid, debito.fichasDebitadas, debito.debitarBonus);
+            socket.emit('erro', { mensagem: resultado.erro });
+            return;
+        }
+
+        const { torneioId } = resultado;
+        socket.join(`torneio:${torneioId}`);
+        socket.data.torneioId = torneioId;
+        socket.emit('torneio:criado', { torneioId });
+        await emitirSaldo(socket, uid);
+        io?.emit('torneios_atualizados', tournamentManager.listarTorneios());
+        console.log(`🏆 Torneio ${torneioId} criado por ${host.nome}`);
+        return torneioId;
+    }
+
+    async function rebuyTorneio(socket, { torneioId } = {}) {
+        if (!socket.data.uid) { socket.emit('erro', { mensagem: 'Autentique-se primeiro.' }); return; }
+        if (!torneioId)       { socket.emit('erro', { mensagem: 'ID do torneio inválido.' }); return; }
+        const uid = socket.data.uid;
+
+        const verificacao = tournamentManager.checarRebuy(torneioId, uid);
+        if (!verificacao.sucesso) { socket.emit('erro', { mensagem: verificacao.erro }); return; }
+
+        const torneio = tournamentManager.getTorneio(torneioId);
+        const debito  = await debitar(uid, torneio.buyIn);
+        if (!debito.sucesso) { socket.emit('erro', { mensagem: debito.erro }); return; }
+
+        // processarRebuy recheca a elegibilidade: o estado pode ter mudado
+        // durante o await do débito (torneio terminou, janela fechou...).
+        const resultado = tournamentManager.processarRebuy(torneioId, uid, debito.debitarBonus || 0);
+        if (!resultado.sucesso) {
+            await creditar(uid, debito.fichasDebitadas, debito.debitarBonus);
+            socket.emit('erro', { mensagem: resultado.erro });
+            return;
+        }
+        await emitirSaldo(socket, uid);
+        socket.emit('torneio:rebuy_confirmado', { torneioId });
+        console.log(`🔄 Rebuy: ${socket.data.nome} no torneio ${torneioId}`);
+    }
+
     /**
      * Saída completa da mesa (voluntária ou por desconexão).
      * MESA DE TORNEIO: fichas de torneio não são dinheiro — sair é forfeit,
@@ -247,6 +304,8 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         entrarMesa:    travado(entrarMesa),
         rebuy:         travado(rebuy),
         entrarTorneio: travado(entrarTorneio),
+        criarTorneio:  travado(criarTorneio),
+        rebuyTorneio:  travado(rebuyTorneio),
         sairMesa,
         removidoPorInatividade,
     };

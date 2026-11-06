@@ -518,6 +518,11 @@ export class TournamentManager {
         const j = torneio.jogadores[uid];
         if (!j) return { sucesso: false, erro: 'Jogador não encontrado.' };
 
+        // Recheca aqui: entre o checarRebuy e este ponto houve o await do
+        // débito, e o torneio/jogador pode ter mudado (quem chama estorna).
+        const verificacao = this.checarRebuy(torneioId, uid);
+        if (!verificacao.sucesso) return verificacao;
+
         j.rebuys++;
         j.status = 'rebuy_pago';
         const bonusRebuy = Math.min(torneio.buyIn, pagoBonus || 0);
