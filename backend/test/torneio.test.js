@@ -25,6 +25,12 @@ test('nenhuma mesa de torneio é criada com um jogador só', (t) => {
     assert.ok(tamanhos.every(n => n >= 2), `mesas com ${tamanhos.join(', ')} jogadores`);
 });
 
+test('torneio sem rebuy (maxRebuys 0) é respeitado', (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { torneio } = montarTorneio(2, { maxRebuys: 0 });
+    assert.equal(torneio.maxRebuys, 0);
+});
+
 test('quem não está no torneio não consegue sentar numa mesa do torneio', (t) => {
     t.mock.timers.enable(TIMERS);
     const { gm, tm, torneioId, torneio } = montarTorneio(2);

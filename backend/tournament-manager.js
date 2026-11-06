@@ -49,7 +49,7 @@ export class TournamentManager {
             status:           'aberto',
             buyIn,
             fichasIniciais:   Math.max(1000, fichasIniciais),
-            maxRebuys:        Math.min(5, Math.max(0, config.maxRebuys     || 1)),
+            maxRebuys:        Math.min(5, Math.max(0, Number(config.maxRebuys ?? 1) || 0)),  // 0 = sem rebuy (|| 1 transformava 0 em 1)
             rebuyPeriod:      Math.min(180, Math.max(0, config.rebuyPeriod || 30)),
             maxJogadores:     Math.min(64, Math.max(4,  config.maxJogadores     || 16)),
             jogadoresPorMesa: Math.min(9,  Math.max(2,  config.jogadoresPorMesa || 6)),
