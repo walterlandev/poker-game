@@ -7,7 +7,29 @@
    injetados (em produção, as funções de firebase-admin.js).
 ================================================================ */
 
+export const MSG = {
+    OCUPADO: 'Aguarde: sua operação anterior ainda está sendo processada.',
+};
+
 export function criarServicoMesas({ io, gameManager, tournamentManager, debitar, creditar, emitirSaldo, socketMesa = new Map() }) {
+
+    // Trava por uid: criar/entrar/rebuy/entrar_torneio do mesmo jogador não
+    // rodam em paralelo. Sem isso, um duplo clique fazia as duas requisições
+    // passarem pela checagem "já está na mesa?" antes do primeiro débito
+    // terminar (o débito é um await no Firestore): debitava duas vezes e
+    // devolvia uma só.
+    const emOperacao = new Set();
+    const travado = (fn) => async (socket, ...args) => {
+        const uid = socket.data?.uid;
+        if (!uid) return fn(socket, ...args);
+        if (emOperacao.has(uid)) {
+            socket.emit('erro', { mensagem: MSG.OCUPADO });
+            return;
+        }
+        emOperacao.add(uid);
+        try { return await fn(socket, ...args); }
+        finally { emOperacao.delete(uid); }
+    };
 
     async function criarMesa(socket, config = {}) {
         if (!socket.data.uid) { socket.emit('erro', { mensagem: 'Autentique-se primeiro.' }); return; }
@@ -64,17 +86,21 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
 
         // Se jogador já está na mesa (reconexão), não debita novamente
         const jaEstaNaMesa = !!mesa.jogadores[uid];
-        let origemBonus = 0;
+        let debito = null;
         if (!jaEstaNaMesa) {
-            const debito = await debitar(uid, mesa.valorBuyIn);
+            debito = await debitar(uid, mesa.valorBuyIn);
             if (!debito.sucesso) { socket.emit('erro', { mensagem: debito.erro }); return; }
-            origemBonus = debito.debitarBonus || 0;
         }
+        const origemBonus = debito?.debitarBonus || 0;
 
         const usuario = { uid, nome: socket.data.nome, avatar: socket.data.avatar, tema: socket.data.tema, origemBonus };
         const resultado = gameManager.entrarMesa(dados.mesaId, usuario, socket, dados.senha);
+        // Débito feito mas não sentou com ele — erro, ou o jogador já estava
+        // sentado (outra requisição chegou antes): estorna o que foi debitado.
+        if (debito && (!resultado.sucesso || resultado.jaEstava)) {
+            await creditar(uid, debito.fichasDebitadas ?? mesa.valorBuyIn, origemBonus);
+        }
         if (!resultado.sucesso) {
-            if (!jaEstaNaMesa) await creditar(uid, mesa.valorBuyIn, origemBonus);
             socket.emit('erro', { mensagem: resultado.erro });
             return;
         }
@@ -82,7 +108,7 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         socket.data.mesaId = dados.mesaId;
         socketMesa.set(socket.id, dados.mesaId);
         socket.emit('entrou_mesa', { mesaId: dados.mesaId });
-        if (!jaEstaNaMesa) await emitirSaldo(socket, uid);
+        if (debito) await emitirSaldo(socket, uid);
         console.log(`🚪 ${usuario.nome} entrou na mesa ${dados.mesaId}`);
         return dados.mesaId;
     }
@@ -123,8 +149,10 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         }
         const usuario = { uid, nome: socket.data.nome, avatar: socket.data.avatar || '', tema: socket.data.tema, pagoBonus: debito?.debitarBonus || 0 };
         const resultado = tournamentManager.entrarTorneio(torneioId, usuario);
+        if (debito && (!resultado.sucesso || resultado.jaEstava)) {
+            await creditar(uid, debito.fichasDebitadas, debito.debitarBonus);
+        }
         if (!resultado.sucesso) {
-            if (!jaEstaNaTorneio) await creditar(uid, debito.fichasDebitadas, debito.debitarBonus);
             socket.emit('erro', { mensagem: resultado.erro });
             return;
         }
@@ -185,5 +213,12 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         console.log(`🚪 ${uid} removido por inatividade: ₿C ${saldo} devolvidos`);
     }
 
-    return { criarMesa, entrarMesa, rebuy, entrarTorneio, sairMesa, removidoPorInatividade };
+    return {
+        criarMesa:     travado(criarMesa),
+        entrarMesa:    travado(entrarMesa),
+        rebuy:         travado(rebuy),
+        entrarTorneio: travado(entrarTorneio),
+        sairMesa,
+        removidoPorInatividade,
+    };
 }

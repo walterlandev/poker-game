@@ -201,7 +201,7 @@ export class GameManager {
             // Jogador já está na mesa (reconexão ou torneio) — garante que o socket
             // entre na sala para receber broadcasts de estado_mesa
             socket.join(mesaId);
-            return { sucesso: true, mesaId };
+            return { sucesso: true, mesaId, jaEstava: true };
         }
 
         // Mesa de torneio só tem quem o torneio sentou lá. Antes qualquer um

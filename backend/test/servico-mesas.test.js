@@ -11,9 +11,11 @@ import { criarIoFalso, avancar } from './helpers.js';
 const TIMERS = { apis: ['setTimeout'] };
 const tick = () => new Promise(r => setImmediate(r));
 
-function montar({ bonus = 0 } = {}) {
+function montar({ bonus = 0, aoDebitar = null } = {}) {
     const io = criarIoFalso();
     const gm = new GameManager(io);
+    // As mesas vivem num Map do módulo: esvazia o que sobrou de outros testes
+    for (const m of gm.getMesasAtivas()) for (const uid of Object.keys(m.jogadores)) gm.sairMesa(m.id, uid);
     const debitos = [], creditos = [];
     const tm = new TournamentManager(io, gm, {
         creditarSaidaMesa: async (uid, valor, origemBonus = 0) => { creditos.push({ uid, valor, origemBonus }); },
@@ -25,6 +27,7 @@ function montar({ bonus = 0 } = {}) {
         // débito "lento" (await de verdade, como o Firestore) para expor corridas
         debitar: async (uid, valor) => {
             await tick();
+            if (aoDebitar) aoDebitar(uid);
             const v = Math.floor(Number(valor)) || 0;
             debitos.push({ uid, valor: v });
             return { sucesso: true, fichasDebitadas: v, debitarBonus: Math.min(bonus, v) };
@@ -68,4 +71,61 @@ test('criar, entrar e sair de mesa real: debita o buy-in e devolve o stack', asy
     await servico.sairMesa(b, 'voluntária');
     assert.deepEqual(creditos, [{ uid: 'b', valor: 500, origemBonus: 0 }]);
     assert.ok(gm.getMesa(mesaId));
+});
+
+// ── #20: duplo clique / requisições concorrentes ─────────────────────
+const liquido = (debitos, creditos, uid) =>
+    soma(debitos.filter(d => d.uid === uid)) - soma(creditos.filter(c => c.uid === uid));
+
+test('duplo "Entrar" na mesma mesa debita o buy-in uma vez só', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { servico, gm, debitos, creditos } = montar();
+    const mesaId = await servico.criarMesa(sock('a'), { buyIn: 500 });
+    const b = sock('b');
+    await Promise.all([servico.entrarMesa(b, { mesaId }), servico.entrarMesa(b, { mesaId })]);
+    assert.equal(gm.getMesa(mesaId).jogadores.b.saldo, 500);
+    assert.equal(liquido(debitos, creditos, 'b'), 500);
+});
+
+test('débito feito mas o jogador já estava sentado: o débito é estornado', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    let gmRef, mesaRef;
+    const ctx = montar({ aoDebitar: (uid) => {
+        // outra requisição sentou o jogador enquanto o débito rodava
+        if (uid === 'b' && mesaRef) gmRef.entrarMesa(mesaRef, { uid: 'b', nome: 'b' }, sock('b'));
+    } });
+    gmRef = ctx.gm;
+    mesaRef = await ctx.servico.criarMesa(sock('a'), { buyIn: 500 });
+    await ctx.servico.entrarMesa(sock('b'), { mesaId: mesaRef });
+    assert.equal(liquido(ctx.debitos, ctx.creditos, 'b'), 0);
+});
+
+test('duplo "Criar mesa" cria uma mesa só e debita uma vez', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { servico, gm, debitos, creditos } = montar();
+    const a = sock('criador_duplo');   // mesas são um Map global: uid exclusivo do teste
+    await Promise.all([servico.criarMesa(a, { buyIn: 500 }), servico.criarMesa(a, { buyIn: 500 })]);
+    assert.equal(gm.getMesasAtivas().filter(m => m.jogadores.criador_duplo).length, 1);
+    assert.equal(liquido(debitos, creditos, 'criador_duplo'), 500);
+});
+
+test('rebuy duplicado processa uma vez só', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { servico, gm, debitos, creditos } = montar();
+    const a = sock('a');
+    const mesaId = await servico.criarMesa(a, { buyIn: 500 });
+    gm.getMesa(mesaId).jogadores.a.saldo = 0;
+    await Promise.all([servico.rebuy(a, { valor: 500 }), servico.rebuy(a, { valor: 500 })]);
+    assert.equal(gm.getMesa(mesaId).jogadores.a.saldo, 500);
+    assert.equal(liquido(debitos, creditos, 'a'), 1000);
+});
+
+test('duplo "Entrar no torneio" debita uma vez só', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { servico, tm, debitos, creditos } = montar();
+    const { torneioId } = tm.criarTorneio({ buyIn: 100 }, { uid: 'h', nome: 'h' });
+    const x = sock('x');
+    await Promise.all([servico.entrarTorneio(x, { torneioId }), servico.entrarTorneio(x, { torneioId })]);
+    assert.equal(liquido(debitos, creditos, 'x'), 100);
+    assert.equal(tm.getTorneio(torneioId).premioTotal, 200);
 });
