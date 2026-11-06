@@ -400,6 +400,12 @@ export class GameManager {
         const mesa = mesas.get(mesaId);
         if (!mesa) return;
 
+        // Nunca recomeça por cima de uma mão em andamento: isso zerava
+        // apostaTotal/pote e cobrava blinds de novo — as fichas já no pote
+        // simplesmente sumiam. O evento 'iniciar_rodada' do host não checa
+        // a fase, e um reinício agendado em duplicidade cairia aqui também.
+        if (['PRE-FLOP', 'FLOP', 'TURN', 'RIVER'].includes(mesa.fase)) return;
+
         // Só interessa avisar o lobby quando a mesa estava "Aguardando"
         // (visível na lista pública) e está prestes a começar a jogar —
         // evita ficar avisando à toa a cada nova mão de um jogo já em curso.
