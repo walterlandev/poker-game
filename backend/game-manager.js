@@ -925,7 +925,11 @@ export class GameManager {
         const primeiro = this._encontrarPrimeiroParaAgir(mesaId);
 
         if (!primeiro) {
-            // Todos all-in → avança automaticamente
+            // Todos all-in → avança automaticamente. Ninguém tem a vez: sem
+            // zerar o turno, ele ficava com quem agiu por último (já all-in)
+            // — o relógio aparecia "preso" nele e uma ação dele passava na
+            // checagem de vez, avançando uma rua extra fora do runout.
+            mesa.turno = null;
             this.emitirEstado(mesaId);
             setTimeout(() => this._avancarFase(mesaId), 1_500);
             return;

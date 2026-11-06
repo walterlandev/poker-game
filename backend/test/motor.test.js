@@ -6,7 +6,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { montarMesa, definirCartas, totalFichas, agir, errosEmitidos } from './helpers.js';
+import { montarMesa, definirCartas, totalFichas, agir, errosEmitidos, avancar } from './helpers.js';
 
 const TIMERS = { apis: ['setTimeout'] };
 
@@ -75,7 +75,7 @@ test('quem está all-in nunca recebe a vez nem o relógio nas ruas seguintes', (
     agir(gm, mesaId, 'h1', 'CALL');                // paga all-in (500)
     assert.equal(mesa.fase, 'FLOP');
     assert.equal(mesa.turno, null, `turno deveria ser null, está com ${mesa.turno}`);
-    t.mock.timers.tick(1500 * 3);
+    avancar(t, 1500 * 3);
     assert.equal(mesa.fase, 'SHOWDOWN');
     assert.equal(totalFichas(mesa), 1500);
 });
@@ -113,7 +113,7 @@ test('heads-up: SB que fica all-in só com o blind não recebe a vez', (t) => {
     gm.iniciarRodada(mesaId);
     assert.equal(mesa.jogadores.h0.status, 'all-in');
     assert.notEqual(mesa.turno, 'h0');
-    t.mock.timers.tick(60_000);
+    avancar(t, 60_000);
     assert.equal(totalFichas(mesa), 1005);
 });
 
@@ -164,7 +164,7 @@ test('runout de all-in não continua depois que a mão acabou por W.O.', (t) => 
     assert.equal(mesa.fase, 'FLOP');
     gm.sairMesa(mesaId, 'h1');                     // sai no meio do runout
     assert.equal(mesa.resultadoMao.tipo, 'wo');
-    t.mock.timers.tick(1600);
+    avancar(t, 1600);
     assert.equal(mesa.resultadoMao.tipo, 'wo', 'timer antigo do runout recalculou o showdown');
 });
 
@@ -176,7 +176,7 @@ test('remoção por inatividade (3ª falta) avisa o servidor com as fichas a dev
     gm.iniciarRodada(mesaId);
     mesa.jogadores.h0.faltasSeguidas = 2;
     mesa.jogadores.h0.origemBonus    = 300;
-    t.mock.timers.tick(45_500);
+    avancar(t, 45_500);
     assert.equal(mesa.jogadores.h0, undefined);
     assert.deepEqual(removidos, [{ mesaId, uid: 'h0', saldo: 1000, origemBonus: 300, torneioId: null }]);
 });

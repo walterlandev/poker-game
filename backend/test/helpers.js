@@ -64,6 +64,14 @@ export function agir(gm, mesaId, uid, acao, valor = 0) {
     gm.processarAcao(mesaId, uid, acao, valor, `sock_${uid}`);
 }
 
+/**
+ * Avança o relógio falso em passos curtos — um tick() único não dispara
+ * timers agendados por outros timers dentro do mesmo intervalo.
+ */
+export function avancar(t, ms, passo = 100) {
+    for (let feito = 0; feito < ms; feito += passo) t.mock.timers.tick(Math.min(passo, ms - feito));
+}
+
 /** Erros enviados ao socket de um jogador (emitirErro usa io.to(socketId)). */
 export function errosEmitidos(io) {
     return io.eventos.filter(e => e.ev === 'erro').map(e => e.dados.mensagem);
