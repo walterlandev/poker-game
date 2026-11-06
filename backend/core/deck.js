@@ -40,6 +40,8 @@
 //   Se usássemos "10-copas" precisaríamos de uma lógica mais complexa.
 // ================================================================
 
+import { randomInt } from 'node:crypto';
+
 export const NAIPES  = ['♥', '♦', '♣', '♠'];
 export const VALORES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
@@ -372,7 +374,11 @@ export function gerarBaralho() {
 function embaralhar(lista) {
     for (let i = lista.length - 1; i > 0; i--) {
         // Sorteia um índice entre 0 e i (inclusive)
-        const j = Math.floor(Math.random() * (i + 1));
+        // crypto.randomInt (CSPRNG, sem viés de módulo). Math.random do V8
+        // é xorshift128+: dá pra reconstruir o estado a partir de saídas
+        // observáveis (ids de mesa, frases/atrasos dos bots) e prever o
+        // baralho — inaceitável num jogo com dinheiro real.
+        const j = randomInt(i + 1);
 
         // Troca lista[i] com lista[j] usando destructuring
         // Sem uma variável temporária:
