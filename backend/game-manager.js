@@ -139,7 +139,12 @@ export class GameManager {
     // ================================================================
 
     criarMesa(config, usuario) {
-        const mesaId = Math.random().toString(36).substring(2, 6).toUpperCase();
+        // mesas.set() com um id já em uso apagava a mesa existente (com as
+        // fichas de quem estava sentado nela) — sorteia de novo até ser único.
+        let mesaId;
+        do {
+            mesaId = Math.random().toString(36).substring(2, 6).toUpperCase();
+        } while (mesas.has(mesaId));
         // Nunca confiar em smallBlind vindo do cliente sem validar sinal/tipo —
         // um valor negativo faria _aplicarBlind() creditar fichas em vez de
         // debitar (mesmo exploit de "imprimir" ₿C do buyIn, ver CLAUDE.md).
