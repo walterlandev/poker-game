@@ -110,3 +110,20 @@ test('regra 6: estado enviado leva moeda e não leva mais treino', async (t) => 
     assert.equal(estado.moeda, 'bonus');
     assert.equal('treino' in estado, false);
 });
+
+// ── Regra 5: bots só em mesa de bônus, nunca em torneio ──────────────
+test('regra 5: adicionarBot recusa mesa real e torneio, aceita mesa de bônus', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { servico, gm, tm } = montar();
+    const real  = await criar(t, servico, sock('r5'), { buyIn: 100, moeda: 'real' });
+    const bonus = await criar(t, servico, sock('b5'), { buyIn: 100, moeda: 'bonus' });
+    assert.deepEqual(gm.adicionarBot(real, 0), { sucesso: false, erro: 'Bots só jogam em mesa de bônus.' });
+    assert.equal(gm.adicionarBot(bonus, 0).sucesso, true);
+    assert.equal(Object.keys(gm.getMesa(bonus).jogadores).length, 2);
+
+    const { torneioId } = tm.criarTorneio({ buyIn: 100, moeda: 'bonus' }, { uid: 't5a', nome: 't5a' });
+    tm.entrarTorneio(torneioId, { uid: 't5b', nome: 't5b' });
+    tm.iniciarTorneio(torneioId, 't5a');
+    const mesaT = tm.getTorneio(torneioId).rodadas[0].mesas[0].mesaId;
+    assert.equal(gm.adicionarBot(mesaT, 0).sucesso, false);
+});
