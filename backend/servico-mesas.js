@@ -12,7 +12,7 @@ export const MSG = {
     OUTRA_MESA: 'Você já está sentado em outra mesa. Saia dela antes de entrar em outra.',
 };
 
-import { decidirMoedaMesa } from './moeda.js';
+import { decidirMoedaMesa, normalizarMoeda } from './moeda.js';
 
 export function criarServicoMesas({ io, gameManager, tournamentManager, debitar, creditar, emitirSaldo, socketMesa = new Map() }) {
 
@@ -165,7 +165,7 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         const jaEstaNaTorneio = !!torneio.jogadores[uid];
         let debito = null;
         if (!jaEstaNaTorneio) {
-            debito = await debitar(uid, torneio.buyIn);
+            debito = await debitar(uid, torneio.buyIn, torneio.moeda);
             if (!debito.sucesso) { socket.emit('erro', { mensagem: debito.erro }); return; }
         }
         const usuario = { uid, nome: socket.data.nome, avatar: socket.data.avatar || '', tema: socket.data.tema, pagoBonus: debito?.debitarBonus || 0 };
@@ -192,7 +192,8 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         const uid   = socket.data.uid;
         const buyIn = config.buyIn || 500;
 
-        const debito = await debitar(uid, buyIn);
+        const moeda  = normalizarMoeda(config.moeda);   // validada no servidor
+        const debito = await debitar(uid, buyIn, moeda);
         if (!debito.sucesso) { socket.emit('erro', { mensagem: debito.erro }); return; }
 
         const host = {
@@ -202,9 +203,9 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
             tema:      socket.data.tema,
             pagoBonus: debito.debitarBonus || 0,   // origem do buy-in (bônus nunca vira real)
         };
-        const resultado = tournamentManager.criarTorneio({ ...config, buyIn: debito.fichasDebitadas }, host);
+        const resultado = tournamentManager.criarTorneio({ ...config, moeda, buyIn: debito.fichasDebitadas }, host);
         if (!resultado.sucesso) {
-            await creditar(uid, debito.fichasDebitadas, torneioMoeda(torneioId), debito.debitarBonus);
+            await creditar(uid, debito.fichasDebitadas, moeda, debito.debitarBonus);
             socket.emit('erro', { mensagem: resultado.erro });
             return;
         }
@@ -228,7 +229,7 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         if (!verificacao.sucesso) { socket.emit('erro', { mensagem: verificacao.erro }); return; }
 
         const torneio = tournamentManager.getTorneio(torneioId);
-        const debito  = await debitar(uid, torneio.buyIn);
+        const debito  = await debitar(uid, torneio.buyIn, torneio.moeda);
         if (!debito.sucesso) { socket.emit('erro', { mensagem: debito.erro }); return; }
 
         // processarRebuy recheca a elegibilidade: o estado pode ter mudado

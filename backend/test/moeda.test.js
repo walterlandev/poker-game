@@ -257,6 +257,53 @@ test('regra 4: rebuy cobra na moeda da mesa (bônus em mesa bônus, real em mesa
     assert.deepEqual(carteira.rb_x, { saldo: 5000, saldoBonus: 0 });
 });
 
+// ── Regra 7: torneio na moeda escolhida ─────────────────────────────
+test('regra 7: torneio bônus — buy-in, rebuy, mesas e prêmio em bônus', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const m = await import('../moeda.js');
+    const carteira = { t7a: { saldo: 1000, saldoBonus: 1000 }, t7b: { saldo: 1000, saldoBonus: 1000 } };
+    const { servico, tm, gm, creditos } = montar({ carteira, planejarDebito: m.planejarDebito, planejarCredito: m.planejarCredito });
+    const torneioId = await servico.criarTorneio(sock('t7a'), { buyIn: 100, moeda: 'bonus', maxRebuys: 1 });
+    await servico.entrarTorneio(sock('t7b'), { torneioId });
+    const torneio = tm.getTorneio(torneioId);
+    assert.equal(torneio.moeda, 'bonus');
+    assert.deepEqual(carteira.t7b, { saldo: 1000, saldoBonus: 900 });
+    tm.iniciarTorneio(torneioId, 't7a');
+    const mesa0 = torneio.rodadas[0].mesas[0];
+    assert.equal(gm.getMesa(mesa0.mesaId).moeda, 'bonus');
+    tm.notificarVencedorMesa(torneioId, mesa0.mesaId, 't7a');      // t7b pode fazer rebuy
+    await servico.rebuyTorneio(sock('t7b'), { torneioId });
+    assert.deepEqual(carteira.t7b, { saldo: 1000, saldoBonus: 800 });
+    const mesa1 = torneio.rodadas[1].mesas[0];
+    tm.notificarVencedorMesa(torneioId, mesa1.mesaId, 't7a');
+    for (let i = 0; i < 20; i++) await tick();
+    assert.equal(torneio.campeao, 't7a');
+    assert.deepEqual(creditos, [{ uid: 't7a', valor: 300, moeda: 'bonus', origemBonus: 300 }]);
+    assert.deepEqual(carteira.t7a, { saldo: 1000, saldoBonus: 1200 });
+});
+
+test('regra 7: torneio bônus abandonado reembolsa em bônus; torneio real usa real; moeda inválida vira real', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const m = await import('../moeda.js');
+    const carteira = { u7a: { saldo: 500, saldoBonus: 500 }, u7b: { saldo: 500, saldoBonus: 500 },
+                       v7a: { saldo: 500, saldoBonus: 500 } };
+    const { servico, tm, gm } = montar({ carteira, planejarDebito: m.planejarDebito, planejarCredito: m.planejarCredito });
+    const tb = await servico.criarTorneio(sock('u7a'), { buyIn: 100, moeda: 'bonus' });
+    await servico.entrarTorneio(sock('u7b'), { torneioId: tb });
+    tm.iniciarTorneio(tb, 'u7a');
+    const mb = tm.getTorneio(tb).rodadas[0].mesas[0];
+    for (const uid of mb.jogadores) { gm.sairMesa(mb.mesaId, uid); tm.abandonarMesa(tb, uid); }
+    for (let i = 0; i < 20; i++) await tick();
+    assert.deepEqual(carteira.u7a, { saldo: 500, saldoBonus: 500 });
+    assert.deepEqual(carteira.u7b, { saldo: 500, saldoBonus: 500 });
+
+    const tr = await servico.criarTorneio(sock('v7a'), { buyIn: 100, moeda: 'real' });
+    assert.equal(tm.getTorneio(tr).moeda, 'real');
+    assert.deepEqual(carteira.v7a, { saldo: 400, saldoBonus: 500 });
+    const ti = tm.criarTorneio({ buyIn: 100, moeda: 'dolar' }, { uid: 'w7', nome: 'w7' });
+    assert.equal(tm.getTorneio(ti.torneioId).moeda, 'real');
+});
+
 // ── Regra 5: bots só em mesa de bônus, nunca em torneio ──────────────
 test('regra 5: adicionarBot recusa mesa real e torneio, aceita mesa de bônus', async (t) => {
     t.mock.timers.enable(TIMERS);

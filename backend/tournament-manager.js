@@ -23,6 +23,7 @@
 ================================================================ */
 
 import { creditarSaidaMesa, buscarSaldo } from './firebase-admin.js';
+import { normalizarMoeda } from './moeda.js';
 
 export class TournamentManager {
 
@@ -62,6 +63,9 @@ export class TournamentManager {
             rodadaAtual:      0,
             campeao:          null,
             premioTotal:      buyIn,
+            // Moeda do torneio ('real' | 'bonus'), validada aqui: buy-in,
+            // rebuy, prêmio e reembolso, tudo nela. Torneio nunca tem bots.
+            moeda:            normalizarMoeda(config.moeda),
             // Parte do prêmio paga com saldo BÔNUS (soma de pagoBonus de
             // todas as entradas e rebuys) — bônus nunca vira saldo real.
             premioBonus:      Math.min(buyIn, host.pagoBonus || 0),
@@ -194,6 +198,7 @@ export class TournamentManager {
                     nome:       `${torneio.nome} — Rodada ${torneio.rodadaAtual + 1} Mesa ${idx + 1}`,
                     buyIn:      torneio.fichasIniciais,   // chip stack dos jogadores
                     smallBlind: sb,
+                    moeda:      torneio.moeda,
                     torneioId,
                 },
                 jogadoresObjeto,
