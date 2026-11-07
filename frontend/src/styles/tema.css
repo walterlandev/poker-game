@@ -1393,3 +1393,30 @@ button.config-item:hover { background: var(--cor-superficie-2); }
     .torneios-lista { grid-column: 2; grid-row: 2 / span 3; }
     .torneios:not(:has(.torneio-atual)) .torneios-lista { grid-column: 1 / -1; }
 }
+
+/* HandStrength no modo grande */
+.forca-grande {
+    width: 200px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: var(--s-3) var(--s-4);
+    border-radius: var(--r-painel); background: var(--cor-superficie); border: 1px solid var(--cor-linha); color: var(--cor-texto);
+}
+.forca-grande-rot { margin: 0; align-self: flex-start; display: flex; align-items: center; font-size: var(--t-12); color: var(--cor-texto-3); }
+.forca-grande-rot .hs-dot { background: var(--cor-positivo); }
+.forca-grande-anel { position: relative; display: grid; place-items: center; }
+.forca-grande-anel svg { transform: rotate(-90deg); }
+.forca-grande-anel .hs-ring-bg { stroke: var(--cor-superficie-2); }
+.forca-grande-anel .hs-ring-fill { stroke: var(--cor-positivo); }
+.forca-grande-anel .num { position: absolute; font-size: var(--t-23); font-weight: 700; }
+.forca-grande-mao { margin: 0; font-size: var(--t-14); font-weight: 600; }
+.forca-grande .forca-mao { width: 100%; }
+.forca-grande-stats { width: 100%; display: flex; justify-content: space-between; margin: 0; }
+.forca-grande-stats div { display: flex; flex-direction: column; align-items: center; }
+.forca-grande-stats dt { font-size: var(--t-11); color: var(--cor-texto-3); }
+.forca-grande-stats dd { margin: 0; font-size: var(--t-14); font-weight: 700; }
+.forca-grande-stats dd.positivo { color: var(--cor-positivo-texto); }
+.forca-grande-stats dd.perigo { color: var(--cor-perigo-texto); }
+.hs-improved { margin: 0; color: var(--cor-positivo-texto); }
+
+/* Mesa: a placa (nome e fichas) fica por cima do anel do temporizador,
+   para o anel não cobrir "Você" na mesa de 9 no celular */
+.assento-placa { z-index: 4; }
+.temporizador-seg { z-index: 6; }

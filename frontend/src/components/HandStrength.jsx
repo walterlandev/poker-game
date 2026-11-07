@@ -262,7 +262,7 @@ export default function HandStrength({
 
     if (!visivel || !dados) return null;
 
-    const { nome, cor, nivel, win, tie, loss } = dados;
+    const { nome, nivel, win, tie, loss } = dados;
     const nivelPct  = Math.round((nivel / 9) * 100);
 
     // ── Modo compacto: pill horizontal ────────────────────────────────
@@ -287,130 +287,34 @@ export default function HandStrength({
 
     return (
         <div className="hs-root">
-            <div ref={containerRef} style={{
-                background:   'var(--cor-superficie)',
-                border:       `1px solid color-mix(in srgb, ${cor} 27%, transparent)`,
-                borderRadius: '12px',
-                padding:      '12px 14px',
-                width:        '188px',
-                transition:   'border-color 0.4s',
-            }}>
-
-                {/* Label */}
-                <div style={{
-                    fontSize:      '10px',
-                    color:         'var(--cor-texto-3)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.08em',
-                    marginBottom:  '8px',
-                    display:       'flex',
-                    alignItems:    'center',
-                }}>
-                    <span className="hs-dot" style={{ background: cor, display: 'none' }} />
+            <div ref={containerRef} className="forca-grande">
+                <p className="forca-grande-rot">
+                    <span className="hs-dot" style={{ display: 'none' }} />
                     Força da mão
-                </div>
+                </p>
 
-                {/* Anel SVG */}
-                <div style={{ display:'flex', justifyContent:'center', marginBottom:'8px' }}>
-                    <svg width="80" height="80" viewBox="0 0 80 80"
-                        style={{ transform: 'rotate(-90deg)' }}>
-                        <circle className="hs-ring-bg" cx="40" cy="40" r="34"
-                            stroke="var(--cor-linha)" />
+                <div className="forca-grande-anel">
+                    <svg width="88" height="88" viewBox="0 0 80 80" aria-hidden="true">
+                        <circle className="hs-ring-bg" cx="40" cy="40" r="34" />
                         <circle className="hs-ring-fill" cx="40" cy="40" r="34"
-                            stroke={cor}
                             strokeDasharray={CIRC}
                             strokeDashoffset={offset} />
                     </svg>
+                    <span className="num">{win}%</span>
+                </div>
+                <p className="forca-grande-mao">{nome}</p>
+
+                <div className="forca-mao" aria-hidden="true">
+                    <div className="barra"><i style={{ width: nivelPct + '%' }} /></div>
                 </div>
 
-                {/* % de vitória */}
-                <div style={{
-                    display:     'flex',
-                    alignItems:  'baseline',
-                    gap:         '5px',
-                    marginBottom:'7px',
-                    justifyContent:'center',
-                }}>
-                    <span style={{
-                        fontSize:   '26px',
-                        fontWeight: '600',
-                        color:      cor,
-                        lineHeight: 1,
-                        transition: 'color 0.4s',
-                    }}>
-                        {win}%
-                    </span>
-                    <span style={{ fontSize:'11px', color:'var(--cor-texto-3)' }}>
-                        de vitória
-                    </span>
-                </div>
+                <dl className="forca-grande-stats">
+                    <div><dt>Vitória</dt><dd className="num positivo">{win}%</dd></div>
+                    <div><dt>Empate</dt><dd className="num">{tie}%</dd></div>
+                    <div><dt>Derrota</dt><dd className="num perigo">{loss}%</dd></div>
+                </dl>
 
-                {/* Badge da mão */}
-                <div className="hs-badge" style={{
-                    display:       'flex',
-                    justifyContent:'center',
-                    alignItems:    'center',
-                    borderRadius:  '5px',
-                    padding:       '3px 10px',
-                    fontSize:      '12px',
-                    fontWeight:    '600',
-                    background:    cor + '22',
-                    color:         cor,
-                    border:        `1px solid color-mix(in srgb, ${cor} 27%, transparent)`,
-                    marginBottom:  '8px',
-                }}>
-                    {nome}
-                </div>
-
-                {/* Barra de nível */}
-                <div style={{
-                    width:        '100%',
-                    height:       '5px',
-                    background:   'var(--cor-linha)',
-                    borderRadius: '3px',
-                    overflow:     'hidden',
-                    marginBottom: '8px',
-                }}>
-                    <div className="hs-bar"
-                        style={{ width: nivelPct + '%', background: cor }} />
-                </div>
-
-                {/* Stats */}
-                <div style={{
-                    display:        'flex',
-                    justifyContent: 'space-between',
-                }}>
-                    {[
-                        { label: 'Vitória', val: win  + '%', c: 'var(--cor-positivo-texto)' },
-                        { label: 'Empate',  val: tie  + '%', c: 'var(--cor-texto-3)' },
-                        { label: 'Derrota', val: loss + '%', c: 'var(--cor-perigo-texto)' },
-                    ].map(({ label, val, c }) => (
-                        <div key={label} style={{
-                            display:       'flex',
-                            flexDirection: 'column',
-                            alignItems:    'center',
-                            gap:           '1px',
-                        }}>
-                            <span style={{ fontSize:'12px', fontWeight:'500', color: c }}>
-                                {val}
-                            </span>
-                            <span style={{
-                                fontSize:      '9px',
-                                color:         'var(--cor-texto-3)',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.06em',
-                            }}>
-                                {label}
-                            </span>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Mão melhorou — visibilidade controlada via DOM ref, sem re-render */}
-                <div className="hs-improved" style={{ display: 'none', color: cor }}>
-                    ↑ Mão melhorou!
-                </div>
-
+                <p className="hs-improved" style={{ display: 'none' }}>A mão melhorou</p>
             </div>
         </div>
     );
