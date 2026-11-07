@@ -135,22 +135,22 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         const valor = parseInt(dados?.valor) || 0;
         if (valor <= 0) { socket.emit('erro', { mensagem: 'Valor de rebuy inválido.' }); return; }
 
-        const treino = gameManager.getMesa(mesaId)?.moeda === 'bonus';
-        let debito = null;
-        if (!treino) {
-            debito = await debitar(uid, valor);
-            if (!debito.sucesso) { socket.emit('erro', { mensagem: debito.erro }); return; }
-        }
+        const mesa = gameManager.getMesa(mesaId);
+        if (!mesa) { socket.emit('erro', { mensagem: 'Mesa não encontrada.' }); return; }
 
-        const resultado = gameManager.fazerRebuy(mesaId, uid, valor, debito?.debitarBonus || 0);
+        // Rebuy cobra só na moeda da mesa, como a entrada.
+        const debito = await debitar(uid, valor, mesa.moeda);
+        if (!debito.sucesso) { socket.emit('erro', { mensagem: debito.erro }); return; }
+
+        const resultado = gameManager.fazerRebuy(mesaId, uid, valor, debito.debitarBonus || 0);
         if (!resultado.sucesso) {
             // Devolve o débito se o rebuy falhou (ex: mão ativa, valor errado)
-            if (debito) await creditar(uid, valor, debito.debitarBonus || 0);
+            await creditar(uid, valor, debito.debitarBonus || 0);
             socket.emit('erro', { mensagem: resultado.erro });
             return;
         }
         socket.emit('rebuy_ok', { valor });
-        if (debito) await emitirSaldo(socket, uid);
+        await emitirSaldo(socket, uid);
     }
 
     async function entrarTorneio(socket, { torneioId } = {}) {
