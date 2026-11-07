@@ -172,9 +172,10 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
                     Sair
                 </button>
                 <InfoMesa mesa={mesa} />
+                {/* Mostra o saldo da moeda desta mesa: bônus na mesa de bônus */}
                 <div className="saldo">
-                    <span>Carteira</span>
-                    <b className="num">₿C {saldoReal.toLocaleString('pt-BR')}</b>
+                    <span>{mesa.moeda === 'bonus' ? 'Bônus na carteira' : 'Carteira'}</span>
+                    <b className="num">₿C {(mesa.moeda === 'bonus' ? saldoBonus : saldoReal).toLocaleString('pt-BR')}</b>
                 </div>
             </header>
 

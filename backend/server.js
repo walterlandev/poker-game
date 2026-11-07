@@ -282,6 +282,12 @@ io.on('connection', (socket) => {
         console.log(`✅ Autenticado: ${dados.nome} (${uid})${socket.data.isAdmin ? ' [admin]' : ''}`);
         socket.emit('autenticado', { sucesso: true, isAdmin: socket.data.isAdmin });
 
+        // Saldo verdadeiro a cada autenticação: o cliente às vezes repõe um
+        // perfil lido antes de um crédito (ex.: depois de criar o PIN, por
+        // cima do bônus de boas-vindas) e mostrava ₿C 0 até recarregar.
+        // Vem ANTES do bônus, para o crédito do bônus chegar por último.
+        await emitirSaldoAtualizado(socket, uid);
+
         // Promoção: conta que ainda não ganhou o bônus de boas-vindas recebe
         // agora, sem precisar clicar (ver concederBonusBoasVindas).
         if (perfil && perfil.bonusResgatado !== true) {
