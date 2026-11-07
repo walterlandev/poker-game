@@ -223,24 +223,6 @@ test('bônus: mesa com bots (cliente antigo) vira mesa de bônus; treino do clie
     assert.equal(gm.getMesa(real).moeda, 'real');        // "treino" vindo do cliente não existe mais
 });
 
-test('treino: entrar, rebuy, sair (inclusive no meio da mão) e desconectar não mexem no saldo', async (t) => {
-    t.mock.timers.enable(TIMERS);
-    const { servico, gm, debitos, creditos } = montar();
-    const a = sock('a'), b = sock('b');
-    const mesaId = await criarComBots(t, servico, a, { buyIn: 500, qtdBots: 1 });
-    await servico.entrarMesa(b, { mesaId });
-    const mesa = gm.getMesa(mesaId);
-    mesa.jogadores.b.saldo = 0;
-    await servico.rebuy(b, { valor: 500 });
-    assert.equal(mesa.jogadores.b.saldo, 500);
-    gm.iniciarRodada(mesaId);
-    assert.equal(mesa.fase, 'PRE-FLOP');
-    await servico.sairMesa(b, 'voluntária');              // no meio da mão
-    await servico.sairMesa(a, 'desconexão');
-    assert.deepEqual(debitos, []);
-    assert.deepEqual(creditos, []);
-});
-
 test('treino: remoção por inatividade não credita nada', async (t) => {
     t.mock.timers.enable(TIMERS);
     const { servico, gm, creditos } = montar();

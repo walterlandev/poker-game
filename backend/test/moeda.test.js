@@ -137,6 +137,26 @@ test('regra 1: entrar em mesa real cobra só o saldo real (e recusa quem só tem
     assert.deepEqual(carteira.bonus1, { saldo: 50, saldoBonus: 9000 });
 });
 
+// ── Regra 2: mesa bônus debita só saldo bônus ───────────────────────
+test('regra 2: entrar em mesa de bônus cobra só o bônus (e recusa quem só tem real)', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { planejarDebito } = await import('../moeda.js');
+    const carteira = { dono2: { saldo: 0, saldoBonus: 1000 }, misto2: { saldo: 700, saldoBonus: 600 }, real2: { saldo: 9000, saldoBonus: 100 } };
+    const { servico, gm, debitos } = montar({ carteira, planejarDebito });
+    const mesaId = await criar(t, servico, sock('dono2'), { buyIn: 500, moeda: 'bonus', qtdBots: 1 });
+    assert.ok(mesaId, 'mesa de bônus criada');
+    assert.deepEqual(carteira.dono2, { saldo: 0, saldoBonus: 500 });
+    await servico.entrarMesa(sock('misto2'), { mesaId });
+    assert.deepEqual(carteira.misto2, { saldo: 700, saldoBonus: 100 });
+    assert.ok(debitos.length === 2 && debitos.every(d => d.moeda === 'bonus'));
+
+    const r = sock('real2');
+    await servico.entrarMesa(r, { mesaId });
+    assert.deepEqual(r.erros(), ['Esta mesa é de bônus. Você precisa de ₿C 500 de bônus para entrar.']);
+    assert.equal(gm.getMesa(mesaId).jogadores.real2, undefined);
+    assert.deepEqual(carteira.real2, { saldo: 9000, saldoBonus: 100 });
+});
+
 // ── Regra 5: bots só em mesa de bônus, nunca em torneio ──────────────
 test('regra 5: adicionarBot recusa mesa real e torneio, aceita mesa de bônus', async (t) => {
     t.mock.timers.enable(TIMERS);
