@@ -304,6 +304,19 @@ test('regra 7: torneio bônus abandonado reembolsa em bônus; torneio real usa r
     assert.equal(tm.getTorneio(ti.torneioId).moeda, 'real');
 });
 
+test('regra 7: criação de torneio que falha depois do débito estorna na moeda do débito', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const m = await import('../moeda.js');
+    const carteira = { f7: { saldo: 1000, saldoBonus: 1000 } };
+    const { servico, tm, creditos } = montar({ carteira, planejarDebito: m.planejarDebito, planejarCredito: m.planejarCredito });
+    tm.criarTorneio = () => ({ sucesso: false, erro: 'Falha simulada.' });
+    const s = sock('f7');
+    await servico.criarTorneio(s, { buyIn: 100, moeda: 'bonus' });
+    assert.deepEqual(s.erros(), ['Falha simulada.']);
+    assert.deepEqual(creditos, [{ uid: 'f7', valor: 100, moeda: 'bonus', origemBonus: 100 }]);
+    assert.deepEqual(carteira.f7, { saldo: 1000, saldoBonus: 1000 });
+});
+
 // ── Regra 8: wallet:enviar só usa saldo real ────────────────────────
 test('regra 8: envio debita e credita só saldo real; sem real suficiente recusa mesmo com bônus', async () => {
     const { planejarEnvio } = await import('../moeda.js');
