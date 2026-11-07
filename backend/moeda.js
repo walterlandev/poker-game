@@ -35,6 +35,18 @@ export function planejarDebito({ saldo = 0, saldoBonus = 0 } = {}, valor, moeda)
     };
 }
 
+/**
+ * Crédito de saída/prêmio/estorno na moeda da mesa. 'bonus': tudo em
+ * saldoBonus. 'real': rede de segurança — a parte origemBonus (se por erro
+ * houver bônus numa mesa real) volta como bônus, nunca como real.
+ */
+export function planejarCredito(fichas, moeda, origemBonus = 0) {
+    const f = Math.max(0, Math.floor(Number(fichas)) || 0);
+    if (normalizarMoeda(moeda) === 'bonus') return { real: 0, bonus: f };
+    const bonus = Math.min(Math.max(Math.floor(Number(origemBonus)) || 0, 0), f);
+    return { real: f - bonus, bonus };
+}
+
 /** Qualquer valor diferente de 'bonus' vira 'real'. */
 export function normalizarMoeda(moeda) {
     return moeda === 'bonus' ? 'bonus' : 'real';

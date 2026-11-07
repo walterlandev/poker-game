@@ -12,7 +12,7 @@ function montarTorneio(nJogadores, config = {}, pagoBonus = {}) {
     // Crédito espionado: registra em vez de ir ao Firestore
     const creditos = [];
     const tm = new TournamentManager(io, gm, {
-        creditarSaidaMesa: async (uid, valor, origemBonus = 0) => { creditos.push({ uid, valor, origemBonus }); },
+        creditarSaidaMesa: async (uid, valor, _moeda, origemBonus = 0) => { creditos.push({ uid, valor, origemBonus }); },
         buscarSaldo:       async () => ({}),
     });
     gm.setTournamentManager(tm);

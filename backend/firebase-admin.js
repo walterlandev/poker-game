@@ -42,7 +42,7 @@
 ================================================================ */
 
 import admin        from 'firebase-admin';
-import { planejarDebito, normalizarMoeda } from './moeda.js';
+import { planejarDebito, planejarCredito, normalizarMoeda } from './moeda.js';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join  } from 'path';
@@ -236,13 +236,14 @@ export async function debitarEntradaMesa(uid, valorBuyIn, moeda = 'real') {
 // bônus; o resto (o que realmente veio de saldo real, mais qualquer ganho
 // da mesa) volta como saldo real. Sem isso, sentar numa mesa com bônus e
 // sair na sequência "lavava" o bônus (não sacável) em saldo real sacável.
-export async function creditarSaidaMesa(uid, fichasRestantes, origemBonus = 0) {
+export async function creditarSaidaMesa(uid, fichasRestantes, moeda = 'real', origemBonus = 0) {
     if (ehBot(uid))           return;
     if (!db)                  return;
     if (fichasRestantes <= 0) return;
 
-    const bonusDevolvido = Math.min(Math.max(Math.floor(Number(origemBonus)) || 0, 0), fichasRestantes);
-    const realDevolvido  = fichasRestantes - bonusDevolvido;
+    // Na moeda da mesa: 'bonus' → tudo em saldoBonus; 'real' → rede de
+    // segurança de origemBonus (ver moeda.js / spec moeda-da-mesa).
+    const { real: realDevolvido, bonus: bonusDevolvido } = planejarCredito(fichasRestantes, moeda, origemBonus);
 
     try {
         await refJogador(uid).update({

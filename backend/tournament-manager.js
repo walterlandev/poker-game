@@ -377,7 +377,7 @@ export class TournamentManager {
             // todas as entradas + rebuys) creditado direto no saldo real.
             if (campeaoUid && torneio.premioTotal > 0) {
                 // A parte paga com bônus (premioBonus) volta como bônus: bônus nunca vira real.
-                await this.creditar(campeaoUid, torneio.premioTotal, Math.min(torneio.premioTotal, torneio.premioBonus || 0));
+                await this.creditar(campeaoUid, torneio.premioTotal, torneio.moeda || 'real', Math.min(torneio.premioTotal, torneio.premioBonus || 0));
                 this.io.to(`torneio:${torneioId}`).emit('torneio:premio_creditado', {
                     torneioId,
                     campeaoUid,
@@ -434,7 +434,7 @@ export class TournamentManager {
         if (!torneio.houveEliminacao && torneio.rodadaAtual === 0) {
             for (const j of Object.values(torneio.jogadores)) {
                 const pago = pagoDe(j);
-                await this.creditar(j.uid, pago.total, pago.bonus);
+                await this.creditar(j.uid, pago.total, torneio.moeda || 'real', pago.bonus);
                 await this._notificarSaldoJogador(j.uid);
             }
             return;
@@ -462,7 +462,7 @@ export class TournamentManager {
             // parte bônus nunca passa da parte (poolBonus <= poolTotal).
             const parte      = Math.floor(poolTotal / n) + (i < poolTotal % n ? 1 : 0);
             const parteBonus = Math.floor(poolBonus / n) + (i < poolBonus % n ? 1 : 0);
-            await this.creditar(destino[i], pago.total + parte, pago.bonus + parteBonus);
+            await this.creditar(destino[i], pago.total + parte, torneio.moeda || 'real', pago.bonus + parteBonus);
             await this._notificarSaldoJogador(destino[i]);
         }
     }

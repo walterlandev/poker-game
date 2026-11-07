@@ -157,6 +157,75 @@ test('regra 2: entrar em mesa de bônus cobra só o bônus (e recusa quem só te
     assert.deepEqual(carteira.real2, { saldo: 9000, saldoBonus: 100 });
 });
 
+// ── Regra 3: tudo o que sai da mesa volta na moeda dela ──────────────
+test('regra 3: planejarCredito — bônus vai todo para saldoBonus; real segue a rede de segurança', async () => {
+    const { planejarCredito } = await import('../moeda.js');
+    assert.deepEqual(planejarCredito(800, 'bonus', 0),   { real: 0,   bonus: 800 });
+    assert.deepEqual(planejarCredito(800, 'real', 0),    { real: 800, bonus: 0 });
+    assert.deepEqual(planejarCredito(800, 'real', 300),  { real: 500, bonus: 300 });
+    assert.deepEqual(planejarCredito(800, 'real', 9999), { real: 0,   bonus: 800 });
+});
+
+test('regra 3: sair, desconectar e vencer por W.O. em mesa de bônus credita bônus; em mesa real, real', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const m = await import('../moeda.js');
+    const { servico, gm, conta, creditos } = montar({ planejarDebito: m.planejarDebito, planejarCredito: m.planejarCredito });
+    const a = sock('s3a'), b = sock('s3b'), r1 = sock('s3r1'), r2 = sock('s3r2');
+    const mesaB = await criar(t, servico, a, { buyIn: 500, moeda: 'bonus' });
+    await servico.entrarMesa(b, { mesaId: mesaB });
+    const antesA = { ...conta('s3a') }, antesB = { ...conta('s3b') };
+    // W.O.: a ganha os blinds de b na mão
+    gm.iniciarRodada(mesaB);
+    const mb = gm.getMesa(mesaB);
+    gm.processarAcao(mesaB, mb.turno, 'FOLD', 0, 'x');
+    assert.equal(mb.resultadoMao.tipo, 'wo');
+    const fichasA = mb.jogadores.s3a.saldo, fichasB = mb.jogadores.s3b.saldo;
+    await servico.sairMesa(a, 'voluntária');
+    await servico.sairMesa(b, 'desconexão');
+    assert.deepEqual(conta('s3a'), { saldo: antesA.saldo, saldoBonus: antesA.saldoBonus + fichasA });
+    assert.deepEqual(conta('s3b'), { saldo: antesB.saldo, saldoBonus: antesB.saldoBonus + fichasB });
+
+    const mesaR = await criar(t, servico, r1, { buyIn: 500, moeda: 'real' });
+    await servico.entrarMesa(r2, { mesaId: mesaR });
+    const antesR = { ...conta('s3r2') };
+    await servico.sairMesa(r2, 'voluntária');
+    assert.deepEqual(conta('s3r2'), { saldo: antesR.saldo + 500, saldoBonus: antesR.saldoBonus });
+    assert.deepEqual(creditos.map(c => c.moeda), ['bonus', 'bonus', 'real']);
+});
+
+test('regra 3: remoção por inatividade em mesa de bônus credita bônus', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const m = await import('../moeda.js');
+    const { servico, gm, conta, creditos } = montar({ planejarDebito: m.planejarDebito, planejarCredito: m.planejarCredito });
+    const mesaId = await criar(t, servico, sock('i3a'), { buyIn: 500, moeda: 'bonus' });
+    await servico.entrarMesa(sock('i3b'), { mesaId });
+    const mesa = gm.getMesa(mesaId);
+    gm.iniciarRodada(mesaId);
+    const quem = mesa.turno;
+    const antes = { ...conta(quem) };
+    const fichas = mesa.jogadores[quem].saldo;
+    mesa.jogadores[quem].faltasSeguidas = 2;
+    for (let i = 0; i < 50; i++) t.mock.timers.tick(1000);
+    await tick();
+    assert.equal(mesa.jogadores[quem], undefined);
+    const credito = creditos.find(c => c.uid === quem);
+    assert.equal(credito?.valor, fichas);
+    assert.equal(credito?.moeda, 'bonus');
+    assert.deepEqual(conta(quem), { saldo: antes.saldo, saldoBonus: antes.saldoBonus + fichas });
+});
+
+test('regra 3: estorno de entrada recusada volta na moeda da mesa', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const m = await import('../moeda.js');
+    const { servico, conta } = montar({ planejarDebito: m.planejarDebito, planejarCredito: m.planejarCredito });
+    const mesaId = await criar(t, servico, sock('e3a'), { buyIn: 500, moeda: 'bonus', senha: 'abc' });
+    const s = sock('e3b');
+    const antes = { ...conta('e3b') };
+    await servico.entrarMesa(s, { mesaId, senha: 'errada' });
+    assert.deepEqual(s.erros(), ['Senha incorreta.']);
+    assert.deepEqual(conta('e3b'), antes);
+});
+
 // ── Regra 4: rebuy cobra na moeda da mesa ───────────────────────────
 test('regra 4: rebuy cobra na moeda da mesa (bônus em mesa bônus, real em mesa real)', async (t) => {
     t.mock.timers.enable(TIMERS);

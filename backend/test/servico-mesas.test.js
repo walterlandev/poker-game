@@ -18,7 +18,7 @@ function montar({ bonus = 0, aoDebitar = null } = {}) {
     for (const m of gm.getMesasAtivas()) for (const uid of Object.keys(m.jogadores)) gm.sairMesa(m.id, uid);
     const debitos = [], creditos = [];
     const tm = new TournamentManager(io, gm, {
-        creditarSaidaMesa: async (uid, valor, origemBonus = 0) => { creditos.push({ uid, valor, origemBonus }); },
+        creditarSaidaMesa: async (uid, valor, _moeda, origemBonus = 0) => { creditos.push({ uid, valor, origemBonus }); },
         buscarSaldo: async () => ({}),
     });
     gm.setTournamentManager(tm);
@@ -32,7 +32,7 @@ function montar({ bonus = 0, aoDebitar = null } = {}) {
             debitos.push({ uid, valor: v });
             return { sucesso: true, fichasDebitadas: v, debitarBonus: Math.min(bonus, v) };
         },
-        creditar: async (uid, valor, origemBonus = 0) => { creditos.push({ uid, valor, origemBonus }); },
+        creditar: async (uid, valor, _moeda, origemBonus = 0) => { creditos.push({ uid, valor, origemBonus }); },
         emitirSaldo: async () => {},
     });
     gm.setAoRemoverPorInatividade(servico.removidoPorInatividade);
@@ -221,21 +221,6 @@ test('bônus: mesa com bots (cliente antigo) vira mesa de bônus; treino do clie
 
     const real = await servico.criarMesa(sock('b'), { buyIn: 500, qtdBots: 0, treino: true });
     assert.equal(gm.getMesa(real).moeda, 'real');        // "treino" vindo do cliente não existe mais
-});
-
-test('treino: remoção por inatividade não credita nada', async (t) => {
-    t.mock.timers.enable(TIMERS);
-    const { servico, gm, creditos } = montar();
-    const a = sock('a'), b = sock('b');
-    const mesaId = await criarComBots(t, servico, a, { buyIn: 500, qtdBots: 1 });
-    await servico.entrarMesa(b, { mesaId });
-    const mesa = gm.getMesa(mesaId);
-    gm.iniciarRodada(mesaId);
-    for (const j of Object.values(mesa.jogadores)) j.faltasSeguidas = 2;
-    avancar(t, 46_000, 1000);
-    await tick();
-    assert.ok(Object.values(mesa.jogadores).filter(j => j.tipo === 'humano').length < 2);
-    assert.deepEqual(creditos, []);
 });
 
 test('treino: mão de treino não grava ranking/estatística; mesa real grava', async (t) => {
