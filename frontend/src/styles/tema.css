@@ -845,19 +845,39 @@ button.aviso-inline { cursor: pointer; }
 .dialogo-acoes .btn { flex: 1; min-height: 48px; }
 
 /* ================================================================
-   MESA DE TREINO (mesa com bots: fichas sem valor)
+   MOEDA DA MESA (real | bonus)
 ================================================================ */
-.etiqueta-treino {
+.etiqueta-moeda {
     display: inline-block; flex-shrink: 0; margin-left: 6px; padding: 1px 6px; border-radius: var(--r-badge);
     font-size: var(--t-11); font-weight: 600; line-height: 1.5; vertical-align: 1px;
     background: var(--cor-superficie-2); color: var(--cor-texto-2);
 }
-.aviso-treino {
-    display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding: 10px 12px;
-    border-radius: var(--r-botao); background: var(--cor-superficie-2); color: var(--cor-texto-2);
-    font-size: var(--t-12); line-height: 1.45;
+.etiqueta-moeda.bonus { background: transparent; box-shadow: inset 0 0 0 1px var(--cor-destaque-linha); color: var(--cor-destaque-texto); }
+.segmento-moeda { margin-bottom: var(--s-3); }
+
+/* Modal de criar mesa */
+.modal-largo { max-width: 520px; }
+.modal-rodape { flex-shrink: 0; padding: var(--s-3) var(--s-5) var(--s-4); border-top: 1px solid var(--cor-linha); }
+.modal-rodape .cart-btn-cheio { margin-top: 0; }
+.cm { display: flex; flex-direction: column; gap: var(--s-2); }
+.cm-grupo { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.cm-moedas { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); }
+.cm-moeda {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px; text-align: left;
+    border: 1px solid var(--cor-linha-forte); border-radius: var(--r-painel); background: var(--cor-fundo);
+    color: var(--cor-texto); font-family: inherit; cursor: pointer;
 }
-.aviso-treino b { color: var(--cor-texto); font-size: var(--t-14); font-weight: 600; }
+.cm-moeda:hover { background: var(--cor-superficie-2); }
+.cm-moeda .t { font-size: var(--t-16); font-weight: 700; }
+.cm-moeda .s { font-size: var(--t-12); color: var(--cor-texto-2); line-height: 1.35; }
+.cm-moeda .v { margin-top: 4px; font-size: var(--t-12); font-weight: 600; color: var(--cor-texto-3); }
+.cm-moeda[aria-checked="true"] { border-color: var(--cor-destaque-linha); background: var(--cor-destaque-suave); box-shadow: inset 0 0 0 1px var(--cor-destaque-linha); }
+.cm-moeda[aria-checked="true"] .v { color: var(--cor-destaque-texto); }
+.cm-dica { font-weight: 500; color: var(--cor-texto-3); margin-left: 6px; }
+.cm-slider { display: flex; align-items: center; gap: var(--s-3); font-size: var(--t-12); color: var(--cor-texto-3); }
+.cm-slider input { flex: 1; }
+.cm-aviso-bots { display: flex; align-items: center; gap: 6px; }
+.cm-privada { margin-top: var(--s-2); }
 
 /* ================================================================
    MODAL GENÉRICO (Configurações e outros)
