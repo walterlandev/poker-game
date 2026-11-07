@@ -265,39 +265,13 @@ export default function App() {
     // Telas
     // ----------------------------------------------------------------
     if (tela === TELAS.CARREGANDO) return (
-        <div style={{
-            minHeight:      '100vh',
-            background:     'var(--cor-fundo)',
-            display:        'flex',
-            flexDirection:  'column',
-            alignItems:     'center',
-            justifyContent: 'center',
-            gap:            '32px',
-            fontFamily:     'var(--fonte)',
-        }}>
-            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'8px' }}>
-                <img src="/logo.png" alt="Poker Game"
-                    style={{ width:'80px', height:'80px', objectFit:'contain' }} />
-                <h1 style={{ fontSize:'32px', fontWeight:'800', color:'var(--cor-texto)', margin:0 }}>
-                    Poker Game
-                </h1>
-                <p style={{ fontSize:'13px', color:'var(--cor-destaque-texto)', margin:0 }}>
-                    Powered by BC Bitchager
-                </p>
+        <div className="tela-carregando" role="status">
+            <div className="marca" translate="no">
+                <span className="marca-selo num" aria-hidden="true">₿C</span>
+                <span className="marca-nome">Bitchager</span>
             </div>
-
-            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'12px' }}>
-                <div style={{
-                    width:'36px', height:'36px',
-                    border:'3px solid var(--cor-linha)',
-                    borderTop:'3px solid var(--cor-destaque)',
-                    borderRadius:'50%',
-                    animation:'girar 0.8s linear infinite',
-                }} />
-                <p style={{ fontSize:'14px', color:'var(--cor-texto-3)', margin:0 }}>
-                    Verificando sessão...
-                </p>
-            </div>
+            <span className="roda-carregando" aria-hidden="true" />
+            <p>Verificando sessão…</p>
         </div>
     );
 
