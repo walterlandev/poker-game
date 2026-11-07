@@ -60,7 +60,7 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
             // debitarEntradaMesa valida e normaliza o valor (nunca confiar num
             // buyIn negativo/inválido vindo do cliente); a mesa usa o valor que
             // ele realmente processou (fichasDebitadas).
-            debito = await debitar(uid, buyIn);
+            debito = await debitar(uid, buyIn, moeda);
             if (!debito.sucesso) { socket.emit('erro', { mensagem: debito.erro }); return; }
         }
 
@@ -110,7 +110,7 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         const jaEstaNaMesa = !!mesa.jogadores[uid];
         let debito = null;
         if (!jaEstaNaMesa && mesa.moeda !== 'bonus') {
-            debito = await debitar(uid, mesa.valorBuyIn);
+            debito = await debitar(uid, mesa.valorBuyIn, mesa.moeda);
             if (!debito.sucesso) { socket.emit('erro', { mensagem: debito.erro }); return; }
         }
         const origemBonus = debito?.debitarBonus || 0;

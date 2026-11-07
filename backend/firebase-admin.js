@@ -42,6 +42,7 @@
 ================================================================ */
 
 import admin        from 'firebase-admin';
+import { planejarDebito, normalizarMoeda } from './moeda.js';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join  } from 'path';
@@ -163,7 +164,8 @@ export async function verificarIdToken(idToken) {
 // Retorna: { sucesso: bool, fichasDebitadas: number, erro?: string }
 // ================================================================
 
-export async function debitarEntradaMesa(uid, valorBuyIn) {
+export async function debitarEntradaMesa(uid, valorBuyIn, moeda = 'real') {
+    moeda = normalizarMoeda(moeda);
     // Nunca confiar em valor vindo do cliente sem validar sinal/tipo — um
     // buyIn negativo ou não-numérico faria o "debitarReal" abaixo virar
     // negativo, e increment(-debitarReal) creditaria ₿C em vez de debitar
@@ -175,7 +177,10 @@ export async function debitarEntradaMesa(uid, valorBuyIn) {
 
     // Bots e modo offline: libera sem debitar
     if (ehBot(uid)) return { sucesso: true, fichasDebitadas: valorBuyIn, debitarReal: 0, debitarBonus: 0 };
-    if (!db)        return { sucesso: true, fichasDebitadas: valorBuyIn, debitarReal: valorBuyIn, debitarBonus: 0 };
+    if (!db) {
+        const real = moeda === 'real';
+        return { sucesso: true, fichasDebitadas: valorBuyIn, debitarReal: real ? valorBuyIn : 0, debitarBonus: real ? 0 : valorBuyIn };
+    }
 
     try {
         const resultado = await db.runTransaction(async (tx) => {
@@ -186,19 +191,11 @@ export async function debitarEntradaMesa(uid, valorBuyIn) {
                 return { sucesso: false, erro: 'Conta não encontrada. Faça login novamente.' };
             }
 
-            const { saldo = 0, saldoBonus = 0 } = snap.data();
-            const saldoTotal = saldo + saldoBonus;
-
-            if (saldoTotal < valorBuyIn) {
-                return {
-                    sucesso: false,
-                    erro:    `Saldo insuficiente. Você tem ₿C ${saldoTotal.toLocaleString('pt-BR')} e o buy-in é ₿C ${valorBuyIn.toLocaleString('pt-BR')}.`,
-                };
-            }
-
-            // Regra: debita do saldo real primeiro, complementa com bônus
-            const debitarReal  = Math.min(valorBuyIn, saldo);
-            const debitarBonus = valorBuyIn - debitarReal;
+            // Moeda da mesa: 'real' debita só saldo, 'bonus' só saldoBonus.
+            // Nunca mistura (ver moeda.js / spec moeda-da-mesa).
+            const plano = planejarDebito(snap.data(), valorBuyIn, moeda);
+            if (!plano.sucesso) return plano;
+            const { debitarReal, debitarBonus } = plano;
 
             tx.update(ref, {
                 saldo:      admin.firestore.FieldValue.increment(-debitarReal),
