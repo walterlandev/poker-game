@@ -136,72 +136,73 @@ export default function Campeonato({ usuario, socket, onEntrarMesa, conviteTorne
     // ================================================================
 
     return (
-        <div style={css.container}>
+        <div className="torneios">
+            <div className="secao-cab">
+                <div className="esq">
+                    <h1 className="titulo-secao">Torneios</h1>
+                </div>
+                <button type="button" className="btn btn-principal btn-criar" onClick={() => setModalCriar(true)}>
+                    <Icone nome="mais" tamanho={18} />Criar torneio
+                </button>
+            </div>
 
             {erro && (
-                <div style={css.erro} onClick={() => setErro(null)}>{erro}</div>
+                <button type="button" className="aviso-inline erro" onClick={() => setErro(null)}>
+                    <span>{erro}</span>
+                    <Icone nome="fechar" tamanho={16} />
+                </button>
             )}
 
-            {/* Modal de rebuy */}
             {rebuyInfo && (
                 <ModalRebuy
                     info={rebuyInfo}
                     usuario={usuario}
+                    moeda={torneioAtual?.moeda}
+                    enviando={rebuyEnviando}
                     onRebuy={handleRebuy}
                     onRecusar={() => setRebuyInfo(null)}
                 />
             )}
 
-            {/* Torneio atual do jogador */}
             {torneioAtual && estouNoTorneio && (
                 <EstadoTorneio
                     torneio={torneioAtual}
                     meuUid={meuUid}
                     souHost={souHost}
                     possoRebuy={possoRebuy}
+                    rebuyEnviando={rebuyEnviando}
                     onIniciar={handleIniciar}
                     onRebuy={handleRebuy}
                 />
             )}
 
-            {/* Lista de torneios abertos */}
-            <div style={css.secao}>
-                <div style={css.secaoHeader}>
-                    <span style={css.secaoTitulo}>Torneios Abertos</span>
-                    <button style={css.btnAtualizar} onClick={() => socket?.emit('listar_torneios')}>
-                        Atualizar
-                    </button>
+            <section className="torneios-lista" aria-labelledby="torneios-abertos">
+                <div className="cart-mov-cab">
+                    <h2 id="torneios-abertos">Abertos para inscrição</h2>
+                    <button type="button" className="cart-link" onClick={() => socket?.emit('listar_torneios')}>Atualizar</button>
                 </div>
 
                 {torneios.length === 0 ? (
-                    <div style={css.vazio}>
-                        <span style={{ fontSize:'32px' }}>🏆</span>
-                        <p style={css.vazioTxt}>Nenhum torneio aberto no momento.</p>
-                        <p style={css.vazioSub}>Crie o primeiro!</p>
+                    <div className="lista-vazia">
+                        <Icone nome="torneio" tamanho={32} />
+                        <p className="titulo">Nenhum torneio aberto agora</p>
+                        <p className="sub">Crie um e chame os amigos pelo código de convite.</p>
                     </div>
                 ) : (
-                    <div style={css.lista}>
+                    <ul className="torneios-itens">
                         {torneios.map(t => (
-                            <CardTorneio
-                                key={t.id}
-                                torneio={t}
-                                meuUid={meuUid}
-                                jaEstou={torneioAtual?.id === t.id && !!estouNoTorneio}
-                                onEntrar={() => handleEntrar(t.id)}
-                                carregando={carregando}
-                            />
+                            <li key={t.id}>
+                                <CardTorneio
+                                    torneio={t}
+                                    jaEstou={torneioAtual?.id === t.id && !!estouNoTorneio}
+                                    onEntrar={() => handleEntrar(t.id)}
+                                    carregando={carregando}
+                                />
+                            </li>
                         ))}
-                    </div>
+                    </ul>
                 )}
-            </div>
-
-            {/* Botão criar */}
-            <div style={css.rodape}>
-                <button style={css.btnCriar} onClick={() => setModalCriar(true)}>
-                    <span style={{ fontSize:'20px', lineHeight:1 }}>+</span>
-                    Criar Torneio
-                </button>
-            </div>
+            </section>
 
             {modalCriar && (
                 <ModalCriarTorneio
@@ -210,7 +211,6 @@ export default function Campeonato({ usuario, socket, onEntrarMesa, conviteTorne
                     onFechar={() => setModalCriar(false)}
                 />
             )}
-
         </div>
     );
 }
@@ -220,23 +220,17 @@ export default function Campeonato({ usuario, socket, onEntrarMesa, conviteTorne
 // ESTADO DO TORNEIO ATUAL
 // ================================================================
 
-function EstadoTorneio({ torneio, meuUid, souHost, possoRebuy, onIniciar, onRebuy }) {
-    const [copiado, setCopiado] = useState(false);
+const NOME_STATUS_TORNEIO = { aberto: 'Aberto', em_andamento: 'Em andamento', finalizado: 'Finalizado' };
+const NOME_STATUS_JOGADOR = {
+    vencedor: 'Campeão', eliminado: 'Eliminado', jogando: 'Jogando',
+    rebuy_disponivel: 'Rebuy disponível', rebuy_pago: 'Rebuy pago', aguardando: 'Aguardando',
+};
 
+function EstadoTorneio({ torneio, meuUid, souHost, possoRebuy, rebuyEnviando, onIniciar, onRebuy }) {
+    const [copiado, setCopiado] = useState(false);
     const totalJogadores = Object.keys(torneio.jogadores || {}).length;
     const minhaEntrada   = torneio.jogadores?.[meuUid];
-
-    const statusCor = {
-        aberto:       'var(--cor-destaque-texto)',
-        em_andamento: 'var(--cor-positivo-texto)',
-        finalizado:   'var(--cor-destaque-texto)',
-    }[torneio.status] || '#fff';
-
-    const statusLabel = {
-        aberto:       'Aberto',
-        em_andamento: 'Em Andamento',
-        finalizado:   'Finalizado',
-    }[torneio.status] || torneio.status;
+    const moedaNome      = (torneio?.moeda ?? 'real') === 'bonus' ? 'bônus' : 'saldo real';
 
     function copiarLink() {
         const url = `${window.location.origin}${window.location.pathname}?torneio=${torneio.id}`;
@@ -246,167 +240,111 @@ function EstadoTorneio({ torneio, meuUid, souHost, possoRebuy, onIniciar, onRebu
         });
     }
 
+    const situacao = {
+        eliminado:        { txt: 'Você foi eliminado.', tom: 'perigo' },
+        rebuy_disponivel: { txt: 'Rebuy disponível: você pode voltar na próxima rodada.', tom: 'aviso' },
+        rebuy_pago:       { txt: 'Rebuy confirmado. Aguardando a próxima rodada.', tom: 'ok' },
+        vencedor:         { txt: 'Você é o campeão.', tom: 'ok' },
+        jogando:          { txt: 'Você está jogando.', tom: 'ok' },
+    }[minhaEntrada?.status] || { txt: 'Inscrito. Aguardando o início.', tom: '' };
+
     return (
-        <div style={css.torneioAtual}>
-            <div style={css.torneioAtualHeader}>
-                <span style={{ fontSize:'18px' }}>🏆</span>
-                <span style={css.torneioNome}>{torneio.nome}<EtiquetaMoeda moeda={torneio?.moeda} /></span>
-                <span style={{ ...css.statusBadge, color: statusCor, borderColor: statusCor }}>
-                    {statusLabel}
-                </span>
+        <section className="torneio-atual" aria-labelledby="torneio-atual-nome">
+            <div className="torneio-atual-cab">
+                <div>
+                    <p className="torneio-atual-rot">Seu torneio</p>
+                    <h2 id="torneio-atual-nome">{torneio.nome}<EtiquetaMoeda moeda={torneio?.moeda} /></h2>
+                </div>
+                <span className={`torneio-status ${torneio.status}`}>{NOME_STATUS_TORNEIO[torneio.status] || torneio.status}</span>
             </div>
 
-            {/* Link de convite — só enquanto torneio está aberto */}
             {torneio.status === 'aberto' && (
-                <div style={css.conviteRow}>
-                    <div style={{ flex:1 }}>
-                        <span style={{ fontSize:'10px', color:'var(--cor-texto-3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>
-                            Código de convite
-                        </span>
-                        <div style={{ fontSize:'14px', fontFamily:'monospace', color:'var(--cor-destaque-texto)', fontWeight:700 }}>
-                            {torneio.id}
-                        </div>
+                <div className="torneio-convite">
+                    <div>
+                        <span className="cart-campo-rot">Código de convite</span>
+                        <b className="num" translate="no">{torneio.id}</b>
                     </div>
-                    <button
-                        style={{
-                            ...css.btnCompartilhar,
-                            background: copiado ? 'var(--cor-positivo-suave)' : 'var(--cor-destaque-suave)',
-                            borderColor: copiado ? 'var(--cor-positivo)' : 'var(--cor-destaque-linha)',
-                            color: copiado ? 'var(--cor-positivo-texto)' : 'var(--cor-destaque-texto)',
-                        }}
-                        onClick={copiarLink}
-                    >
-                        {copiado ? '✓ Copiado!' : '🔗 Compartilhar'}
+                    <button type="button" className="btn btn-neutro" onClick={copiarLink}>
+                        <Icone nome={copiado ? 'check' : 'link'} tamanho={16} />{copiado ? 'Link copiado' : 'Copiar link'}
                     </button>
                 </div>
             )}
 
-            <div style={css.torneioStats}>
+            <dl className="torneio-stats">
                 <Stat label="Jogadores" valor={`${totalJogadores}/${torneio.maxJogadores}`} />
-                <Stat label="Buy-In"    valor={`₿C ${fmt(torneio.buyIn)}`} />
-                <Stat label="Fichas"    valor={fmt(torneio.fichasIniciais)} corValor="var(--cor-positivo-texto)" />
-                <Stat label="Por Mesa"  valor={torneio.jogadoresPorMesa} />
+                <Stat label={`Buy-in (${moedaNome})`} valor={`₿C ${fmt(torneio.buyIn)}`} />
+                <Stat label="Fichas" valor={fmt(torneio.fichasIniciais)} />
+                <Stat label="Por mesa" valor={torneio.jogadoresPorMesa} />
                 {torneio.rodadaAtual > 0 && <Stat label="Rodada" valor={torneio.rodadaAtual + 1} />}
-                {torneio.rebuyAtivo && (
-                    <Stat label="Rebuy" valor={`${torneio.rebuyMinRestantes}min`} corValor="var(--cor-perigo-texto)" />
-                )}
-            </div>
+                {torneio.rebuyAtivo && <Stat label="Rebuy fecha em" valor={`${torneio.rebuyMinRestantes} min`} />}
+            </dl>
 
-            {/* Minha situação */}
             {minhaEntrada && (
-                <div style={{
-                    ...css.minhaSituacao,
-                    background:  minhaEntrada.status === 'eliminado' || minhaEntrada.status === 'rebuy_disponivel'
-                        ? 'var(--cor-perigo-suave)' : 'var(--cor-positivo-suave)',
-                    borderColor: minhaEntrada.status === 'eliminado' || minhaEntrada.status === 'rebuy_disponivel'
-                        ? 'var(--cor-perigo-linha)' : 'var(--cor-positivo-suave)',
-                }}>
-                    <span style={{
-                        fontSize:'11px', fontWeight:600, flex:1,
-                        color: (minhaEntrada.status === 'eliminado' || minhaEntrada.status === 'rebuy_disponivel')
-                            ? 'var(--cor-perigo-texto)' : 'var(--cor-positivo-texto)',
-                    }}>
-                        {minhaEntrada.status === 'eliminado'         ? '❌ Você foi eliminado'
-                         : minhaEntrada.status === 'rebuy_disponivel' ? '⚡ Rebuy disponível!'
-                         : minhaEntrada.status === 'rebuy_pago'       ? '✅ Rebuy confirmado — aguardando próxima rodada'
-                         : minhaEntrada.status === 'vencedor'         ? '🏆 Você é o campeão!'
-                         : minhaEntrada.status === 'jogando'          ? '🃏 Você está jogando'
-                         : '⏳ Aguardando início'}
-                    </span>
-                    {minhaEntrada.rebuys > 0 && (
-                        <span style={{ fontSize:'10px', color:'var(--cor-texto-3)' }}>
-                            {minhaEntrada.rebuys}× rebuy
-                        </span>
-                    )}
-                </div>
+                <p className={`torneio-situacao ${situacao.tom}`} role="status">
+                    {situacao.txt}
+                    {minhaEntrada.rebuys > 0 && <span className="num"> ({minhaEntrada.rebuys}× rebuy)</span>}
+                </p>
             )}
 
-            {/* Botão rebuy via lobby */}
             {possoRebuy && (
-                <button style={css.btnRebuy} onClick={onRebuy}>
-                    🔄 Fazer Rebuy — custo ₿C {fmt(torneio.buyIn)} → +{fmt(torneio.fichasIniciais)} fichas
+                <button type="button" className="btn btn-principal cart-btn-cheio" onClick={onRebuy} disabled={rebuyEnviando} aria-busy={rebuyEnviando || undefined}>
+                    Fazer rebuy por ₿C {fmt(torneio.buyIn)} de {moedaNome} (+{fmt(torneio.fichasIniciais)} fichas)
                 </button>
             )}
 
-            {/* Aviso de janela de rebuy aberta */}
             {torneio.aguardandoRebuys && (
-                <div style={css.avisoRebuy}>
-                    ⏳ Aguardando decisões de rebuy (60s) antes de iniciar a próxima rodada...
-                </div>
+                <p className="cart-nota" role="status">Aguardando as decisões de rebuy (60 s) antes da próxima rodada…</p>
             )}
 
             {torneio.campeao && (
-                <div style={css.campeao}>
-                    🏆 Campeão: <strong>{torneio.jogadores?.[torneio.campeao]?.nome || torneio.campeao}</strong>
-                    {torneio.premioTotal > 0 && (
-                        <span> — levou o prêmio de <strong>₿C {fmt(torneio.premioTotal)}</strong></span>
-                    )}
-                </div>
+                <p className="torneio-campeao">
+                    <Icone nome="torneio" tamanho={18} />
+                    <span>
+                        Campeão: <b>{torneio.jogadores?.[torneio.campeao]?.nome || torneio.campeao}</b>
+                        {torneio.premioTotal > 0 && <> com prêmio de <b className="num">₿C {fmt(torneio.premioTotal)}</b> em {moedaNome}</>}
+                    </span>
+                </p>
             )}
 
-            {/* Botão iniciar (host) */}
             {souHost && torneio.status === 'aberto' && (
-                <button
-                    style={{ ...css.btnIniciar, opacity: totalJogadores < 2 ? 0.5 : 1 }}
-                    disabled={totalJogadores < 2}
-                    onClick={onIniciar}
-                >
+                <button type="button" className="btn btn-principal cart-btn-cheio" disabled={totalJogadores < 2} onClick={onIniciar}>
                     {totalJogadores < 2
                         ? `Aguardando jogadores (${totalJogadores}/2)`
-                        : `▶ Iniciar Torneio  (${totalJogadores} jogadores)`}
+                        : <><Icone nome="play" tamanho={18} />Iniciar torneio ({totalJogadores} jogadores)</>}
                 </button>
             )}
 
-            {/* Lista de jogadores */}
             {totalJogadores > 0 && (
-                <div style={css.jogadoresList}>
+                <ul className="torneio-jogadores">
                     {Object.values(torneio.jogadores).map(j => (
-                        <div key={j.uid} style={css.jogadorItem}>
-                            {j.avatar
-                                ? <img src={j.avatar} alt={j.nome} style={{ width:'22px', height:'22px', borderRadius:'50%', objectFit:'cover' }} onError={e => { e.target.style.display='none'; }} />
-                                : <span style={{ fontSize:'18px' }}>{j.uid?.startsWith('bot_') ? '🤖' : '🧑'}</span>
-                            }
-                            <span style={{
-                                fontSize:   '12px',
-                                color:      j.uid === meuUid ? 'var(--cor-destaque-texto)' : 'var(--cor-texto)',
-                                fontWeight: j.uid === meuUid ? 700 : 400,
-                                flex:       1,
-                            }}>
+                        <li key={j.uid}>
+                            <span className="torneio-av" aria-hidden="true">
+                                {j.avatar
+                                    ? <img src={j.avatar} alt="" width={28} height={28} onError={e => { e.target.style.display = 'none'; }} />
+                                    : (j.nome?.[0]?.toUpperCase() || '?')}
+                            </span>
+                            <span className="nm">
                                 {j.nome}
-                                {j.rebuys > 0 && (
-                                    <span style={{ fontSize:'9px', color:'var(--cor-perigo-texto)', marginLeft:'4px' }}>
-                                        ({j.rebuys}R)
-                                    </span>
-                                )}
+                                {j.rebuys > 0 && <span className="num"> ({j.rebuys}R)</span>}
                             </span>
-                            <span style={{
-                                fontSize:'10px',
-                                color: {
-                                    vencedor:          'var(--cor-destaque-texto)',
-                                    eliminado:         'var(--cor-perigo-texto)',
-                                    jogando:           'var(--cor-positivo-texto)',
-                                    rebuy_disponivel:  'var(--cor-perigo-texto)',
-                                    rebuy_pago:        '#6EE7B7',
-                                    aguardando:        'var(--cor-texto-3)',
-                                }[j.status] || 'var(--cor-texto-3)',
-                            }}>
-                                {j.status?.replace('_', ' ')}
-                            </span>
-                        </div>
+                            <span className={`torneio-jstatus ${j.status}`}>{NOME_STATUS_JOGADOR[j.status] || j.status?.replace('_', ' ')}</span>
+                        </li>
                     ))}
-                </div>
+                </ul>
             )}
-        </div>
+        </section>
     );
 }
 
 
 // ================================================================
-// MODAL REBUY — popup automático quando jogador é eliminado
+// MODAL REBUY — aparece quando o jogador é eliminado
 // ================================================================
 
-function ModalRebuy({ info, usuario, onRebuy, onRecusar }) {
+function ModalRebuy({ info, usuario, moeda, enviando, onRebuy, onRecusar }) {
     const [seg, setSeg] = useState(60);
+    const ehBonus = (moeda ?? 'real') === 'bonus';
+    const saldo   = ehBonus ? (usuario?.saldoBonus || 0) : (usuario?.saldo || 0);
 
     useEffect(() => {
         const t = setInterval(() => {
@@ -419,45 +357,23 @@ function ModalRebuy({ info, usuario, onRebuy, onRecusar }) {
     }, [onRecusar]);
 
     return (
-        <div style={cssModal.overlay}>
-            <div style={{ ...cssModal.caixa, border:'1px solid var(--cor-perigo-linha)' }}>
-                <div style={{ textAlign:'center', fontSize:'32px' }}>💥</div>
-                <p style={{ margin:0, fontWeight:700, fontSize:'16px', textAlign:'center', color:'var(--cor-texto)' }}>
-                    Você foi eliminado!
-                </p>
-                <p style={{ margin:0, fontSize:'13px', color:'var(--cor-texto-2)', textAlign:'center' }}>
-                    Quer fazer rebuy e continuar no torneio?
-                </p>
-
-                <div style={{ display:'flex', gap:'10px', justifyContent:'center', flexWrap:'wrap' }}>
-                    <StatRebuy label="Custo"  valor={`₿C ${fmt(info.custo)}`} />
-                    <StatRebuy label="Fichas" valor={`+${fmt(info.fichasGanhas)}`} />
-                    <StatRebuy label="Saldo"  valor={`₿C ${fmt(usuario?.saldo)}`} />
-                    <StatRebuy label="Período restante" valor={`${info.periodoRestante}min`} />
-                </div>
-
-                <div style={{ textAlign:'center', fontSize:'12px', color:'var(--cor-texto-3)' }}>
-                    Tempo para decidir: <b style={{ color:'var(--cor-perigo-texto)' }}>{seg}s</b>
-                </div>
-
-                <div style={{ display:'flex', gap:'10px' }}>
-                    <button style={cssModal.btnRebuyConfirmar} onClick={onRebuy}>
-                        🔄 Fazer Rebuy
-                    </button>
-                    <button style={cssModal.btnRebuyRecusar} onClick={onRecusar}>
-                        Não, obrigado
+        <div className="dialogo-veu">
+            <div className="dialogo" role="alertdialog" aria-modal="true" aria-labelledby="rebuy-titulo" aria-describedby="rebuy-texto">
+                <h2 id="rebuy-titulo">Você foi eliminado</h2>
+                <p id="rebuy-texto">Quer fazer rebuy e continuar no torneio? Você tem <b className="num">{seg} s</b> para decidir.</p>
+                <dl className="torneio-stats">
+                    <Stat label={`Custo (${ehBonus ? 'bônus' : 'saldo real'})`} valor={`₿C ${fmt(info.custo)}`} />
+                    <Stat label="Fichas" valor={`+${fmt(info.fichasGanhas)}`} />
+                    <Stat label={ehBonus ? 'Seu bônus' : 'Seu saldo real'} valor={`₿C ${fmt(saldo)}`} />
+                    <Stat label="Janela restante" valor={`${info.periodoRestante} min`} />
+                </dl>
+                <div className="dialogo-acoes">
+                    <button type="button" className="btn btn-neutro" onClick={onRecusar}>Não, obrigado</button>
+                    <button type="button" className="btn btn-principal" onClick={onRebuy} disabled={enviando} aria-busy={enviando || undefined}>
+                        Fazer rebuy
                     </button>
                 </div>
             </div>
-        </div>
-    );
-}
-
-function StatRebuy({ label, valor }) {
-    return (
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', background:'var(--cor-superficie)', borderRadius:'8px', padding:'8px 14px', gap:'2px' }}>
-            <span style={{ fontSize:'10px', color:'var(--cor-texto-3)', textTransform:'uppercase' }}>{label}</span>
-            <span style={{ fontSize:'14px', fontWeight:700, color:'var(--cor-texto)' }}>{valor}</span>
         </div>
     );
 }
@@ -469,49 +385,32 @@ function StatRebuy({ label, valor }) {
 
 function CardTorneio({ torneio, jaEstou, onEntrar, carregando }) {
     const cheio = torneio.totalJogadores >= torneio.maxJogadores;
-
     return (
-        <div style={css.card}>
-            <div style={css.cardHeader}>
-                <span style={{ fontSize:'16px' }}>🏆</span>
-                <span style={css.cardNome}>{torneio.nome}<EtiquetaMoeda moeda={torneio?.moeda} /></span>
-                <span style={{ ...css.statusBadge, color:'var(--cor-destaque-texto)', borderColor:'var(--cor-destaque-texto)', fontSize:'9px' }}>
-                    {torneio.totalJogadores}/{torneio.maxJogadores}
-                </span>
+        <div className="torneio-item">
+            <div className="torneio-item-meio">
+                <div className="nome">{torneio.nome}<EtiquetaMoeda moeda={torneio?.moeda} /></div>
+                <div className="meta num">
+                    <span>Buy-in <b className="cor-bc">₿C {fmt(torneio.buyIn)}</b></span>
+                    <span>{fmt(torneio.fichasIniciais)} fichas</span>
+                    <span>{torneio.jogadoresPorMesa} por mesa</span>
+                    {torneio.maxRebuys > 0 && <span>rebuy {torneio.maxRebuys}×</span>}
+                </div>
             </div>
-
-            <div style={css.cardStats}>
-                <span style={css.cardStat}>Buy-In: <b style={{ color:'var(--cor-destaque-texto)' }}>₿C {fmt(torneio.buyIn)}</b></span>
-                <span style={css.cardStat}>Fichas: <b style={{ color:'var(--cor-positivo-texto)' }}>{fmt(torneio.fichasIniciais)}</b></span>
-                <span style={css.cardStat}>Por mesa: <b style={{ color:'var(--cor-destaque-texto)' }}>{torneio.jogadoresPorMesa}</b></span>
-                {torneio.maxRebuys > 0 && (
-                    <span style={css.cardStat}>Rebuy: <b style={{ color:'var(--cor-perigo-texto)' }}>{torneio.maxRebuys}×</b></span>
-                )}
+            <div className="torneio-item-acao">
+                <span className="num torneio-vagas">{torneio.totalJogadores}/{torneio.maxJogadores}</span>
+                <button type="button" className="btn btn-neutro" disabled={carregando || jaEstou || cheio} aria-busy={carregando || undefined} onClick={onEntrar}>
+                    {jaEstou ? 'Inscrito' : cheio ? 'Lotado' : 'Entrar'}
+                </button>
             </div>
-
-            <button
-                style={{
-                    ...css.btnEntrar,
-                    opacity:    (carregando || jaEstou || cheio) ? 0.6 : 1,
-                    cursor:     (carregando || jaEstou || cheio) ? 'not-allowed' : 'pointer',
-                    background: jaEstou ? 'var(--cor-positivo-suave)' : 'var(--cor-destaque)',
-                    border:     jaEstou ? '1px solid var(--cor-positivo)' : 'none',
-                    color:      jaEstou ? 'var(--cor-positivo-texto)' : '#fff',
-                }}
-                disabled={carregando || jaEstou || cheio}
-                onClick={onEntrar}
-            >
-                {jaEstou ? '✓ Inscrito' : cheio ? 'Lotado' : 'Entrar'}
-            </button>
         </div>
     );
 }
 
-function Stat({ label, valor, corValor }) {
+function Stat({ label, valor }) {
     return (
-        <div style={css.stat}>
-            <span style={css.statLabel}>{label}</span>
-            <span style={{ ...css.statValor, color: corValor || 'var(--cor-texto)' }}>{valor}</span>
+        <div>
+            <dt>{label}</dt>
+            <dd className="num">{valor}</dd>
         </div>
     );
 }
@@ -660,187 +559,6 @@ function FaixaTorneio({ id, rotulo, valor, min, max, step, atual, onChange, esq,
         </>
     );
 }
-
-
-// ================================================================
-// ESTILOS
-// ================================================================
-
-const css = {
-    container: { display:'flex', flexDirection:'column', gap:'16px', paddingBottom:'80px' },
-    erro: {
-        background:'var(--cor-perigo-suave)', border:'1px solid var(--cor-perigo-linha)',
-        borderRadius:'10px', padding:'10px 14px', fontSize:'13px', color:'var(--cor-perigo-texto)', cursor:'pointer',
-    },
-    secao:       { display:'flex', flexDirection:'column', gap:'10px' },
-    secaoHeader: { display:'flex', alignItems:'center', justifyContent:'space-between' },
-    secaoTitulo: { fontSize:'14px', fontWeight:600, color:'var(--cor-texto)' },
-    btnAtualizar: {
-        background:'transparent', border:'1px solid var(--cor-linha)',
-        borderRadius:'6px', color:'var(--cor-texto-3)',
-        fontSize:'11px', padding:'4px 10px', cursor:'pointer', fontFamily:'inherit',
-    },
-    lista: { display:'flex', flexDirection:'column', gap:'8px' },
-    vazio: {
-        display:'flex', flexDirection:'column', alignItems:'center', gap:'6px',
-        padding:'32px 16px',
-        background:'var(--cor-hover-linha)', border:'1px dashed var(--cor-linha)', borderRadius:'12px',
-    },
-    vazioTxt: { color:'var(--cor-texto-3)', margin:0, fontSize:'13px' },
-    vazioSub: { color:'var(--cor-linha-forte)', margin:0, fontSize:'11px' },
-    rodape: {
-        position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)',
-        width:'100%', maxWidth:'480px',
-        padding:'10px 14px max(14px, env(safe-area-inset-bottom))',
-        background:'var(--cor-superficie)', zIndex:100, boxSizing:'border-box',
-    },
-    btnCriar: {
-        width:'100%', padding:'14px',
-        background:'var(--cor-destaque)',
-        border:'none', borderRadius:'12px', color:'var(--cor-texto-inverso)', fontSize:'16px', fontWeight:600,
-        cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px',
-        fontFamily:'var(--fonte)', WebkitTapHighlightColor:'transparent',
-    },
-    card: {
-        background:'var(--cor-superficie)', border:'1px solid var(--cor-linha)',
-        borderRadius:'12px', padding:'12px 14px', display:'flex', flexDirection:'column', gap:'8px',
-    },
-    cardHeader: { display:'flex', alignItems:'center', gap:'8px' },
-    cardNome: {
-        fontSize:'13px', fontWeight:600, color:'var(--cor-texto)', flex:1,
-        overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
-    },
-    cardStats: { display:'flex', gap:'10px', flexWrap:'wrap' },
-    cardStat:  { fontSize:'11px', color:'var(--cor-texto-3)' },
-    statusBadge: {
-        fontSize:'10px', fontWeight:600, padding:'2px 7px', borderRadius:'10px',
-        border:'1px solid', whiteSpace:'nowrap', flexShrink:0,
-    },
-    btnEntrar: {
-        padding:'8px 14px', borderRadius:'8px', fontSize:'13px', fontWeight:600,
-        fontFamily:'var(--fonte)', WebkitTapHighlightColor:'transparent', alignSelf:'flex-start',
-    },
-    torneioAtual: {
-        background:'var(--cor-destaque-suave)', border:'1px solid var(--cor-destaque-suave)',
-        borderRadius:'14px', padding:'14px', display:'flex', flexDirection:'column', gap:'10px',
-    },
-    torneioAtualHeader: { display:'flex', alignItems:'center', gap:'8px' },
-    torneioNome: { fontSize:'14px', fontWeight:700, color:'var(--cor-texto)', flex:1 },
-    torneioStats: { display:'flex', gap:'8px', flexWrap:'wrap' },
-    stat: {
-        display:'flex', flexDirection:'column', alignItems:'center',
-        background:'var(--cor-superficie)', border:'1px solid var(--cor-superficie)',
-        borderRadius:'8px', padding:'5px 10px', minWidth:'56px',
-    },
-    statLabel: { fontSize:'9px', color:'var(--cor-texto-3)', textTransform:'uppercase', letterSpacing:'0.06em' },
-    statValor: { fontSize:'13px', fontWeight:700 },
-    minhaSituacao: {
-        padding:'7px 12px', borderRadius:'8px', border:'1px solid', display:'flex', alignItems:'center', gap:'8px',
-    },
-    campeao: {
-        background:'var(--cor-destaque-suave)', border:'1px solid var(--cor-destaque-linha)',
-        borderRadius:'8px', padding:'7px 12px', fontSize:'13px', color:'#FDE68A', textAlign:'center',
-    },
-    btnIniciar: {
-        padding:'12px', background:'var(--cor-positivo)',
-        border:'none', borderRadius:'10px', color:'var(--cor-sobre-positivo)', fontSize:'14px', fontWeight:700,
-        cursor:'pointer', fontFamily:'var(--fonte)', WebkitTapHighlightColor:'transparent',
-    },
-    btnRebuy: {
-        padding:'12px', background:'var(--cor-perigo)',
-        border:'none', borderRadius:'10px', color:'var(--cor-sobre-positivo)', fontSize:'13px', fontWeight:700,
-        cursor:'pointer', fontFamily:'var(--fonte)', WebkitTapHighlightColor:'transparent',
-    },
-    avisoRebuy: {
-        background:'var(--cor-perigo-suave)', border:'1px solid var(--cor-perigo-linha)',
-        borderRadius:'8px', padding:'8px 12px', fontSize:'12px', color:'var(--cor-perigo-texto)', textAlign:'center',
-    },
-    jogadoresList: { display:'flex', flexDirection:'column', gap:'4px', maxHeight:'200px', overflowY:'auto' },
-    jogadorItem: {
-        display:'flex', alignItems:'center', gap:'8px',
-        padding:'4px 0', borderBottom:'1px solid var(--cor-superficie)',
-    },
-    conviteRow: {
-        display:'flex', alignItems:'center', gap:'10px',
-        background:'var(--cor-superficie)', border:'1px solid var(--cor-linha)',
-        borderRadius:'10px', padding:'10px 14px',
-    },
-    btnCompartilhar: {
-        border:'1px solid', borderRadius:'8px', padding:'6px 12px',
-        fontSize:'12px', fontWeight:700, cursor:'pointer',
-        fontFamily:'var(--fonte)', WebkitTapHighlightColor:'transparent', whiteSpace:'nowrap',
-    },
-};
-
-const cssModal = {
-    overlay: {
-        position:'fixed', inset:0, background:'rgba(5,8,16,0.80)',
-        display:'flex', alignItems:'flex-end', justifyContent:'center',
-        zIndex:500, backdropFilter:'blur(4px)',
-    },
-    caixa: {
-        background:'var(--cor-superficie)', border:'1px solid var(--cor-destaque-suave)',
-        borderRadius:'20px 20px 0 0',
-        padding:'20px 16px max(20px, env(safe-area-inset-bottom))',
-        width:'100%', maxWidth:'480px', display:'flex', flexDirection:'column', gap:'14px',
-        maxHeight:'90vh', overflowY:'auto', fontFamily:'var(--fonte)', color:'var(--cor-texto)',
-    },
-    header: { display:'flex', alignItems:'center', justifyContent:'space-between' },
-    titulo: { fontSize:'16px', fontWeight:700, color:'var(--cor-texto)' },
-    btnFechar: {
-        background:'transparent', border:'none', color:'var(--cor-texto-3)',
-        fontSize:'18px', cursor:'pointer', padding:'4px 8px', fontFamily:'inherit',
-    },
-    erro: {
-        background:'var(--cor-perigo-suave)', border:'1px solid var(--cor-perigo-linha)',
-        borderRadius:'8px', padding:'8px 12px', fontSize:'12px', color:'var(--cor-perigo-texto)',
-    },
-    campo: { display:'flex', flexDirection:'column', gap:'6px' },
-    label: {
-        fontSize:'12px', fontWeight:600, color:'var(--cor-texto-2)',
-        textTransform:'uppercase', letterSpacing:'0.05em',
-    },
-    input: {
-        background:'var(--cor-superficie)', border:'1px solid var(--cor-linha)',
-        borderRadius:'8px', padding:'10px 12px', color:'var(--cor-texto)',
-        fontSize:'14px', fontFamily:'var(--fonte)', outline:'none',
-    },
-    opcoes: { display:'flex', gap:'6px', flexWrap:'wrap' },
-    btnOpcao: {
-        flex:'1 1 50px', padding:'8px 4px', borderRadius:'8px', border:'1px solid',
-        fontSize:'12px', fontWeight:600, cursor:'pointer',
-        fontFamily:'var(--fonte)', WebkitTapHighlightColor:'transparent',
-    },
-    hint: { fontSize:'10px', color:'var(--cor-texto-3)', margin:0 },
-    slider: { width:'100%', cursor:'pointer' },
-    sliderLabels: { display:'flex', justifyContent:'space-between', fontSize:'10px', color:'var(--cor-texto-3)' },
-    resumo: {
-        display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'6px',
-        background:'var(--cor-superficie)', border:'1px solid var(--cor-superficie)',
-        borderRadius:'8px', padding:'10px 12px', fontSize:'13px', color:'var(--cor-texto)',
-    },
-    btnCriar: {
-        padding:'14px', background:'var(--cor-destaque)',
-        border:'none', borderRadius:'12px', color:'var(--cor-texto-inverso)', fontSize:'15px', fontWeight:700,
-        cursor:'pointer', fontFamily:'var(--fonte)', WebkitTapHighlightColor:'transparent',
-    },
-    secaoRebuy: {
-        display:'flex', flexDirection:'column', gap:'10px',
-        background:'var(--cor-perigo-suave)', border:'1px solid var(--cor-perigo-suave)',
-        borderRadius:'10px', padding:'12px',
-    },
-    btnRebuyConfirmar: {
-        flex:1, padding:'12px', background:'var(--cor-perigo)',
-        border:'none', borderRadius:'10px', color:'var(--cor-sobre-perigo)', fontSize:'14px', fontWeight:700,
-        cursor:'pointer', fontFamily:'var(--fonte)',
-    },
-    btnRebuyRecusar: {
-        flex:1, padding:'12px',
-        background:'var(--cor-superficie)', border:'1px solid var(--cor-linha)',
-        borderRadius:'10px', color:'var(--cor-texto-2)',
-        fontSize:'13px', cursor:'pointer', fontFamily:'var(--fonte)',
-    },
-};
 
 
 // Moeda do torneio ('real' | 'bonus'); servidor antigo sem o campo = real
