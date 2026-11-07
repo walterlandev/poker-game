@@ -1168,3 +1168,21 @@ button.config-item:hover { background: var(--cor-superficie-2); }
 .cart-badge-bonus .barra { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--cor-superficie-2); }
 .cart-badge-bonus .barra .real { background: var(--cor-positivo); }
 .cart-badge-bonus .barra .bonus { background: var(--cor-destaque); }
+.cart > [aria-live] { display: contents; }
+.cart-resumo-linha.destaque:first-child { border-top: 0; padding-top: 0; }
+
+/* Carteira no desktop: ações à esquerda, movimentações à direita */
+@media (min-width: 1100px) {
+    .cart {
+        max-width: 1120px; display: grid; column-gap: var(--s-6); row-gap: var(--s-4); align-items: start;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+        grid-template-areas: "topo mov" "aviso mov" "acoes mov" "acoes ledger";
+        grid-template-rows: auto auto auto 1fr;
+    }
+    .cart-topo { grid-area: topo; }
+    .cart > [aria-live] { display: block; grid-area: aviso; }
+    .cart-acoes-bloco { grid-area: acoes; }
+    .cart-mov { grid-area: mov; padding-top: 6px; }
+    .cart-ledger { grid-area: ledger; align-self: end; }
+    .cart-divisao, .cart-acoes { max-width: none; }
+}

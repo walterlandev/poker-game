@@ -86,6 +86,7 @@ export default function WalletCard({ saldoReal = 0, sacadoHoje = 0, usuario, soc
             if (data.simulado) {
                 onFeedback('sucesso', `Depósito de teste: ₿C ${fmtBC(data.bcCreditar)} entram no saldo real em alguns segundos.`);
             } else {
+                setAcao(null);   // o formulário dá lugar ao QR Code
                 setPixPendente({
                     pixCopiaECola: data.pixCopiaECola,
                     qrCode:        data.qrCode,
@@ -106,6 +107,7 @@ export default function WalletCard({ saldoReal = 0, sacadoHoje = 0, usuario, soc
         // ver backend/wallet/wallet-manager.js (wallet:sacar/confirmarSaque).
         const onSaquePendente = (data) => {
             setProcessando(null);
+            setAcao(null);       // o formulário dá lugar ao estado "aguardando PIX"
             setSaquePendente(data);
         };
 
