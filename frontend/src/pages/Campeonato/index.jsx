@@ -8,6 +8,7 @@
 ================================================================ */
 
 import { useState, useEffect } from 'react';
+import Icone from '../../components/Icone';
 
 function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
 
@@ -249,7 +250,7 @@ function EstadoTorneio({ torneio, meuUid, souHost, possoRebuy, onIniciar, onRebu
         <div style={css.torneioAtual}>
             <div style={css.torneioAtualHeader}>
                 <span style={{ fontSize:'18px' }}>🏆</span>
-                <span style={css.torneioNome}>{torneio.nome}</span>
+                <span style={css.torneioNome}>{torneio.nome}<EtiquetaMoeda moeda={torneio?.moeda} /></span>
                 <span style={{ ...css.statusBadge, color: statusCor, borderColor: statusCor }}>
                     {statusLabel}
                 </span>
@@ -473,7 +474,7 @@ function CardTorneio({ torneio, jaEstou, onEntrar, carregando }) {
         <div style={css.card}>
             <div style={css.cardHeader}>
                 <span style={{ fontSize:'16px' }}>🏆</span>
-                <span style={css.cardNome}>{torneio.nome}</span>
+                <span style={css.cardNome}>{torneio.nome}<EtiquetaMoeda moeda={torneio?.moeda} /></span>
                 <span style={{ ...css.statusBadge, color:'var(--cor-destaque-texto)', borderColor:'var(--cor-destaque-texto)', fontSize:'9px' }}>
                     {torneio.totalJogadores}/{torneio.maxJogadores}
                 </span>
@@ -530,6 +531,8 @@ function ModalCriarTorneio({ socket, usuario, onFechar }) {
     const [rebuyPeriod,      setRebuyPeriod     ] = useState(30);
     const [enviando,         setEnviando        ] = useState(false);
     const [erro,             setErro            ] = useState(null);
+    // Moeda do torneio: 'real' (padrão) ou 'bonus'
+    const [moeda,            setMoeda           ] = useState('real');
 
     function handleBuyIn(v) {
         setBuyIn(v);
@@ -550,6 +553,7 @@ function ModalCriarTorneio({ socket, usuario, onFechar }) {
             jogadoresPorMesa,
             maxRebuys,
             rebuyPeriod,
+            moeda,
         });
 
         function onCriado() { cleanup(); onFechar(); }
@@ -564,138 +568,96 @@ function ModalCriarTorneio({ socket, usuario, onFechar }) {
         setTimeout(cleanup, 10000);
     }
 
+    const ehBonus    = moeda === 'bonus';
+    const saldoMoeda = ehBonus ? (usuario?.saldoBonus || 0) : (usuario?.saldo || 0);
+    const semSaldo   = saldoMoeda < buyIn;   // só visual; o servidor decide
+
     return (
-        <div style={cssModal.overlay} onClick={onFechar}>
-            <div style={cssModal.caixa} onClick={e => e.stopPropagation()}>
-
-                <div style={cssModal.header}>
-                    <span style={cssModal.titulo}>Criar Torneio</span>
-                    <button style={cssModal.btnFechar} onClick={onFechar}>✕</button>
+        <>
+            <div className="modal-veu" onClick={() => !enviando && onFechar()} />
+            <div className="modal modal-largo" role="dialog" aria-modal="true" aria-labelledby="ct-titulo">
+                <div className="modal-cab">
+                    <div className="esq"><h2 id="ct-titulo">Criar torneio</h2></div>
+                    <button type="button" onClick={onFechar} className="modal-icone-btn" aria-label="Fechar" disabled={enviando}>
+                        <Icone nome="fechar" />
+                    </button>
                 </div>
 
-                {erro && <div style={cssModal.erro}>{erro}</div>}
+                <div className="modal-corpo cm">
+                    <fieldset className="cm-grupo">
+                        <legend className="cart-campo-rot">Moeda do torneio</legend>
+                        <div className="cm-moedas" role="radiogroup" aria-label="Moeda do torneio">
+                            <button type="button" role="radio" aria-checked={!ehBonus} className="cm-moeda" onClick={() => setMoeda('real')}>
+                                <span className="t">Real</span>
+                                <span className="s">Buy-in, rebuy e prêmio em saldo real</span>
+                                <span className="v num">Você tem ₿C {fmt(usuario?.saldo || 0)}</span>
+                            </button>
+                            <button type="button" role="radio" aria-checked={ehBonus} className="cm-moeda" onClick={() => setMoeda('bonus')}>
+                                <span className="t">Bônus</span>
+                                <span className="s">Buy-in, rebuy e prêmio em bônus</span>
+                                <span className="v num">Você tem ₿C {fmt(usuario?.saldoBonus || 0)}</span>
+                            </button>
+                        </div>
+                    </fieldset>
 
-                <div style={cssModal.campo}>
-                    <label style={cssModal.label}>Nome do Torneio</label>
-                    <input
-                        style={cssModal.input}
-                        value={nome}
-                        onChange={e => setNome(e.target.value)}
-                        maxLength={40}
-                        placeholder="Ex: Grand Slam Weekly"
-                    />
-                </div>
+                    <label className="cart-campo-rot" htmlFor="ct-nome">Nome do torneio</label>
+                    <div className="cart-campo">
+                        <input id="ct-nome" value={nome} onChange={e => setNome(e.target.value)} maxLength={40} placeholder="Ex.: Torneio de sexta…" autoComplete="off" />
+                    </div>
 
-                <div style={cssModal.campo}>
-                    <label style={cssModal.label}>Buy-In — taxa de entrada (₿C)</label>
-                    <div style={cssModal.opcoes}>
+                    <span className="cart-campo-rot">Buy-in em ₿C de {ehBonus ? 'bônus' : 'saldo real'}</span>
+                    <div className="cart-atalhos" role="group" aria-label="Buy-in">
                         {[200, 500, 1000, 2000, 5000].map(v => (
-                            <button
-                                key={v}
-                                style={{
-                                    ...cssModal.btnOpcao,
-                                    background:  buyIn === v ? 'var(--cor-destaque-suave)' : 'var(--cor-superficie)',
-                                    borderColor: buyIn === v ? 'var(--cor-destaque-linha)' : 'var(--cor-linha)',
-                                    color:       buyIn === v ? 'var(--cor-destaque-texto)' : 'var(--cor-texto-2)',
-                                }}
-                                onClick={() => handleBuyIn(v)}
-                            >
-                                {fmt(v)}
+                            <button key={v} type="button" className="cart-chip num" aria-pressed={buyIn === v} onClick={() => handleBuyIn(v)}>
+                                ₿C {fmt(v)}
                             </button>
                         ))}
                     </div>
-                    <p style={cssModal.hint}>Saldo atual: ₿C {fmt(usuario?.saldo)}</p>
-                </div>
 
-                <div style={cssModal.campo}>
-                    <label style={cssModal.label}>Fichas por jogador: {fmt(fichasIniciais)}</label>
-                    <input
-                        type="range" min={1000} max={200000} step={1000}
-                        value={fichasIniciais}
-                        onChange={e => setFichasIniciais(Number(e.target.value))}
-                        style={cssModal.slider}
-                    />
-                    <div style={cssModal.sliderLabels}><span>1.000</span><span>200.000</span></div>
-                    <p style={cssModal.hint}>Stack distribuído igualmente a todos ao iniciar</p>
-                </div>
-
-                <div style={cssModal.campo}>
-                    <label style={cssModal.label}>Máximo de Jogadores: {maxJogadores}</label>
-                    <input
-                        type="range" min={4} max={64} step={4}
-                        value={maxJogadores}
-                        onChange={e => setMaxJogadores(Number(e.target.value))}
-                        style={cssModal.slider}
-                    />
-                    <div style={cssModal.sliderLabels}><span>4</span><span>64</span></div>
-                </div>
-
-                <div style={cssModal.campo}>
-                    <label style={cssModal.label}>Jogadores por Mesa: {jogadoresPorMesa}</label>
-                    <input
-                        type="range" min={2} max={9} step={1}
-                        value={jogadoresPorMesa}
-                        onChange={e => setJogadoresPorMesa(Number(e.target.value))}
-                        style={cssModal.slider}
-                    />
-                    <div style={cssModal.sliderLabels}><span>2</span><span>9</span></div>
-                </div>
-
-                {/* Rebuy */}
-                <div style={cssModal.secaoRebuy}>
-                    <span style={{ fontSize:'12px', fontWeight:700, color:'var(--cor-perigo-texto)' }}>Regras de Rebuy</span>
-                    <p style={cssModal.hint}>Permite que jogadores eliminados paguem o buy-in novamente e re-entrem na próxima rodada</p>
-
-                    <div style={{ display:'flex', gap:'12px', flexWrap:'wrap' }}>
-                        <div style={{ ...cssModal.campo, flex:1 }}>
-                            <label style={cssModal.label}>
-                                Rebuys máx: {maxRebuys === 0 ? 'Desativado' : maxRebuys}
-                            </label>
-                            <input
-                                type="range" min={0} max={5} step={1}
-                                value={maxRebuys}
-                                onChange={e => setMaxRebuys(Number(e.target.value))}
-                                style={cssModal.slider}
-                            />
-                            <div style={cssModal.sliderLabels}><span>Off</span><span>5×</span></div>
-                        </div>
-
-                        {maxRebuys > 0 && (
-                            <div style={{ ...cssModal.campo, flex:1 }}>
-                                <label style={cssModal.label}>Período: {rebuyPeriod}min</label>
-                                <input
-                                    type="range" min={10} max={120} step={10}
-                                    value={rebuyPeriod}
-                                    onChange={e => setRebuyPeriod(Number(e.target.value))}
-                                    style={cssModal.slider}
-                                />
-                                <div style={cssModal.sliderLabels}><span>10m</span><span>2h</span></div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Resumo */}
-                <div style={cssModal.resumo}>
-                    <span>Buy-In: <b style={{ color:'var(--cor-destaque-texto)' }}>₿C {fmt(buyIn)}</b></span>
-                    <span>Fichas: <b style={{ color:'var(--cor-positivo-texto)' }}>{fmt(fichasIniciais)}</b></span>
+                    <FaixaTorneio id="ct-fichas" rotulo="Fichas por jogador" valor={fmt(fichasIniciais)} min={1000} max={200000} step={1000}
+                        atual={fichasIniciais} onChange={setFichasIniciais} esq="1.000" dir="200.000" />
+                    <p className="cart-nota">O mesmo stack para todos ao iniciar.</p>
+                    <FaixaTorneio id="ct-max" rotulo="Máximo de jogadores" valor={maxJogadores} min={4} max={64} step={4}
+                        atual={maxJogadores} onChange={setMaxJogadores} esq="4" dir="64" />
+                    <FaixaTorneio id="ct-mesa" rotulo="Jogadores por mesa" valor={jogadoresPorMesa} min={2} max={9} step={1}
+                        atual={jogadoresPorMesa} onChange={setJogadoresPorMesa} esq="2" dir="9" />
+                    <FaixaTorneio id="ct-rebuys" rotulo="Rebuys por jogador" valor={maxRebuys === 0 ? 'desativado' : `${maxRebuys}×`} min={0} max={5} step={1}
+                        atual={maxRebuys} onChange={setMaxRebuys} esq="0" dir="5" />
                     {maxRebuys > 0 && (
-                        <span style={{ fontSize:'11px', color:'var(--cor-texto-2)' }}>
-                            Rebuy: {maxRebuys}× / {rebuyPeriod}min
-                        </span>
+                        <FaixaTorneio id="ct-periodo" rotulo="Janela de rebuy" valor={`${rebuyPeriod} min`} min={10} max={120} step={10}
+                            atual={rebuyPeriod} onChange={setRebuyPeriod} esq="10 min" dir="2 h" />
                     )}
+                    <p className="cart-nota">O rebuy deixa quem foi eliminado pagar o buy-in de novo e voltar na rodada seguinte.</p>
+
+                    <dl className="cart-resumo">
+                        <div className="cart-resumo-linha"><dt>Seu {ehBonus ? 'bônus' : 'saldo real'}</dt><dd className="num">₿C {fmt(saldoMoeda)}</dd></div>
+                        <div className="cart-resumo-linha"><dt>Buy-in</dt><dd className="num">₿C {fmt(buyIn)}</dd></div>
+                        <div className="cart-resumo-linha"><dt>Fichas por jogador</dt><dd className="num">{fmt(fichasIniciais)}</dd></div>
+                    </dl>
+
+                    {erro && <p className="cart-erro" role="alert">{erro}</p>}
                 </div>
 
-                <button
-                    style={{ ...cssModal.btnCriar, opacity: enviando ? 0.6 : 1 }}
-                    disabled={enviando}
-                    onClick={handleCriar}
-                >
-                    {enviando ? 'Criando...' : 'Criar Torneio'}
-                </button>
-
+                <div className="modal-rodape">
+                    <button type="button" className="btn btn-principal cart-btn-cheio" disabled={enviando || semSaldo} aria-busy={enviando || undefined} onClick={handleCriar}>
+                        {enviando ? 'Criando torneio…' : semSaldo ? `Falta ${ehBonus ? 'bônus' : 'saldo real'} para o buy-in` : `Criar torneio de ${ehBonus ? 'bônus' : 'saldo real'}`}
+                    </button>
+                </div>
             </div>
-        </div>
+        </>
+    );
+}
+
+function FaixaTorneio({ id, rotulo, valor, min, max, step, atual, onChange, esq, dir }) {
+    return (
+        <>
+            <label className="cart-campo-rot" htmlFor={id}>{rotulo} <span className="cm-dica num">{valor}</span></label>
+            <div className="cm-slider">
+                <span className="num">{esq}</span>
+                <input id={id} type="range" min={min} max={max} step={step} value={atual} onChange={e => onChange(Number(e.target.value))} />
+                <span className="num">{dir}</span>
+            </div>
+        </>
     );
 }
 
@@ -879,3 +841,10 @@ const cssModal = {
         fontSize:'13px', cursor:'pointer', fontFamily:'var(--fonte)',
     },
 };
+
+
+// Moeda do torneio ('real' | 'bonus'); servidor antigo sem o campo = real
+function EtiquetaMoeda({ moeda }) {
+    const m = moeda ?? 'real';
+    return <span className={`etiqueta-moeda ${m}`}>{m === 'bonus' ? 'Bônus' : 'Real'}</span>;
+}
