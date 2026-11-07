@@ -223,7 +223,7 @@ test('bônus: mesa com bots (cliente antigo) vira mesa de bônus; treino do clie
     assert.equal(gm.getMesa(real).moeda, 'real');        // "treino" vindo do cliente não existe mais
 });
 
-test('treino: mão de treino não grava ranking/estatística; mesa real grava', async (t) => {
+test('bônus: mão em mesa de bônus (com bots) não grava ranking/estatística; mesa real grava', async (t) => {
     t.mock.timers.enable(TIMERS);
     const { servico, gm } = montar();
     const gravados = [];

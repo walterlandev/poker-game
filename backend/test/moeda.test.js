@@ -323,6 +323,26 @@ test('regra 8: wallet:enviar usa planejarEnvio (sem caminho que debite bônus)',
     assert.ok(!/saldoBonus:\s*admin\.firestore\.FieldValue\.increment/.test(handler), 'handler ainda mexe em saldoBonus');
 });
 
+// ── Regra 9: ranking só em mesa real ────────────────────────────────
+test('regra 9: mesa bônus não grava ranking; mesa real grava', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { servico, gm } = montar();
+    const gravados = [];
+    gm.salvarResultado = (r) => gravados.push(r);
+    const b = await criar(t, servico, sock('k9a'), { buyIn: 100, moeda: 'bonus' });
+    await servico.entrarMesa(sock('k9b'), { mesaId: b });
+    gm.iniciarRodada(b);
+    gm.processarAcao(b, gm.getMesa(b).turno, 'FOLD', 0, 'x');
+    assert.equal(gm.getMesa(b).fase, 'SHOWDOWN');
+    assert.equal(gravados.length, 0);
+
+    const r = await criar(t, servico, sock('k9c'), { buyIn: 100, moeda: 'real' });
+    await servico.entrarMesa(sock('k9d'), { mesaId: r });
+    gm.iniciarRodada(r);
+    gm.processarAcao(r, gm.getMesa(r).turno, 'FOLD', 0, 'x');
+    assert.equal(gravados.length, 1);
+});
+
 // ── Regra 5: bots só em mesa de bônus, nunca em torneio ──────────────
 test('regra 5: adicionarBot recusa mesa real e torneio, aceita mesa de bônus', async (t) => {
     t.mock.timers.enable(TIMERS);
