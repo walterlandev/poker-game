@@ -24,12 +24,12 @@ export function socketFalso(uid) {
  * Cria um GameManager e uma mesa com jogadores humanos h0..hN-1, cada um
  * com o stack indicado. Ordem dos assentos = ordem do array.
  */
-export function montarMesa(stacks, { smallBlind = 10, buyIn = 1000, treino = false } = {}) {
+export function montarMesa(stacks, { smallBlind = 10, buyIn = 1000, moeda = 'real' } = {}) {
     const io = criarIoFalso();
     const gm = new GameManager(io);
     const uids = stacks.map((_, i) => `h${i}`);
 
-    const { mesaId } = gm.criarMesa({ smallBlind, buyIn, treino }, { uid: uids[0], nome: uids[0] });
+    const { mesaId } = gm.criarMesa({ smallBlind, buyIn, moeda }, { uid: uids[0], nome: uids[0] });
     for (let i = 1; i < uids.length; i++) {
         gm.entrarMesa(mesaId, { uid: uids[i], nome: uids[i] }, socketFalso(uids[i]));
     }

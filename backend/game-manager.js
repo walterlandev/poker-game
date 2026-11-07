@@ -19,6 +19,7 @@ import { calcularForca }           from './core/engine-poker.js';
 import { BotManager }              from './core/bots.js';
 import { gerarBaralho }            from './core/deck.js';
 import { salvarResultadoRodada }   from './firebase-admin.js';
+import { normalizarMoeda, MSG_MOEDA } from './moeda.js';
 
 const mesas = new Map();
 
@@ -183,10 +184,10 @@ export class GameManager {
             ultimaAcaoDescritiva: 'Mesa criada. Aguardando jogadores.',
             ordem:                [usuario.uid],
             senha:                config.senha ? String(config.senha) : null,
-            // Mesa de TREINO (com bots): fichas sem valor, nada é debitado nem
-            // creditado. Decidido pelo servidor (servico-mesas.js, pelo número
-            // de bots) — nunca pelo cliente — e não muda depois.
-            treino:               config.treino === true,
+            // Moeda da mesa: 'real' (saldo sacável) ou 'bonus' (saldoBonus).
+            // Decidida e validada no servidor (servico-mesas.js / moeda.js) —
+            // nunca confiada ao cliente — e não muda depois.
+            moeda:                normalizarMoeda(config.moeda),
             contribuicoesEncerradas: [],
             jogadores: {
                 [usuario.uid]: this._criarJogador(usuario, config.buyIn || 1000, 'humano'),
@@ -376,10 +377,10 @@ export class GameManager {
     adicionarBot(mesaId, rankPontosJogador = 0) {
         const mesa = mesas.get(mesaId);
         if (!mesa) return { sucesso: false, erro: 'Mesa não encontrada.' };
-        // Bot só em mesa de treino: os bots recompram fichas do nada, então
-        // numa mesa com dinheiro real quem ganhasse deles sacaria ₿C criado
-        // por eles. Mesa de torneio nunca é de treino.
-        if (!mesa.treino) return { sucesso: false, erro: 'Bots só jogam em mesa de treino (fichas sem valor). Crie uma mesa com bots para treinar.' };
+        // Bot só em mesa de bônus e nunca em torneio: os bots recompram
+        // fichas do nada; numa mesa real quem ganhasse deles sacaria ₿C
+        // criado por eles.
+        if (mesa.moeda !== 'bonus' || mesa.torneioId) return { sucesso: false, erro: MSG_MOEDA.BOTS_SO_BONUS };
         if (Object.keys(mesa.jogadores).length >= 9) return { sucesso: false, erro: 'Mesa cheia.' };
 
         const index = Object.keys(mesa.jogadores).length;
@@ -724,7 +725,7 @@ export class GameManager {
                 saldo:       jogador.saldo,
                 origemBonus: jogador.origemBonus || 0,
                 torneioId:   mesa.torneioId || null,
-                treino:      !!mesa.treino,
+                moeda:       mesa.moeda,
             });
             // sairMesa já trata a saída no meio de uma mão como desistência
             // (fold) e resolve corretamente quem age em seguida — setar
@@ -1269,8 +1270,8 @@ export class GameManager {
             fichasPerdidas: premiados[uid]  ? 0 : mesa.valorBuyIn,
             venceu:         !!premiados[uid],
         }));
-        // Mesa de treino não conta para ranking/estatística.
-        if (!mesa.treino) this.salvarResultado(resultados);
+        // Só mesa real conta para ranking/estatística.
+        if (mesa.moeda !== 'bonus') this.salvarResultado(resultados);
     }
 
     /**
@@ -1439,7 +1440,7 @@ export class GameManager {
             this._agendarProximaRodada(mesaId);
         }
 
-        if (!mesa.treino) this.salvarResultado([{
+        if (mesa.moeda !== 'bonus') this.salvarResultado([{
             uid:            vencedorUid,
             nome:           j.nome,
             avatar:         j.avatar || '',
@@ -1589,7 +1590,7 @@ export class GameManager {
             jogadores:            {},
             torneioId,              // ← liga ao torneio
             senha:                null,
-            treino:               false,
+            moeda:                normalizarMoeda(config.moeda),   // herda a do torneio
             contribuicoesEncerradas: [],
         };
 

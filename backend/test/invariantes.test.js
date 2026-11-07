@@ -123,7 +123,7 @@ function totalFichas(mesa) {
 
 test('mesa com bots: 150 mãos sem quebrar turno, saldo nem conservação dentro da mão', (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    const { gm, mesaId, mesa } = montarMesa([2000], { smallBlind: 10, buyIn: 1000, treino: true });
+    const { gm, mesaId, mesa } = montarMesa([2000], { smallBlind: 10, buyIn: 1000, moeda: 'bonus' });
     for (let i = 0; i < 4; i++) gm.adicionarBot(mesaId, 600);
     const r = rng(99);
     gm.iniciarRodada(mesaId);

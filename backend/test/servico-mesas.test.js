@@ -209,20 +209,18 @@ async function criarComBots(t, servico, socket, config) {
     return id;
 }
 
-test('treino: mesa com bots é criada sem débito e marcada treino (e o cliente não decide isso)', async (t) => {
+test('bônus: mesa com bots (cliente antigo) vira mesa de bônus; treino do cliente é ignorado', async (t) => {
     t.mock.timers.enable(TIMERS);
-    const { servico, gm, debitos } = montar();
+    const { servico, gm } = montar();
     const mesaId = await criarComBots(t, servico, sock('a'), { buyIn: 700, qtdBots: 2 });
     const mesa = gm.getMesa(mesaId);
-    assert.equal(mesa.treino, true);
+    assert.equal(mesa.moeda, 'bonus');
     assert.equal(Object.keys(mesa.jogadores).length, 3);
-    assert.equal(mesa.jogadores.a.saldo, 700);           // mesmo stack, só como fichas
-    assert.equal(debitos.length, 0);
-    assert.equal(gm.filtrarEstadoParaJogador(mesa, 'a').treino, true);
+    assert.equal(mesa.jogadores.a.saldo, 700);
+    assert.equal(gm.filtrarEstadoParaJogador(mesa, 'a').moeda, 'bonus');
 
     const real = await servico.criarMesa(sock('b'), { buyIn: 500, qtdBots: 0, treino: true });
-    assert.equal(gm.getMesa(real).treino, false);        // treino vindo do cliente é ignorado
-    assert.equal(debitos.length, 1);
+    assert.equal(gm.getMesa(real).moeda, 'real');        // "treino" vindo do cliente não existe mais
 });
 
 test('treino: entrar, rebuy, sair (inclusive no meio da mão) e desconectar não mexem no saldo', async (t) => {
@@ -285,7 +283,7 @@ test('bot não entra em mesa real nem em mesa de torneio', async (t) => {
     const r = gm.adicionarBot(realId, 0);
     assert.equal(r?.sucesso, false);
     assert.equal(Object.keys(gm.getMesa(realId).jogadores).length, 1);
-    assert.equal(gm.getMesa(realId).treino, false);
+    assert.equal(gm.getMesa(realId).moeda, 'real');
 
     const { torneioId } = tm.criarTorneio({ buyIn: 100 }, { uid: 't0', nome: 't0' });
     tm.entrarTorneio(torneioId, { uid: 't1', nome: 't1' });

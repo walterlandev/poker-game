@@ -142,7 +142,7 @@ app.get('/mesas', (req, res) => {
             bigBlind:     m.bigBlind,
             buyIn:        m.valorBuyIn,
             temSenha:     !!m.senha,
-            treino:       !!m.treino,   // mesa com bots: fichas sem valor
+            moeda:        m.moeda || 'real',
         }));
     res.json({ mesas });
 });
