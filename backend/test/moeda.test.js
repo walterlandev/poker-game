@@ -372,3 +372,76 @@ test('regra 5: adicionarBot recusa mesa real e torneio, aceita mesa de bônus', 
     const mesaT = tm.getTorneio(torneioId).rodadas[0].mesas[0].mesaId;
     assert.equal(gm.adicionarBot(mesaT, 0).sucesso, false);
 });
+
+// ── Regra 10: fuzz — mesa real não cria bônus; mesa bônus não cria real ──
+function rng(semente) {
+    let s = semente >>> 0;
+    return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+}
+
+/**
+ * Joga mãos aleatórias pelo serviço (entrar, agir, rebuy, sair no meio da
+ * mão, estouro de tempo) com carteiras em memória e confere, ao fim, os
+ * totais de saldo real e de saldo bônus de todas as contas.
+ */
+async function fuzzMoeda(t, moeda, semente, comBots) {
+    const m = await import('../moeda.js');
+    const r = rng(semente);
+    const n = 2 + Math.floor(r() * 4);
+    const uids = Array.from({ length: n }, (_, i) => `z${moeda[0]}${semente}_${i}`);
+    const carteira = Object.fromEntries(uids.map(u => [u, { saldo: 5000, saldoBonus: 5000 }]));
+    const { servico, gm } = montar({ carteira, planejarDebito: m.planejarDebito, planejarCredito: m.planejarCredito });
+    const totais = () => Object.values(carteira).reduce((a, c) => ({ real: a.real + c.saldo, bonus: a.bonus + c.saldoBonus }), { real: 0, bonus: 0 });
+    const antes = totais();
+    const socks = Object.fromEntries(uids.map(u => [u, sock(u)]));
+    let acoes = 0, maos = 0;
+
+    const mesaId = await criar(t, servico, socks[uids[0]], { buyIn: 500, moeda, qtdBots: comBots ? 2 : 0 });
+    for (const u of uids.slice(1)) await servico.entrarMesa(socks[u], { mesaId });
+    gm.iniciarRodada(mesaId);
+    const mesa = gm.getMesa(mesaId);
+    for (let passo = 0; passo < 1500 && gm.getMesa(mesaId); passo++) {
+        const uid = mesa.turno;
+        if (uid && !uid.startsWith('bot_') && ['PRE-FLOP', 'FLOP', 'TURN', 'RIVER'].includes(mesa.fase)) {
+            const j = mesa.jogadores[uid];
+            const x = r();
+            const humanos = Object.values(mesa.jogadores).filter(h => h.tipo === 'humano').length;
+            if (x < 0.03 && humanos > 2) { await servico.sairMesa(socks[uid], 'voluntária'); continue; }
+            if (x < 0.05 && humanos > 2) { for (let i = 0; i < 47; i++) t.mock.timers.tick(1000); await tick(); continue; }
+            const custo = mesa.maiorAposta - j.apostaRodada;
+            if (x < 0.25)      gm.processarAcao(mesaId, uid, 'FOLD', 0, 's');
+            else if (x < 0.6)  gm.processarAcao(mesaId, uid, custo > 0 ? 'CALL' : 'CHECK', 0, 's');
+            else               gm.processarAcao(mesaId, uid, 'RAISE', j.saldo + j.apostaRodada, 's');
+            if (mesa.turno === uid) gm.processarAcao(mesaId, uid, 'CALL', 0, 's');
+            acoes++;
+        } else {
+            for (let i = 0; i < 12; i++) t.mock.timers.tick(1000);
+            await tick();
+            for (const u of uids) {
+                const j = mesa.jogadores[u];
+                if (j && j.saldo === 0 && r() < 0.5) await servico.rebuy(socks[u], { valor: 500 });
+            }
+            if (mesa.fase === 'SHOWDOWN') maos++;
+            if (mesa.fase === 'AGUARDANDO') gm.iniciarRodada(mesaId);
+        }
+    }
+    // todo mundo sai no fim: o que está na mesa volta para as carteiras
+    for (const u of uids) if (gm.getMesa(mesaId)?.jogadores[u]) await servico.sairMesa(socks[u], 'fim');
+    await tick();
+    assert.ok(acoes > 30, `fuzz jogou pouco: ${acoes} ações`);
+    return { antes, depois: totais(), acoes, maos };
+}
+
+for (const semente of [1, 2, 3, 4, 5, 6]) {
+    test(`regra 10: fuzz mesa real (semente ${semente}) — nenhum bônus é criado nem gasto, real se conserva`, async (t) => {
+        t.mock.timers.enable(TIMERS);
+        const { antes, depois } = await fuzzMoeda(t, 'real', semente, false);
+        assert.equal(depois.bonus, antes.bonus, 'mesa real mexeu no saldo bônus');
+        assert.equal(depois.real, antes.real, 'mesa real criou/destruiu saldo real');
+    });
+    test(`regra 10: fuzz mesa bônus com bots (semente ${semente}) — nenhum saldo real é criado nem gasto`, async (t) => {
+        t.mock.timers.enable(TIMERS);
+        const { antes, depois } = await fuzzMoeda(t, 'bonus', semente, true);
+        assert.equal(depois.real, antes.real, 'mesa bônus mexeu no saldo real');
+    });
+}
