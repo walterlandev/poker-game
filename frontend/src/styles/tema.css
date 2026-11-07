@@ -1280,3 +1280,59 @@ button.config-item:hover { background: var(--cor-superficie-2); }
     .auth-mesa span { position: absolute; inset: 8px; border-radius: 999px; border: 1.5px dashed var(--cor-costura); }
     .auth-conteudo { padding: var(--s-7); }
 }
+
+/* ================================================================
+   LOJA (pacotes de ₿C e temas de baralho)
+================================================================ */
+.loja { display: flex; flex-direction: column; gap: var(--s-4); color: var(--cor-texto); }
+.loja-cab { display: flex; flex-direction: column; gap: 4px; }
+.loja-saldo { margin: 0; font-size: var(--t-14); color: var(--cor-texto-2); }
+.loja-saldo span { color: var(--cor-texto-3); }
+.loja > [aria-live] { display: contents; }
+.loja-colunas { display: flex; flex-direction: column; gap: var(--s-5); }
+.loja-col { display: none; flex-direction: column; gap: var(--s-3); }
+.loja-col.ativa { display: flex; }
+.loja-col-titulo { display: none; margin: 0; font-size: var(--t-16); font-weight: 700; }
+.loja-pacotes { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--s-2); }
+.loja-pacote {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px; border-radius: var(--r-painel);
+    border: 1px solid var(--cor-linha-forte); background: var(--cor-superficie); color: var(--cor-texto); font-family: inherit; cursor: pointer; text-align: left;
+}
+.loja-pacote:hover { background: var(--cor-superficie-2); }
+.loja-pacote b { font-size: var(--t-19); font-weight: 700; }
+.loja-pacote span { font-size: var(--t-12); color: var(--cor-texto-2); }
+.loja-pacote[aria-pressed="true"] { border-color: var(--cor-destaque-linha); background: var(--cor-destaque-suave); box-shadow: inset 0 0 0 1px var(--cor-destaque-linha); }
+.loja-pacote[aria-pressed="true"] span { color: var(--cor-destaque-texto); }
+
+.temas { display: flex; flex-direction: column; gap: var(--s-3); }
+.tema-preview { border-radius: var(--r-painel); overflow: hidden; border: 1px solid var(--cor-linha); background: var(--cor-superficie); }
+.tema-preview-feltro {
+    display: grid; place-items: center; padding: var(--s-5) var(--s-3);
+    background: var(--ruido), radial-gradient(80% 90% at 50% 40%, var(--cor-feltro-brilho) 0%, var(--cor-feltro) 55%, var(--cor-feltro-fundo) 100%);
+}
+.tema-preview-cartas { display: flex; gap: 6px; }
+.tema-preview-cartas .carta:nth-child(odd) { transform: translateY(-4px); }
+.tema-preview-info { display: flex; flex-direction: column; gap: 6px; padding: var(--s-4); }
+.tema-preview-titulo { display: flex; align-items: center; gap: 4px; }
+.tema-preview-titulo h3 { margin: 0; font-size: var(--t-19); font-weight: 700; }
+.tema-preco { margin: 0; font-size: var(--t-16); font-weight: 700; color: var(--cor-destaque-texto); }
+.tema-sem-saldo { font-size: var(--t-12); font-weight: 500; color: var(--cor-perigo-texto); }
+.tema-em-uso { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; font-size: var(--t-14); font-weight: 600; color: var(--cor-positivo-texto); }
+.temas-grade { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-2); }
+.tema-mini {
+    width: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; border-radius: var(--r-painel);
+    border: 1px solid var(--cor-linha); background: var(--cor-superficie); color: var(--cor-texto); font-family: inherit; cursor: pointer;
+}
+.tema-mini:hover { background: var(--cor-superficie-2); }
+.tema-mini[aria-pressed="true"] { border-color: var(--cor-destaque-linha); box-shadow: inset 0 0 0 1px var(--cor-destaque-linha); background: var(--cor-destaque-suave); }
+.tema-mini-cartas { display: flex; padding: 8px 10px; border-radius: 8px; background: var(--cor-feltro); }
+.tema-mini-cartas > * + * { margin-left: -10px; transform: rotate(8deg); }
+.tema-mini-nome { font-size: var(--t-12); font-weight: 600; text-align: center; }
+.tema-mini-preco { font-size: var(--t-11); color: var(--cor-texto-3); }
+
+@media (min-width: 900px) {
+    .loja-alterna { display: none; }
+    .loja-colunas { flex-direction: row; align-items: flex-start; gap: var(--s-6); }
+    .loja-col, .loja-col.ativa { display: flex; flex: 1; min-width: 0; }
+    .loja-col-titulo { display: block; }
+}

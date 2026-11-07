@@ -172,14 +172,7 @@ const estilosGlobais = `
   }
   .carta-revelada { animation: virarCarta 0.4s ease forwards; }
 
-  /* Lobby e cabeçalho: ver styles/tema.css. Loja/index.jsx continua aqui. */
-  .loja-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
-  .loja-corpo { display: flex; flex-direction: column; gap: 14px; }
-  @media (min-width: 768px) {
-    .loja-tabs { display: none; }
-    .loja-corpo { flex-direction: row; align-items: flex-start; gap: 20px; }
-    .loja-col { flex: 1; display: block !important; }
-  }
+  /* Lobby, cabeçalho e Loja: ver styles/tema.css */
 
   /* Tela de jogo, slider e ActionBar: ver styles/tema.css */
 
