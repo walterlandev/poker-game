@@ -6,7 +6,6 @@
    Permite editar: nome, email, telefone, foto de perfil.
    Também oferece opção de recuperação de senha por email.
 
-   ADIÇÕES DESTA VERSÃO:
    → Upload de foto do dispositivo (PC ou celular)
    → ID do jogador exibido e copiável (para transferência ₿C)
    → Temas comprados exibidos no perfil
@@ -22,13 +21,15 @@
    → sendPasswordResetEmail() — envia email de recuperação
    → Firestore — atualiza perfil na coleção 'jogadores'
 
+   Estilos em styles/ranking-admin.css (prefixos jan- e pf-).
+
    PROPS:
      usuario   → { uid, nome, email, avatar, telefone, temasComprados }
      onFechar  → fecha o modal
      onAtualizar → callback quando perfil é salvo com sucesso
 ================================================================ */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
     getAuth,
     updateProfile,
@@ -37,6 +38,8 @@ import {
 } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase-config';
+import Icone from '../../components/Icone';
+import '../../styles/ranking-admin.css';
 
 // Lista de avatares disponíveis em /public/
 const AVATARES = [
@@ -70,9 +73,18 @@ export default function ModalPerfil({ usuario, socket, onFechar, onAtualizar }) 
 
     // ── Upload de foto ──
     const inputFotoRef = useRef(null);
+    const janelaRef    = useRef(null);
     const [fotoLocal,   setFotoLocal  ] = useState(null); // base64 — só pra pré-visualização
-    const [fotoArquivo, setFotoArquivo] = useState(null); // File — o que de fato sobe pro Storage
+    const [fotoArquivo, setFotoArquivo] = useState(null); // File — o que de fato sobe pro servidor
     const [carregandoFoto, setCarregandoFoto] = useState(false);
+
+    // Foco na janela ao abrir e Esc para fechar
+    useEffect(() => {
+        janelaRef.current?.focus();
+        function aoTeclar(e) { if (e.key === 'Escape') onFechar(); }
+        document.addEventListener('keydown', aoTeclar);
+        return () => document.removeEventListener('keydown', aoTeclar);
+    }, [onFechar]);
 
     function mostrarFeedback(tipo, mensagem) {
         setFeedback({ tipo, mensagem });
@@ -106,7 +118,7 @@ export default function ModalPerfil({ usuario, socket, onFechar, onAtualizar }) 
         }
 
         setCarregandoFoto(true);
-        setFotoArquivo(file); // guarda o arquivo de verdade — sobe pro Storage ao salvar
+        setFotoArquivo(file); // guarda o arquivo de verdade — sobe pro servidor ao salvar
 
         const reader = new FileReader();
         reader.onload = (ev) => {
@@ -133,7 +145,7 @@ export default function ModalPerfil({ usuario, socket, onFechar, onAtualizar }) 
         navigator.clipboard.writeText(usuario.uid).then(() => {
             setIdCopiado(true);
             setTimeout(() => setIdCopiado(false), 2000);
-        });
+        }).catch(() => mostrarFeedback('erro', 'Não foi possível copiar o ID.'));
     }
 
     // ----------------------------------------------------------------
@@ -213,7 +225,7 @@ export default function ModalPerfil({ usuario, socket, onFechar, onAtualizar }) 
             });
 
             setFotoArquivo(null);
-            mostrarFeedback('sucesso', 'Perfil atualizado com sucesso!');
+            mostrarFeedback('sucesso', 'Perfil atualizado.');
 
             onAtualizar?.({
                 ...usuario,
@@ -260,460 +272,173 @@ export default function ModalPerfil({ usuario, socket, onFechar, onAtualizar }) 
 
     return (
         <>
-            {/* Overlay */}
-            <div onClick={onFechar} style={estilos.overlay} />
+            <div onClick={onFechar} className="jan-veu" />
 
-            {/* Modal */}
-            <div style={estilos.modal}>
+            <div className="jan-pos">
+                <div
+                    ref={janelaRef}
+                    tabIndex={-1}
+                    className="jan pf"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="titulo-perfil"
+                >
 
-                {/* Header */}
-                <div style={estilos.header}>
-                    <h2 style={estilos.titulo}>Meu Perfil</h2>
-                    <button onClick={onFechar} style={estilos.btnFechar}>✕</button>
-                </div>
+                    <div className="jan-cab">
+                        <h2 id="titulo-perfil">Meu perfil</h2>
+                        <button type="button" onClick={onFechar} className="jan-fechar" aria-label="Fechar">
+                            <Icone nome="fechar" />
+                        </button>
+                    </div>
 
-                <div style={estilos.corpo}>
+                    <div className="pf-corpo">
 
-                    {/* Feedback */}
-                    {feedback && (
-                        <div style={{
-                            ...estilos.feedback,
-                            background: feedback.tipo === 'sucesso'
-                                ? 'var(--cor-positivo-suave)' : 'var(--cor-perigo-suave)',
-                            border: feedback.tipo === 'sucesso'
-                                ? '1px solid var(--cor-positivo)' : '1px solid var(--cor-perigo-linha)',
-                            color: feedback.tipo === 'sucesso' ? 'var(--cor-positivo-texto)' : 'var(--cor-perigo-texto)',
-                        }}>
-                            {feedback.tipo === 'sucesso' ? '✓' : '✕'} {feedback.mensagem}
-                        </div>
-                    )}
+                        {/* Foto */}
+                        <fieldset className="pf-sec">
+                            <legend>Foto</legend>
 
-                    {/* Avatar atual + botão de upload */}
-                    <div style={estilos.avatarSecao}>
-
-                        {/* Input file escondido */}
-                        <input
-                            ref={inputFotoRef}
-                            type="file"
-                            accept="image/*"
-                            onChange={handleFotoEscolhida}
-                            style={{ display: 'none' }}
-                        />
-
-                        {/* Avatar com botão de câmera sobreposto */}
-                        <div style={estilos.avatarWrapper}>
-                            <img
-                                src={avatar}
-                                alt="Avatar"
-                                style={estilos.avatarAtual}
-                                onError={e => { e.target.src = '/avata01.png'; }}
+                            <input
+                                ref={inputFotoRef}
+                                type="file"
+                                accept="image/*"
+                                onChange={handleFotoEscolhida}
+                                className="so-leitor"
+                                tabIndex={-1}
+                                aria-hidden="true"
                             />
+
+                            <div className="pf-foto-linha">
+                                <img
+                                    src={avatar}
+                                    alt="Sua foto atual"
+                                    className="pf-foto"
+                                    onError={e => { e.target.src = '/avata01.png'; }}
+                                />
+                                <div className="pf-foto-txt">
+                                    <button type="button" onClick={handleEscolherFoto} disabled={carregandoFoto} className="pf-btn">
+                                        <Icone nome="cima" />
+                                        {carregandoFoto ? 'Carregando...' : 'Enviar uma foto'}
+                                    </button>
+                                    {fotoLocal
+                                        ? <p className="ok" role="status">Foto carregada. Toque em Salvar para confirmar.</p>
+                                        : <p>Imagem de até 2 MB, ou escolha um avatar abaixo.</p>}
+                                </div>
+                            </div>
+
+                            <div className="pf-avatares" role="radiogroup" aria-label="Avatares prontos">
+                                {AVATARES.map((url, i) => (
+                                    <button
+                                        key={url}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={avatar === url && !fotoLocal}
+                                        aria-label={`Avatar ${i + 1}`}
+                                        onClick={() => { setAvatar(url); setFotoLocal(null); }}
+                                        className="pf-avatar-op"
+                                    >
+                                        <img src={url} alt="" onError={e => { e.target.style.display = 'none'; }} />
+                                    </button>
+                                ))}
+                            </div>
+                        </fieldset>
+
+                        {/* ID do jogador */}
+                        <div className="pf-id">
+                            <div className="pf-id-txt">
+                                <span>Seu ID, para receber ₿C</span>
+                                <code>{usuario?.uid || '—'}</code>
+                            </div>
                             <button
-                                onClick={handleEscolherFoto}
-                                style={estilos.btnCamera}
-                                title="Carregar foto do dispositivo"
+                                type="button"
+                                onClick={handleCopiarId}
+                                className={`pf-btn${idCopiado ? ' copiado' : ''}`}
+                                aria-label="Copiar ID"
                             >
-                                {carregandoFoto ? '⏳' : '📷'}
+                                <Icone nome={idCopiado ? 'check' : 'copiar'} />
+                                {idCopiado ? 'Copiado' : 'Copiar'}
                             </button>
                         </div>
 
-                        {/* Botão explícito de upload */}
-                        <button onClick={handleEscolherFoto} style={estilos.btnUpload}>
-                            📁 Carregar foto do dispositivo
-                        </button>
+                        {/* Dados */}
+                        <div className="pf-sec">
+                            <Campo
+                                id="pf-nome" label="Nome de usuário" valor={nome} onChange={setNome}
+                                placeholder="Seu nome no jogo" autoComplete="nickname"
+                            />
+                            <Campo
+                                id="pf-email" label="Email" valor={email} onChange={setEmail}
+                                placeholder="seu@email.com" tipo="email" autoComplete="email"
+                            />
+                            <Campo
+                                id="pf-tel" label="Telefone" valor={telefone} onChange={setTelefone}
+                                placeholder="(00) 00000-0000" tipo="tel" autoComplete="tel"
+                            />
+                        </div>
 
-                        {fotoLocal && (
-                            <p style={estilos.fotoLocalAviso}>
-                                ✓ Foto carregada — clique em Salvar para confirmar
-                            </p>
+                        {/* Temas comprados */}
+                        {temasComprados.length > 0 && (
+                            <div className="pf-sec">
+                                <h3>Temas desbloqueados</h3>
+                                <ul className="pf-temas">
+                                    {temasComprados.map(temaId => {
+                                        const ativo = usuario?.tema === temaId;
+                                        return (
+                                            <li key={temaId} className={`pf-tema${ativo ? ' ativo' : ''}`}>
+                                                {NOMES_TEMAS[temaId] || temaId}
+                                                {ativo && <span className="em-uso">em uso</span>}
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </div>
                         )}
 
-                        <p style={estilos.labelSecao}>Ou escolha um avatar</p>
-                        <div style={estilos.avatarGrid}>
-                            {AVATARES.map(url => (
-                                <div
-                                    key={url}
-                                    onClick={() => { setAvatar(url); setFotoLocal(null); }}
-                                    style={{
-                                        ...estilos.avatarOpcao,
-                                        border: avatar === url && !fotoLocal
-                                            ? '2px solid var(--cor-destaque)'
-                                            : '2px solid transparent',
-                                        boxShadow: avatar === url && !fotoLocal
-                                            ? '0 0 8px var(--cor-destaque-linha)'
-                                            : 'none',
-                                    }}
-                                >
-                                    <img src={url} alt="avatar"
-                                        style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:'8px' }}
-                                        onError={e => { e.target.style.display='none'; }}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* ID DO JOGADOR */}
-                    <div style={estilos.idCard}>
-                        <div style={estilos.idTextos}>
-                            <p style={estilos.idLabel}>🆔 Seu ID — use para receber ₿C</p>
-                            <p style={estilos.idValor}>{usuario?.uid || '—'}</p>
-                        </div>
-                        <button onClick={handleCopiarId} style={{
-                            ...estilos.btnCopiar,
-                            background: idCopiado ? 'var(--cor-positivo-suave)' : 'var(--cor-destaque-suave)',
-                            border:     idCopiado ? '1px solid var(--cor-positivo)' : '1px solid var(--cor-destaque-linha)',
-                            color:      idCopiado ? 'var(--cor-positivo-texto)' : 'var(--cor-destaque-texto)',
-                        }}>
-                            {idCopiado ? '✓ Copiado!' : '📋 Copiar'}
+                        {/* Recuperar senha */}
+                        <button type="button" onClick={handleRecuperarSenha} disabled={enviandoSenha} className="pf-link">
+                            <Icone nome="cadeado" />
+                            {enviandoSenha ? 'Enviando...' : 'Enviar link de recuperação de senha'}
                         </button>
-                    </div>
-
-                    {/* Campos de edição */}
-                    <div style={estilos.campos}>
-
-                        <Campo
-                            label="Nome de usuário"
-                            valor={nome}
-                            onChange={setNome}
-                            placeholder="Seu nome no jogo"
-                            icone="👤"
-                        />
-
-                        <Campo
-                            label="Email"
-                            valor={email}
-                            onChange={setEmail}
-                            placeholder="seu@email.com"
-                            tipo="email"
-                            icone="✉️"
-                        />
-
-                        <Campo
-                            label="Telefone"
-                            valor={telefone}
-                            onChange={setTelefone}
-                            placeholder="(00) 00000-0000"
-                            tipo="tel"
-                            icone="📱"
-                        />
 
                     </div>
 
-                    {/* TEMAS COMPRADOS */}
-                    {temasComprados.length > 0 && (
-                        <div style={estilos.temasSecao}>
-                            <p style={estilos.labelSecao}>🎨 Temas desbloqueados</p>
-                            <div style={estilos.temasGrid}>
-                                {temasComprados.map(temaId => (
-                                    <div
-                                        key={temaId}
-                                        style={{
-                                            ...estilos.temaBadge,
-                                            border: usuario?.tema === temaId
-                                                ? '1px solid var(--cor-destaque-linha)'
-                                                : '1px solid var(--cor-linha)',
-                                            background: usuario?.tema === temaId
-                                                ? 'var(--cor-destaque-suave)'
-                                                : 'var(--cor-superficie)',
-                                        }}
-                                    >
-                                        <span style={{ fontSize: '13px' }}>🎨</span>
-                                        <span style={{
-                                            fontSize:   '12px',
-                                            fontWeight: usuario?.tema === temaId ? '600' : '400',
-                                            color:      usuario?.tema === temaId ? 'var(--cor-destaque-texto)' : 'var(--cor-texto-2)',
-                                        }}>
-                                            {NOMES_TEMAS[temaId] || temaId}
-                                        </span>
-                                        {usuario?.tema === temaId && (
-                                            <span style={estilos.temaBadgeAtivo}>ativo</span>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
+                    <div className="pf-rodape">
+                        {feedback && (
+                            <p className={`jan-aviso ${feedback.tipo === 'sucesso' ? 'sucesso' : 'erro'}`} role={feedback.tipo === 'sucesso' ? 'status' : 'alert'}>
+                                <Icone nome={feedback.tipo === 'sucesso' ? 'check' : 'alerta'} />
+                                <span>{feedback.mensagem}</span>
+                            </p>
+                        )}
+                        <div className="pf-rodape-btns">
+                            <button type="button" onClick={onFechar} className="jan-btn neutro">
+                                Cancelar
+                            </button>
+                            <button type="button" onClick={handleSalvar} disabled={salvando} aria-busy={salvando} className="jan-btn principal">
+                                {salvando ? 'Salvando...' : 'Salvar alterações'}
+                            </button>
                         </div>
-                    )}
-
-                    {/* Recuperar senha */}
-                    <button
-                        onClick={handleRecuperarSenha}
-                        disabled={enviandoSenha}
-                        style={estilos.btnSenha}
-                    >
-                        {enviandoSenha ? 'Enviando...' : '🔑 Enviar link de recuperação de senha'}
-                    </button>
+                    </div>
 
                 </div>
-
-                {/* Footer */}
-                <div style={estilos.footer}>
-                    <button onClick={onFechar} style={estilos.btnCancelar}>
-                        Cancelar
-                    </button>
-                    <button
-                        onClick={handleSalvar}
-                        disabled={salvando}
-                        style={{
-                            ...estilos.btnSalvar,
-                            opacity: salvando ? 0.7 : 1,
-                        }}
-                    >
-                        {salvando ? 'Salvando...' : '✓ Salvar alterações'}
-                    </button>
-                </div>
-
             </div>
         </>
     );
 }
 
-// Campo de input reutilizável
-function Campo({ label, valor, onChange, placeholder, tipo = 'text', icone }) {
+// Campo de texto com rótulo ligado ao input
+function Campo({ id, label, valor, onChange, placeholder, tipo = 'text', autoComplete }) {
     return (
-        <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
-            <label style={estilosC.label}>
-                {icone} {label}
-            </label>
-            <input
-                type={tipo}
-                value={valor}
-                onChange={e => onChange(e.target.value)}
-                placeholder={placeholder}
-                style={estilosC.input}
-            />
+        <div className="jan-campo">
+            <label htmlFor={id}>{label}</label>
+            <div className="jan-entrada">
+                <input
+                    id={id}
+                    type={tipo}
+                    value={valor}
+                    onChange={e => onChange(e.target.value)}
+                    placeholder={placeholder}
+                    autoComplete={autoComplete}
+                />
+            </div>
         </div>
     );
 }
-
-const estilosC = {
-    label: { fontSize:'12px', color:'var(--cor-texto-2)', fontWeight:'500' },
-    input: {
-        background:   'var(--cor-superficie)',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '8px',
-        padding:      '10px 12px',
-        color:        'var(--cor-texto)',
-        fontSize:     '14px',
-        fontFamily:   'var(--fonte)',
-        outline:      'none',
-        width:        '100%',
-        boxSizing:    'border-box',
-    },
-};
-
-const estilos = {
-    overlay: {
-        position: 'fixed', inset:0,
-        background: 'var(--cor-veu)',
-        zIndex: 200, backdropFilter:'blur(4px)',
-    },
-    modal: {
-        position:      'fixed',
-        top:           '50%',
-        left:          '50%',
-        transform:     'translate(-50%, -50%)',
-        background:    'var(--cor-superficie)',
-        border:        '1px solid var(--cor-linha)',
-        borderRadius:  '16px',
-        width:         '90%',
-        maxWidth:      '480px',
-        maxHeight:     '90vh',
-        display:       'flex',
-        flexDirection: 'column',
-        zIndex:        201,
-        overflow:      'hidden',
-        fontFamily:    'var(--fonte)',
-        color:         'var(--cor-texto)',
-    },
-    header: {
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'space-between',
-        padding:        '16px 20px',
-        borderBottom:   '1px solid var(--cor-linha)',
-        flexShrink:     0,
-    },
-    titulo: { fontSize:'18px', fontWeight:'700', margin:0 },
-    btnFechar: {
-        background:'var(--cor-superficie)', border:'none',
-        borderRadius:'8px', color:'var(--cor-texto-2)',
-        fontSize:'16px', width:'32px', height:'32px',
-        cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
-    },
-    corpo: {
-        flex:1, overflowY:'auto', padding:'16px 20px',
-        display:'flex', flexDirection:'column', gap:'16px',
-    },
-    feedback: {
-        display:'flex', alignItems:'center', gap:'8px',
-        padding:'10px 14px', borderRadius:'8px',
-        fontSize:'13px', fontWeight:'500',
-    },
-    avatarSecao: {
-        display:'flex', flexDirection:'column', alignItems:'center', gap:'10px',
-    },
-
-    // Avatar com botão de câmera sobreposto
-    avatarWrapper: {
-        position: 'relative',
-        display:  'inline-block',
-    },
-    avatarAtual: {
-        width:'80px', height:'80px', borderRadius:'50%',
-        border:'3px solid var(--cor-destaque)', objectFit:'cover',
-        boxShadow:'0 0 16px var(--cor-destaque-linha)',
-        display: 'block',
-    },
-    btnCamera: {
-        position:       'absolute',
-        bottom:         '0',
-        right:          '0',
-        width:          '28px',
-        height:         '28px',
-        borderRadius:   '50%',
-        background:     'var(--cor-destaque)',
-        border:         '2px solid var(--cor-superficie)',
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        cursor:         'pointer',
-        fontSize:       '14px',
-        padding:        0,
-    },
-
-    // Botão explícito de upload
-    btnUpload: {
-        background:   'var(--cor-destaque-suave)',
-        border:       '1px solid var(--cor-destaque-linha)',
-        borderRadius: '8px',
-        color:        'var(--cor-destaque-texto)',
-        fontSize:     '12px',
-        fontWeight:   '500',
-        padding:      '7px 14px',
-        cursor:       'pointer',
-        fontFamily:   'var(--fonte)',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    fotoLocalAviso: {
-        fontSize:  '11px',
-        color:     'var(--cor-positivo-texto)',
-        margin:    0,
-    },
-
-    labelSecao: {
-        fontSize:'12px', color:'var(--cor-texto-3)',
-        margin:0, textTransform:'uppercase', letterSpacing:'0.06em',
-    },
-    avatarGrid: {
-        display:'grid', gridTemplateColumns:'repeat(5, 1fr)',
-        gap:'8px', width:'100%',
-    },
-    avatarOpcao: {
-        width:'100%', aspectRatio:'1',
-        borderRadius:'10px', overflow:'hidden',
-        cursor:'pointer', transition:'border 0.2s, box-shadow 0.2s',
-    },
-
-    // ID do jogador
-    idCard: {
-        display:      'flex',
-        alignItems:   'center',
-        gap:          '10px',
-        padding:      '12px 14px',
-        background:   'var(--cor-destaque-suave)',
-        border:       '1px solid var(--cor-destaque-suave)',
-        borderRadius: '10px',
-    },
-    idTextos: { flex: 1, minWidth: 0 },
-    idLabel: {
-        fontSize:     '11px',
-        color:        'var(--cor-texto-3)',
-        margin:       0,
-        marginBottom: '3px',
-    },
-    idValor: {
-        fontSize:   '11px',
-        color:      'var(--cor-destaque-texto)',
-        margin:     0,
-        fontFamily: 'monospace',
-        wordBreak:  'break-all',
-    },
-    btnCopiar: {
-        flexShrink:   0,
-        padding:      '7px 12px',
-        borderRadius: '8px',
-        cursor:       'pointer',
-        fontSize:     '12px',
-        fontWeight:   '600',
-        fontFamily:   'var(--fonte)',
-        transition:   'all 0.2s',
-        whiteSpace:   'nowrap',
-    },
-
-    campos: {
-        display:'flex', flexDirection:'column', gap:'12px',
-    },
-
-    // Temas comprados
-    temasSecao: {
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '8px',
-    },
-    temasGrid: {
-        display:  'flex',
-        flexWrap: 'wrap',
-        gap:      '6px',
-    },
-    temaBadge: {
-        display:      'flex',
-        alignItems:   'center',
-        gap:          '5px',
-        padding:      '5px 10px',
-        borderRadius: '20px',
-        transition:   'all 0.15s',
-    },
-    temaBadgeAtivo: {
-        fontSize:     '9px',
-        background:   'var(--cor-destaque-linha)',
-        color:        'var(--cor-destaque-texto)',
-        padding:      '1px 5px',
-        borderRadius: '4px',
-        fontWeight:   '600',
-    },
-
-    btnSenha: {
-        background:   'var(--cor-superficie)',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '8px',
-        color:        'var(--cor-texto-2)',
-        fontSize:     '13px',
-        padding:      '10px',
-        cursor:       'pointer',
-        fontFamily:   'var(--fonte)',
-        textAlign:    'left',
-        width:        '100%',
-    },
-    footer: {
-        display:'flex', gap:'10px',
-        padding:'14px 20px',
-        borderTop:'1px solid var(--cor-linha)',
-        flexShrink:0,
-    },
-    btnCancelar: {
-        flex:1, padding:'12px',
-        background:'var(--cor-superficie)',
-        border:'1px solid var(--cor-linha)',
-        borderRadius:'10px', color:'var(--cor-texto-2)',
-        fontSize:'14px', cursor:'pointer', fontFamily:'var(--fonte)',
-    },
-    btnSalvar: {
-        flex:2, padding:'12px',
-        background:'var(--cor-destaque)',
-        border:'none', borderRadius:'10px',
-        color:'var(--cor-texto-inverso)', fontSize:'14px', fontWeight:'600',
-        cursor:'pointer', fontFamily:'var(--fonte)',
-    },
-};
