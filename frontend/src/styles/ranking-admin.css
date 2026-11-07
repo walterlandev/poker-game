@@ -27,7 +27,7 @@
     padding: var(--s-3); pointer-events: none;
 }
 .jan {
-    pointer-events: auto; width: 100%; max-height: 92dvh; display: flex; flex-direction: column;
+    box-sizing: border-box; pointer-events: auto; width: 100%; max-height: 92dvh; display: flex; flex-direction: column;
     overflow: hidden; border-radius: var(--r-folha); background: var(--cor-superficie);
     border: 1px solid var(--cor-linha); box-shadow: var(--sombra-2); color: var(--cor-texto);
     font-family: var(--fonte); animation: fadeIn .15s ease;
@@ -261,7 +261,7 @@
 .adm-tab thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .adm-tab tbody tr { display: block; padding: var(--s-3) 0; border-bottom: 1px solid var(--cor-linha); }
 .adm-tab td { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-3); padding: 3px 0; }
-.adm-tab td[data-rotulo]::before { content: attr(data-rotulo); flex-shrink: 0; font-size: var(--t-12); color: var(--cor-texto-3); }
+.adm-tab td[data-rotulo]::before { content: attr(data-rotulo); flex-shrink: 0; font-size: var(--t-12); font-weight: 400; color: var(--cor-texto-3); }
 .adm-tab td.principal { display: block; padding-bottom: 6px; }
 .adm-tab td.principal::before { content: none; }
 .adm-tab .num, .adm-tab .tnum { font-variant-numeric: tabular-nums; }
@@ -359,7 +359,8 @@
 .pf-corpo { flex: 1; overflow-y: auto; padding: var(--s-4) var(--s-5) var(--s-5); display: flex; flex-direction: column; gap: var(--s-5); overscroll-behavior: contain; }
 .pf-sec { display: flex; flex-direction: column; gap: var(--s-3); margin: 0; padding: 0; border: 0; min-width: 0; }
 .pf-sec > h3, .pf-sec > legend { margin: 0; padding: 0; font-size: var(--t-14); font-weight: 700; }
-.pf-foto-linha { display: flex; align-items: center; gap: var(--s-4); }
+.pf-sec > legend { margin-bottom: var(--s-3); }
+.pf-foto-linha { padding: 4px; display: flex; align-items: center; gap: var(--s-4); }
 .pf-foto {
     width: 84px; height: 84px; flex-shrink: 0; border-radius: 50%; background: var(--cor-superficie-2);
     box-shadow: 0 0 0 2px var(--cor-superficie), 0 0 0 4px var(--cor-destaque);

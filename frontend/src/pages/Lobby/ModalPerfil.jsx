@@ -436,7 +436,10 @@ function Campo({ id, label, valor, onChange, placeholder, tipo = 'text', autoCom
                     value={valor}
                     onChange={e => onChange(e.target.value)}
                     placeholder={placeholder}
+                    name={id}
                     autoComplete={autoComplete}
+                    spellCheck={false}
+                    inputMode={tipo === 'tel' ? 'tel' : tipo === 'email' ? 'email' : undefined}
                 />
             </div>
         </div>

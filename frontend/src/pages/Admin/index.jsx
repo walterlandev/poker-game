@@ -176,7 +176,9 @@ export default function Admin({ socket }) {
                                         value={busca}
                                         onChange={e => setBusca(e.target.value)}
                                         placeholder="Buscar por nome, email ou uid"
+                                        name="busca-usuario"
                                         autoComplete="off"
+                                        spellCheck={false}
                                     />
                                 </label>
                                 <span className="adm-total" aria-live="polite">

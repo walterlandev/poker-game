@@ -86,7 +86,9 @@ export default function ModalSenha({ onConfirmar, onFechar }) {
                                 }}
                                 onKeyDown={handleKeyDown}
                                 maxLength={20}
+                                name="senha-mesa"
                                 autoComplete="off"
+                                spellCheck={false}
                                 aria-invalid={erro ? 'true' : undefined}
                                 aria-describedby={erro ? 'sn-erro' : undefined}
                             />
