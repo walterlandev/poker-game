@@ -4,3 +4,10 @@ node_modules
 dist
 .claude/settings.local.json
 
+
+# Instalador de skills (npx skills) e arquivos temporários do Claude Code
+.agents/
+skills-lock.json
+.claude/worktrees/
+.claude/E6ZQMD~Q
+.superpowers/
