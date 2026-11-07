@@ -15,6 +15,7 @@ import { depositar, sacar, bonus, confirmarTransacao, TIPOS } from './transactio
 import { blockchain }                    from './blockchain.js';
 import { criarCarteira, validarEndereco } from './wallet.js';
 import { criarPagamentoPIX, enviarPIXSaida } from './mercadopago.js';
+import { planejarEnvio }                   from '../moeda.js';
 
 
 // ================================================================
@@ -705,32 +706,18 @@ export function registrarEventosWallet(socket, io) {
                 const snapRem = await tx.get(refRem);
                 if (!snapRem.exists) return { sucesso: false, erro: 'Jogador não encontrado.' };
 
-                const remetente  = snapRem.data();
-                const saldoReal  = remetente.saldo      || 0;
-                const saldoBonus = remetente.saldoBonus || 0;
+                const remetente = snapRem.data();
 
-                if (totalDebitado > saldoReal + saldoBonus) {
-                    return { sucesso: false, erro: 'Saldo insuficiente.' };
-                }
-
-                const debitarReal  = Math.min(totalDebitado, saldoReal);
-                const debitarBonus = totalDebitado - debitarReal;
+                // Só o saldo REAL pode ser enviado (spec moeda-da-mesa, regra
+                // 6): bônus nunca sai da conta do jogador, nem como bônus.
+                const plano = planejarEnvio(remetente, totalDebitado, valor);
+                if (!plano.sucesso) return plano;
 
                 tx.update(refRem, {
-                    saldo:      admin.firestore.FieldValue.increment(-debitarReal),
-                    saldoBonus: admin.firestore.FieldValue.increment(-debitarBonus),
+                    saldo: admin.firestore.FieldValue.increment(-plano.debitarReal),
                 });
-
-                // O destinatário recebe na MESMA proporção real/bônus que o
-                // remetente pagou — sem isso, enviar ₿C que veio de saldo
-                // BÔNUS (não sacável) creditava tudo como saldo real sacável
-                // pro destinatário, "lavando" bônus através do envio (inclusive
-                // pra uma segunda conta própria).
-                const bonusParaDestino = Math.min(debitarBonus, valor);
-                const realParaDestino  = valor - bonusParaDestino;
                 tx.update(refJogador(destinatarioUid), {
-                    saldo:      admin.firestore.FieldValue.increment(realParaDestino),
-                    saldoBonus: admin.firestore.FieldValue.increment(bonusParaDestino),
+                    saldo: admin.firestore.FieldValue.increment(plano.creditarReal),
                 });
 
                 return { sucesso: true, remetenteNome: remetente.nome };

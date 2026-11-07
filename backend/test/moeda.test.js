@@ -304,6 +304,25 @@ test('regra 7: torneio bônus abandonado reembolsa em bônus; torneio real usa r
     assert.equal(tm.getTorneio(ti.torneioId).moeda, 'real');
 });
 
+// ── Regra 8: wallet:enviar só usa saldo real ────────────────────────
+test('regra 8: envio debita e credita só saldo real; sem real suficiente recusa mesmo com bônus', async () => {
+    const { planejarEnvio } = await import('../moeda.js');
+    assert.deepEqual(planejarEnvio({ saldo: 1000, saldoBonus: 5000 }, 110, 100),
+        { sucesso: true, debitarReal: 110, debitarBonus: 0, creditarReal: 100, creditarBonus: 0 });
+    assert.deepEqual(planejarEnvio({ saldo: 50, saldoBonus: 5000 }, 110, 100),
+        { sucesso: false, erro: 'Só o saldo real pode ser enviado. Seu saldo real é ₿C 50.' });
+});
+
+test('regra 8: wallet:enviar usa planejarEnvio (sem caminho que debite bônus)', async () => {
+    const fs = await import('fs');
+    const fonte = fs.readFileSync(new URL('../wallet/wallet-manager.js', import.meta.url), 'utf8');
+    const ini = fonte.indexOf("socket.on('wallet:enviar'");
+    const fim = fonte.indexOf('socket.on(', ini + 10);
+    const handler = fonte.slice(ini, fim < 0 ? undefined : fim);
+    assert.ok(handler.includes('planejarEnvio('), 'handler não usa planejarEnvio');
+    assert.ok(!/saldoBonus:\s*admin\.firestore\.FieldValue\.increment/.test(handler), 'handler ainda mexe em saldoBonus');
+});
+
 // ── Regra 5: bots só em mesa de bônus, nunca em torneio ──────────────
 test('regra 5: adicionarBot recusa mesa real e torneio, aceita mesa de bônus', async (t) => {
     t.mock.timers.enable(TIMERS);

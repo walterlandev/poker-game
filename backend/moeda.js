@@ -47,6 +47,18 @@ export function planejarCredito(fichas, moeda, origemBonus = 0) {
     return { real: f - bonus, bonus };
 }
 
+/**
+ * Envio de ₿C (wallet:enviar): só o saldo REAL sai da conta, e o
+ * destinatário recebe só em real. Bônus nunca é enviável.
+ * totalDebitado = valor + taxa; valorLiquido = o que o destinatário recebe.
+ */
+export function planejarEnvio({ saldo = 0 } = {}, totalDebitado, valorLiquido) {
+    if (saldo < totalDebitado) {
+        return { sucesso: false, erro: `Só o saldo real pode ser enviado. Seu saldo real é ₿C ${fmt(saldo)}.` };
+    }
+    return { sucesso: true, debitarReal: totalDebitado, debitarBonus: 0, creditarReal: valorLiquido, creditarBonus: 0 };
+}
+
 /** Qualquer valor diferente de 'bonus' vira 'real'. */
 export function normalizarMoeda(moeda) {
     return moeda === 'bonus' ? 'bonus' : 'real';
