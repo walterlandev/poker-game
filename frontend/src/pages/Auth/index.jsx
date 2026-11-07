@@ -60,168 +60,68 @@ export default function Auth({ onAutenticado, socket, usuarioSemPin = null }) {
 
 
     return (
-        <div style={estilos.pagina}>
+        <div className="auth">
 
-            {/* ---- Logo do app ---- */}
-            <div style={estilos.logo}>
-                <span style={estilos.logoEmoji}>🃏</span>
-                <h1 style={estilos.logoTitulo}>Poker Game</h1>
-                <p style={estilos.logoSubtitulo}>Powered by ₿C Bitchager</p>
-            </div>
-
-            {/* ---- Indicador de etapa (apenas no cadastro com PIN) ---- */}
-            {tela === 'criarPin' && (
-                <div style={estilos.etapas}>
-                    <Etapa numero={1} label="Conta"  concluida />
-                    <div style={estilos.etapaLinha} />
-                    <Etapa numero={2} label="PIN"    ativa />
-                    <div style={estilos.etapaLinha} />
-                    <Etapa numero={3} label="Jogar"  />
+            {/* ---- Marca (painel de feltro no desktop, faixa no celular) ---- */}
+            <aside className="auth-marca" aria-label="Bitchager">
+                <div className="marca" translate="no">
+                    <span className="marca-selo num" aria-hidden="true">₿C</span>
+                    <span className="marca-nome">Bitchager</span>
                 </div>
-            )}
+                <p className="auth-lema">Texas Hold’em com ₿C, de mesa em mesa.</p>
+                <div className="auth-mesa" aria-hidden="true"><span /></div>
+            </aside>
 
-            {/* ---- Conteúdo ---- */}
-            <div style={estilos.card}>
-                {tela === 'login' && (
-                    <Login
-                        onAutenticado={onAutenticado}
-                        onIrParaCadastro={() => setTela('cadastro')}
-                    />
-                )}
+            <main className="auth-conteudo">
 
-                {tela === 'cadastro' && (
-                    <Cadastro
-                        onAutenticado={handleCadastrado}
-                        onLoginExistente={onAutenticado}
-                        onIrParaLogin={() => setTela('login')}
-                    />
-                )}
-
+                {/* Etapas do cadastro (só na criação do PIN) */}
                 {tela === 'criarPin' && (
-                    <CriarPin
-                        usuario={usuarioPendente}
-                        socket={socket}
-                        onConcluido={handlePinCriado}
-                    />
+                    <ol className="auth-etapas" aria-label="Etapas do cadastro">
+                        <Etapa numero={1} label="Conta" concluida />
+                        <Etapa numero={2} label="PIN"   ativa />
+                        <Etapa numero={3} label="Jogar" />
+                    </ol>
                 )}
-            </div>
 
-            {/* ---- Rodapé ---- */}
-            <p style={estilos.rodape}>
-                Ao continuar você concorda com os{' '}
-                <span style={estilos.link}>Termos de Uso</span>
-            </p>
+                <div className="auth-cartao">
+                    {tela === 'login' && (
+                        <Login
+                            onAutenticado={onAutenticado}
+                            onIrParaCadastro={() => setTela('cadastro')}
+                        />
+                    )}
 
+                    {tela === 'cadastro' && (
+                        <Cadastro
+                            onAutenticado={handleCadastrado}
+                            onLoginExistente={onAutenticado}
+                            onIrParaLogin={() => setTela('login')}
+                        />
+                    )}
+
+                    {tela === 'criarPin' && (
+                        <CriarPin
+                            usuario={usuarioPendente}
+                            socket={socket}
+                            onConcluido={handlePinCriado}
+                        />
+                    )}
+                </div>
+
+                <p className="auth-rodape">
+                    Ao continuar você concorda com os <span className="auth-link-fraco">Termos de Uso</span>.
+                </p>
+            </main>
         </div>
     );
 }
 
-
-// ================================================================
-// SUBCOMPONENTE: Indicador de etapa do cadastro
-// ================================================================
 
 function Etapa({ numero, label, concluida, ativa }) {
-    const cor = concluida ? 'var(--cor-positivo-texto)' : ativa ? 'var(--cor-destaque)' : 'var(--cor-linha-forte)';
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-            <div style={{
-                width:          '28px',
-                height:         '28px',
-                borderRadius:   '50%',
-                background:     cor,
-                display:        'flex',
-                alignItems:     'center',
-                justifyContent: 'center',
-                fontSize:       '12px',
-                fontWeight:     '700',
-                color:          '#fff',
-            }}>
-                {concluida ? '✓' : numero}
-            </div>
-            <span style={{ fontSize: '10px', color: ativa ? 'var(--cor-destaque-texto)' : 'var(--cor-texto-3)' }}>
-                {label}
-            </span>
-        </div>
+        <li className={`auth-etapa${concluida ? ' feita' : ''}${ativa ? ' ativa' : ''}`} aria-current={ativa ? 'step' : undefined}>
+            <span className="n num" aria-hidden="true">{concluida ? '✓' : numero}</span>
+            <span className="r">{label}</span>
+        </li>
     );
 }
-
-
-// ================================================================
-// ESTILOS
-// ================================================================
-
-const estilos = {
-
-    pagina: {
-        minHeight:      '100vh',
-        background:     'var(--cor-fundo)',
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'center',
-        justifyContent: 'center',
-        padding:        '20px 16px',
-        fontFamily:     'var(--fonte)',
-        gap:            '20px',
-    },
-
-    logo: {
-        display:       'flex',
-        flexDirection: 'column',
-        alignItems:    'center',
-        gap:           '6px',
-    },
-
-    logoEmoji: {
-        fontSize:   '56px',
-        lineHeight: 1,
-    },
-
-    logoTitulo: {
-        fontSize:      '28px',
-        fontWeight:    '800',
-        color:         'var(--cor-texto)',
-        margin:        0,
-        letterSpacing: '-0.02em',
-    },
-
-    logoSubtitulo: {
-        fontSize:   '12px',
-        color:      'var(--cor-destaque-texto)',
-        margin:     0,
-        fontWeight: '500',
-    },
-
-    // Indicador de etapas do cadastro
-    etapas: {
-        display:    'flex',
-        alignItems: 'center',
-        gap:        '8px',
-    },
-
-    etapaLinha: {
-        width:      '40px',
-        height:     '1px',
-        background: 'var(--cor-linha)',
-    },
-
-    card: {
-        width:        '100%',
-        maxWidth:     '400px',
-        background:   'var(--cor-superficie)',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '16px',
-        overflow:     'hidden',
-    },
-
-    rodape: {
-        fontSize:  '11px',
-        color:     'var(--cor-texto-3)',
-        textAlign: 'center',
-    },
-
-    link: {
-        color:  'var(--cor-destaque)',
-        cursor: 'pointer',
-    },
-};

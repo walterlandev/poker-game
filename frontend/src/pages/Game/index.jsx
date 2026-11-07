@@ -151,8 +151,7 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
     const minhasParse  = minhasCartas.map(parsearCarta);
     const temaMinhas   = euSou?.tema || usuario?.tema || 'classico';
     const mostrarMao   = jogoAtivo && euSou;
-    const treino       = mesa?.treino === true;   // fichas sem valor: sem ₿C
-    const moeda        = (n) => (treino ? fmt(n) : `₿C ${fmt(n)}`);
+    const moeda        = (n) => `₿C ${fmt(n)}`;
 
     // Sair no meio de uma mão em que você ainda está jogando pede confirmação;
     // fora disso (entre mãos, já desistiu, sem cartas) sai direto.
@@ -237,7 +236,7 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
                             <div className="linha">
                                 {temSaldoParaRebuy && (
                                     <button type="button" onClick={() => handleRebuy(buyInMesa)} className="btn btn-principal" disabled={recomprando} aria-busy={recomprando || undefined}>
-                                        {treino ? `Recomprar ${fmt(buyInMesa)} fichas` : `Comprar ₿C ${buyInMesa.toLocaleString('pt-BR')}`}
+                                        {`Comprar ₿C ${buyInMesa.toLocaleString('pt-BR')}${(mesa?.moeda ?? 'real') === 'bonus' ? ' de bônus' : ''}`}
                                     </button>
                                 )}
                                 <button type="button" onClick={handleSair} className="btn btn-neutro">
@@ -288,7 +287,6 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
                             pote={mesa.pote || 0}
                             expiraEm={mesa.turnoExpiraEm || null}
                             nomeDaVez={nomeDaVez}
-                            treino={treino}
                             onAcao={handleAcao}
                         />
                     )}
@@ -303,7 +301,7 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
 
                     {/* SHOWDOWN */}
                     {mesa.fase === 'SHOWDOWN' && mesa.resultadoMao && (
-                        <ResultadoRodada resultado={mesa.resultadoMao} meuUid={meuUid} treino={treino} />
+                        <ResultadoRodada resultado={mesa.resultadoMao} meuUid={meuUid} />
                     )}
                 </section>
             </div>
@@ -312,7 +310,7 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
             <div aria-live="polite">
                 {notificacao && <div className="jogo-aviso">{notificacao}</div>}
             </div>
-            {notifGanho && <NotifResultado notif={notifGanho} treino={treino} />}
+            {notifGanho && <NotifResultado notif={notifGanho} />}
 
             {confirmarSaida && (
                 <ConfirmarSaida
@@ -327,7 +325,7 @@ export default function Game({ socket, usuario, mesaId, onSair }) {
 function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
 
 // ── Painel de resultado da rodada (dentro do painel inferior) ──────
-function ResultadoRodada({ resultado, meuUid, treino = false }) {
+function ResultadoRodada({ resultado, meuUid }) {
     const isWin = resultado.vencedores.some(v => v.uid === meuUid);
     return (
         <div className="resultado">
@@ -338,7 +336,7 @@ function ResultadoRodada({ resultado, meuUid, treino = false }) {
                 <div key={v.uid} className={`resultado-linha${v.uid === meuUid ? ' eu' : ''}`}>
                     <span className="nm">{v.uid === meuUid ? 'Você' : v.nome}</span>
                     {v.mao && <span className="mao">{v.mao}</span>}
-                    <span className="premio num">+{treino ? fmt(v.premio) : `₿C ${fmt(v.premio)}`}</span>
+                    <span className="premio num">+₿C {fmt(v.premio)}</span>
                 </div>
             ))}
             {resultado.tipo === 'wo' && (
@@ -349,7 +347,7 @@ function ResultadoRodada({ resultado, meuUid, treino = false }) {
 }
 
 // ── Notificação flutuante de vitória/derrota ───────────────────────
-function NotifResultado({ notif, treino = false }) {
+function NotifResultado({ notif }) {
     const isWin  = notif.tipo === 'ganho';
     const res    = notif.resultado;
     const meuUid = notif.meuUid;
@@ -359,7 +357,7 @@ function NotifResultado({ notif, treino = false }) {
         <div className={`jogo-resultado${isWin ? ' ganho' : ''}`} role="status">
             <div className="titulo">{isWin ? 'Você ganhou' : 'Não foi desta vez'}</div>
             {minha?.mao && <div className="mao">{minha.mao}</div>}
-            {minha?.premio > 0 && <div className="premio num">+{treino ? `${fmt(minha.premio)} fichas` : `₿C ${fmt(minha.premio)}`}</div>}
+            {minha?.premio > 0 && <div className="premio num">+₿C {fmt(minha.premio)}</div>}
             {!isWin && res?.vencedores?.[0] && (
                 <div className="quem">
                     {res.vencedores[0].nome}

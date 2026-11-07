@@ -1,37 +1,25 @@
 /* ================================================================
    ARQUIVO: frontend/src/pages/Lobby/ModalCriarMesa.jsx
 
-   CONCEITO GERAL:
-   Modal com formulário para criar uma nova mesa de poker.
-   O jogador configura:
-     → Nome da mesa
-     → Buy-in (quanto cada jogador paga para entrar)
-     → Small Blind (aposta mínima)
+   Modal para criar uma mesa. O jogador escolhe:
+     → Moeda da mesa: Real (padrão) ou Bônus. O buy-in sai do saldo
+       daquela moeda e o que voltar ao sair volta nela também.
+     → Nome, buy-in, small blind
+     → Bots (0 a 5) — só em mesa de Bônus
      → Senha (opcional — torna a mesa privada)
-     → Quantidade de bots (0 a 5)
 
-   CUSTO DE CRIAR MESA:
-   Criar uma mesa custa ₿C (Bitchager). O valor é o próprio buy-in.
-   Esse saldo é debitado da carteira do jogador ao criar.
-   Se o jogador não tiver saldo suficiente, o botão fica bloqueado.
-
-   MUDANÇAS DESTA VERSÃO:
-     → Integração do Saldo Bônus: Agora o sistema soma usuario.saldo + usuario.bonus
-       para permitir a criação da mesa.
+   O saldo mostrado e a trava do botão são só visuais: o servidor é
+   quem confere o saldo na moeda escolhida e decide.
 
    PROPS:
-     usuario      → { uid, nome, saldo, bonus, rankPontos }
+     usuario      → { uid, nome, saldo, saldoBonus, rankPontos }
      socket       → instância do Socket.io
      onMesaCriada → function(mesaId): chamada após criar com sucesso
      onFechar     → function(): fecha o modal
 ================================================================ */
 
-import { useState } from 'react';
-
-
-// ================================================================
-// BLOCO 1: CONFIGURAÇÕES PADRÃO E LIMITES
-// ================================================================
+import { useState, useEffect } from 'react';
+import Icone from '../../components/Icone';
 
 const CONFIG_PADRAO = {
     nome:       '',
@@ -39,6 +27,7 @@ const CONFIG_PADRAO = {
     smallBlind: 10,
     senha:      '',
     qtdBots:    2,
+    moeda:      'real',
 };
 
 const LIMITES = {
@@ -47,103 +36,78 @@ const LIMITES = {
     qtdBots:    { min: 0,    max: 5      },
 };
 
-// Opções de buy-in rápido para o jogador escolher
 const OPCOES_BUYIN = [100, 500, 1000, 5000, 10000];
-
-// Opções de small blind rápido
 const OPCOES_BLIND = [5, 10, 25, 50, 100];
 
-// Formata número com separador de milhar
+const NOME_MOEDA = { real: 'saldo real', bonus: 'bônus' };
+
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
-
-
-// ================================================================
-// BLOCO 2: COMPONENTE PRINCIPAL
-// ================================================================
 
 export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar }) {
 
     const saldoReal  = usuario?.saldo      || 0;
     const saldoBonus = usuario?.saldoBonus || 0;
-    const saldoTotal = saldoReal + saldoBonus;
-    // ---------------------------------------------------------
 
-    // Estado do formulário — começa com os valores padrão
-    const [form, setForm] = useState(CONFIG_PADRAO);
-
-    // Estado de envio — evita duplo clique
-    const [enviando, setEnviando] = useState(false);
-
-    // Erros de validação por campo
-    const [erros, setErros] = useState({});
-
-    // Mostra ou esconde o campo de senha
+    const [form,        setForm       ] = useState(CONFIG_PADRAO);
+    const [enviando,    setEnviando   ] = useState(false);
+    const [erros,       setErros      ] = useState({});
     const [mesaPrivada, setMesaPrivada] = useState(false);
 
+    const ehBonus    = form.moeda === 'bonus';
+    const saldoMoeda = ehBonus ? saldoBonus : saldoReal;
+    // Bots só jogam em mesa de bônus
+    const qtdBots    = ehBonus ? form.qtdBots : 0;
 
-    // ----------------------------------------------------------------
-    // Atualiza um campo do formulário
-    // Recebe o nome do campo e o novo valor
-    // ----------------------------------------------------------------
     function atualizar(campo, valor) {
         setForm(f => ({ ...f, [campo]: valor }));
-        // Remove o erro do campo ao editar
-        if (erros[campo]) {
-            setErros(e => ({ ...e, [campo]: null }));
-        }
+        if (erros[campo] || erros.geral) setErros(e => ({ ...e, [campo]: null, geral: null }));
     }
 
+    // Esc fecha
+    useEffect(() => {
+        const onKey = (e) => { if (e.key === 'Escape' && !enviando) onFechar?.(); };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [onFechar, enviando]);
 
     // ----------------------------------------------------------------
-    // VALIDAÇÃO
-    // Retorna true se válido, false se inválido (e preenche erros)
+    // VALIDAÇÃO (só para orientar; o servidor valida de novo)
     // ----------------------------------------------------------------
     function validar() {
         const novosErros = {};
 
         if (!form.nome.trim() || form.nome.trim().length < 3) {
-            novosErros.nome = 'Nome deve ter pelo menos 3 caracteres.';
+            novosErros.nome = 'O nome precisa de pelo menos 3 caracteres.';
         }
-
         if (form.buyIn < LIMITES.buyIn.min) {
             novosErros.buyIn = `Buy-in mínimo: ₿C ${fmt(LIMITES.buyIn.min)}`;
         }
-
         if (form.buyIn > LIMITES.buyIn.max) {
             novosErros.buyIn = `Buy-in máximo: ₿C ${fmt(LIMITES.buyIn.max)}`;
         }
-
         if (form.smallBlind < LIMITES.smallBlind.min) {
             novosErros.smallBlind = `Small blind mínimo: ₿C ${LIMITES.smallBlind.min}`;
         }
-
         // Big blind não pode ser maior que 10% do buy-in
         const bigBlind = form.smallBlind * 2;
         if (bigBlind > form.buyIn * 0.1) {
-            novosErros.smallBlind = `Blind muito alto para este buy-in. Máximo: ₿C ${Math.floor(form.buyIn * 0.05)}`;
+            novosErros.smallBlind = `Blind alto demais para este buy-in. Máximo: ₿C ${Math.floor(form.buyIn * 0.05)}`;
         }
-
-        // Usa o saldoTotal para validar. Mesa com bots é mesa de TREINO
-        // (fichas de jogo, sem débito de ₿C — quem decide é o servidor),
-        // então o saldo da carteira não limita.
-        if (form.qtdBots === 0 && saldoTotal < form.buyIn) {
-            novosErros.buyIn = `Saldo insuficiente. Você tem ₿C ${fmt(saldoTotal)}`;
+        if (saldoMoeda < form.buyIn) {
+            novosErros.buyIn = `Você tem ₿C ${fmt(saldoMoeda)} de ${NOME_MOEDA[form.moeda]}, menos que o buy-in.`;
         }
-
         if (mesaPrivada && form.senha.length > 0 && form.senha.length < 4) {
-            novosErros.senha = 'Senha deve ter pelo menos 4 caracteres.';
+            novosErros.senha = 'A senha precisa de pelo menos 4 caracteres.';
         }
 
         setErros(novosErros);
-        // Retorna true se não houver erros
         return Object.keys(novosErros).length === 0;
     }
 
-
     // ----------------------------------------------------------------
-    // ENVIO DO FORMULÁRIO
+    // ENVIO
     // ----------------------------------------------------------------
     async function handleCriar() {
         if (!validar()) return;
@@ -151,37 +115,30 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
 
         setEnviando(true);
 
-        // Monta o objeto de configuração da mesa
         const config = {
             nome:       form.nome.trim(),
             buyIn:      form.buyIn,
             smallBlind: form.smallBlind,
             senha:      mesaPrivada ? form.senha : '',
-            qtdBots:    form.qtdBots,
+            qtdBots,
+            moeda:      form.moeda,
             rankPontos: usuario?.rankPontos || 0,
         };
 
-        // Emite o evento para o servidor via Socket.io
         socket.emit('criar_mesa', config);
 
-        // Handlers nomeados pra poder dar socket.off explicitamente — com
-        // socket.once "solto" (sem cleanup no timeout), se o servidor
-        // respondesse depois dos 10s, ou se o usuário tentasse de novo
-        // após o timeout, os listeners se acumulavam: uma resposta atrasada
-        // de uma tentativa já "desistida" podia chamar onMesaCriada com um
-        // mesaId inesperado, ou (pior) duas tentativas processadas pelo
-        // servidor criavam duas mesas com dois débitos de buy-in.
+        // Handlers nomeados pra poder dar socket.off explicitamente — sem
+        // isso, respostas atrasadas de uma tentativa "desistida" podiam
+        // acumular listeners e criar duas mesas com dois débitos.
         function cleanup() {
             socket.off('mesa_criada', onMesaCriadaHandler);
             socket.off('erro',        onErroHandler);
         }
-
         function onMesaCriadaHandler({ mesaId }) {
             cleanup();
             setEnviando(false);
             onMesaCriada(mesaId);
         }
-
         function onErroHandler({ mensagem }) {
             cleanup();
             setEnviando(false);
@@ -191,561 +148,213 @@ export default function ModalCriarMesa({ usuario, socket, onMesaCriada, onFechar
         socket.once('mesa_criada', onMesaCriadaHandler);
         socket.once('erro',        onErroHandler);
 
-        // Timeout de segurança: se o servidor não responder em 10s.
-        // Usa a forma funcional de setEnviando pra checar o valor ATUAL
-        // (não o `enviando` capturado no closure, que sempre seria o
-        // valor de antes do submit — por isso esse timeout nunca disparava).
+        // Timeout de segurança de 10 s (forma funcional para ler o valor atual)
         setTimeout(() => {
             setEnviando(atual => {
                 if (!atual) return atual;
                 cleanup();
-                setErros({ geral: 'Tempo esgotado. Tente novamente.' });
+                setErros({ geral: 'O servidor não respondeu. Tente de novo.' });
                 return false;
             });
         }, 10000);
     }
 
-
-    // ================================================================
-    // RENDERIZAÇÃO
-    // ================================================================
-    // Mesa com bots = treino (sem débito de ₿C, decidido pelo servidor)
-    const semSaldo = form.qtdBots === 0 && saldoTotal < form.buyIn;
+    const semSaldo = saldoMoeda < form.buyIn;
 
     return (
         <>
-            {/* Overlay escuro atrás do modal */}
-            <div onClick={onFechar} style={estilos.overlay} />
+            <div className="modal-veu" onClick={() => !enviando && onFechar()} />
 
-            {/* Container do modal */}
-            <div style={estilos.modal}>
-
-                {/* ---- Cabeçalho ---- */}
-                <div style={estilos.cabecalho}>
-                    <div>
-                        <h2 style={estilos.titulo}>Criar Mesa</h2>
-                        <p style={estilos.subtitulo}>
-                            {form.qtdBots > 0
-                                ? 'Mesa de treino: fichas de jogo, sem custo e sem prêmio em ₿C'
-                                : <>Custo: <span style={{ color: 'var(--cor-destaque-texto)' }}>₿C {fmt(form.buyIn)}</span> (buy-in)</>}
-                        </p>
+            <div className="modal modal-largo" role="dialog" aria-modal="true" aria-labelledby="cm-titulo">
+                <div className="modal-cab">
+                    <div className="esq">
+                        <h2 id="cm-titulo">Criar mesa</h2>
                     </div>
-                    <button onClick={onFechar} style={estilos.btnFechar} aria-label="Fechar">
-                        ✕
+                    <button type="button" onClick={onFechar} className="modal-icone-btn" aria-label="Fechar" disabled={enviando}>
+                        <Icone nome="fechar" />
                     </button>
                 </div>
 
-                {/* ---- Corpo com scroll ---- */}
-                <div style={estilos.corpo}>
+                <div className="modal-corpo cm">
 
-                    {/* Erro geral do servidor */}
-                    {erros.geral && (
-                        <div style={estilos.erroGeral}>{erros.geral}</div>
-                    )}
+                    {/* ---- Moeda da mesa ---- */}
+                    <fieldset className="cm-grupo">
+                        <legend className="cart-campo-rot">Moeda da mesa</legend>
+                        <div className="cm-moedas" role="radiogroup" aria-label="Moeda da mesa">
+                            <BotaoMoeda
+                                ativo={!ehBonus}
+                                titulo="Real"
+                                sub="Usa o saldo real e devolve em real"
+                                saldo={saldoReal}
+                                onClick={() => atualizar('moeda', 'real')}
+                            />
+                            <BotaoMoeda
+                                ativo={ehBonus}
+                                titulo="Bônus"
+                                sub="Usa o bônus; dá para jogar com bots"
+                                saldo={saldoBonus}
+                                onClick={() => atualizar('moeda', 'bonus')}
+                            />
+                        </div>
+                    </fieldset>
 
-                    {/* Campo: Nome da mesa */}
-                    <Campo label="Nome da mesa" erro={erros.nome}>
+                    {/* ---- Nome ---- */}
+                    <label className="cart-campo-rot" htmlFor="cm-nome">Nome da mesa</label>
+                    <div className={`cart-campo${erros.nome ? ' com-erro' : ''}`}>
                         <input
+                            id="cm-nome"
                             type="text"
-                            placeholder="Ex: Mesa do Walterlan"
+                            placeholder="Ex.: Sexta sem limite…"
                             value={form.nome}
                             onChange={e => atualizar('nome', e.target.value)}
                             maxLength={30}
-                            style={{
-                                ...estilos.input,
-                                borderColor: erros.nome
-                                    ? 'var(--cor-perigo-linha)'
-                                    : 'var(--cor-linha)',
-                            }}
+                            autoComplete="off"
+                            aria-invalid={!!erros.nome}
                         />
-                    </Campo>
+                    </div>
+                    {erros.nome && <p className="cart-erro" role="alert">{erros.nome}</p>}
 
-                    {/* Campo: Buy-in com botões rápidos */}
-                    <Campo label={form.qtdBots > 0 ? 'Fichas iniciais (treino)' : 'Buy-in (₿C)'} erro={erros.buyIn}>
-                        <div style={estilos.botoesRapidos}>
-                            {OPCOES_BUYIN.map(v => (
-                                <button
-                                    key={v}
-                                    onClick={() => atualizar('buyIn', v)}
-                                    style={{
-                                        ...estilos.btnOpcao,
-                                        background: form.buyIn === v
-                                            ? 'var(--cor-destaque-linha)'
-                                            : 'var(--cor-superficie)',
-                                        border: form.buyIn === v
-                                            ? '1px solid var(--cor-destaque-linha)'
-                                            : '1px solid var(--cor-linha)',
-                                        color: form.buyIn === v ? 'var(--cor-destaque-texto)' : 'var(--cor-texto-2)',
-                                    }}
-                                >
-                                    {fmt(v)}
-                                </button>
-                            ))}
-                        </div>
+                    {/* ---- Buy-in ---- */}
+                    <label className="cart-campo-rot" htmlFor="cm-buyin">Buy-in em ₿C de {NOME_MOEDA[form.moeda]}</label>
+                    <div className="cart-atalhos">
+                        {OPCOES_BUYIN.map(v => (
+                            <button key={v} type="button" className="cart-chip num" aria-pressed={form.buyIn === v} onClick={() => atualizar('buyIn', v)}>
+                                ₿C {fmt(v)}
+                            </button>
+                        ))}
+                    </div>
+                    <div className={`cart-campo${erros.buyIn ? ' com-erro' : ''}`}>
+                        <span className="cart-campo-pre">₿C</span>
                         <input
+                            id="cm-buyin"
                             type="number"
+                            inputMode="numeric"
                             value={form.buyIn}
                             onChange={e => atualizar('buyIn', parseInt(e.target.value) || 0)}
                             min={LIMITES.buyIn.min}
                             max={LIMITES.buyIn.max}
-                            style={{
-                                ...estilos.input,
-                                marginTop: '8px',
-                                borderColor: erros.buyIn
-                                    ? 'var(--cor-perigo-linha)'
-                                    : 'var(--cor-linha)',
-                            }}
+                            aria-invalid={!!erros.buyIn}
                         />
-                    </Campo>
+                    </div>
+                    {erros.buyIn && <p className="cart-erro" role="alert">{erros.buyIn}</p>}
 
-                    {/* Campo: Small Blind com botões rápidos */}
-                    <Campo
-                        label={`Small Blind (₿C) — Big Blind: ₿C ${fmt(form.smallBlind * 2)}`}
-                        erro={erros.smallBlind}
-                    >
-                        <div style={estilos.botoesRapidos}>
-                            {OPCOES_BLIND.map(v => (
-                                <button
-                                    key={v}
-                                    onClick={() => atualizar('smallBlind', v)}
-                                    style={{
-                                        ...estilos.btnOpcao,
-                                        background: form.smallBlind === v
-                                            ? 'var(--cor-positivo-suave)'
-                                            : 'var(--cor-superficie)',
-                                        border: form.smallBlind === v
-                                            ? '1px solid var(--cor-positivo)'
-                                            : '1px solid var(--cor-linha)',
-                                        color: form.smallBlind === v ? 'var(--cor-positivo-texto)' : 'var(--cor-texto-2)',
-                                    }}
-                                >
-                                    {v}
-                                </button>
-                            ))}
-                        </div>
-                    </Campo>
+                    {/* ---- Small blind ---- */}
+                    <label className="cart-campo-rot" htmlFor="cm-blind">
+                        Small blind <span className="cm-dica num">big blind ₿C {fmt(form.smallBlind * 2)}</span>
+                    </label>
+                    <div className="cart-atalhos">
+                        {OPCOES_BLIND.map(v => (
+                            <button key={v} type="button" className="cart-chip num" aria-pressed={form.smallBlind === v} onClick={() => atualizar('smallBlind', v)}>
+                                ₿C {v}
+                            </button>
+                        ))}
+                    </div>
+                    {erros.smallBlind && <p className="cart-erro" role="alert">{erros.smallBlind}</p>}
 
-                    {/* Campo: Quantidade de bots */}
-                    <Campo label={`Bots na mesa: ${form.qtdBots === 0 ? 'Nenhum' : form.qtdBots}`}>
-                        <div style={estilos.sliderContainer}>
-                            <span style={estilos.sliderLabel}>0</span>
-                            <input
-                                type="range"
-                                min={LIMITES.qtdBots.min}
-                                max={LIMITES.qtdBots.max}
-                                value={form.qtdBots}
-                                onChange={e => atualizar('qtdBots', parseInt(e.target.value))}
-                                style={estilos.slider}
-                            />
-                            <span style={estilos.sliderLabel}>5</span>
-                        </div>
-                        {form.qtdBots > 0 && (
-                            <div className="aviso-treino" role="note">
-                                <b>Mesa de treino</b>
-                                <span>Com bots, as fichas são só de jogo: sem custo e sem prêmio em ₿C. Bots do seu nível são sorteados automaticamente.</span>
+                    {/* ---- Bots (só bônus) ---- */}
+                    {ehBonus ? (
+                        <div className="cm-grupo">
+                            <label className="cart-campo-rot" htmlFor="cm-bots">
+                                Bots na mesa <span className="cm-dica num">{form.qtdBots === 0 ? 'nenhum' : form.qtdBots}</span>
+                            </label>
+                            <div className="cm-slider">
+                                <span className="num">0</span>
+                                <input
+                                    id="cm-bots"
+                                    type="range"
+                                    min={LIMITES.qtdBots.min}
+                                    max={LIMITES.qtdBots.max}
+                                    value={form.qtdBots}
+                                    onChange={e => atualizar('qtdBots', parseInt(e.target.value))}
+                                />
+                                <span className="num">5</span>
                             </div>
-                        )}
-                    </Campo>
-
-                    {/* Toggle: Mesa privada */}
-                    <div style={estilos.toggleContainer}>
-                        <div>
-                            <p style={estilos.toggleLabel}>Mesa privada</p>
-                            <p style={estilos.toggleDesc}>
-                                Apenas jogadores com senha podem entrar
-                            </p>
+                            {form.qtdBots > 0 && <p className="cart-nota">Bots do seu nível são sorteados automaticamente.</p>}
                         </div>
+                    ) : (
+                        <p className="cart-nota cm-aviso-bots">
+                            <Icone nome="robo" tamanho={16} />
+                            Bots só jogam em mesa de bônus.
+                        </p>
+                    )}
+
+                    {/* ---- Mesa privada ---- */}
+                    <div className="config-item estatico cm-privada">
+                        <Icone nome="cadeado" />
+                        <span className="txt">
+                            <b>Mesa privada</b>
+                            <span>Só entra quem souber a senha</span>
+                        </span>
                         <button
-                            onClick={() => setMesaPrivada(p => !p)}
-                            style={{
-                                ...estilos.toggle,
-                                background: mesaPrivada ? 'var(--cor-destaque)' : 'var(--cor-linha)',
-                            }}
+                            type="button"
                             role="switch"
                             aria-checked={mesaPrivada}
+                            aria-label="Mesa privada"
+                            onClick={() => setMesaPrivada(p => !p)}
+                            className={`interruptor${mesaPrivada ? ' ligado' : ''}`}
                         >
-                            <div style={{
-                                ...estilos.toggleBolinha,
-                                transform: mesaPrivada ? 'translateX(20px)' : 'translateX(0)',
-                            }} />
+                            <span />
                         </button>
                     </div>
-
-                    {/* Campo: Senha (aparece só se mesa privada) */}
                     {mesaPrivada && (
-                        <Campo label="Senha da mesa" erro={erros.senha}>
-                            <input
-                                type="text"
-                                placeholder="Mínimo 4 caracteres"
-                                value={form.senha}
-                                onChange={e => atualizar('senha', e.target.value)}
-                                maxLength={20}
-                                style={{
-                                    ...estilos.input,
-                                    borderColor: erros.senha
-                                        ? 'var(--cor-perigo-linha)'
-                                        : 'var(--cor-linha)',
-                                }}
-                            />
-                        </Campo>
+                        <>
+                            <label className="cart-campo-rot" htmlFor="cm-senha">Senha da mesa</label>
+                            <div className={`cart-campo${erros.senha ? ' com-erro' : ''}`}>
+                                <input
+                                    id="cm-senha"
+                                    type="text"
+                                    placeholder="Mínimo 4 caracteres…"
+                                    value={form.senha}
+                                    onChange={e => atualizar('senha', e.target.value)}
+                                    maxLength={20}
+                                    autoComplete="off"
+                                    spellCheck={false}
+                                    aria-invalid={!!erros.senha}
+                                />
+                            </div>
+                            {erros.senha && <p className="cart-erro" role="alert">{erros.senha}</p>}
+                        </>
                     )}
 
-                    {/* Resumo do custo (mesa de treino não custa ₿C) */}
-                    {form.qtdBots === 0 && (
-                    <div style={estilos.resumoCusto}>
-                        <div style={estilos.resumoLinha}>
-                            <span style={estilos.resumoLabel}>Seu saldo Total</span>
-                            <span style={estilos.resumoValor}>
-                                ₿C {fmt(saldoTotal)}
-                            </span>
+                    {/* ---- Resumo na moeda escolhida ---- */}
+                    <dl className="cart-resumo">
+                        <div className="cart-resumo-linha"><dt>Seu {NOME_MOEDA[form.moeda]}</dt><dd className="num">₿C {fmt(saldoMoeda)}</dd></div>
+                        <div className="cart-resumo-linha"><dt>Buy-in</dt><dd className="num">− ₿C {fmt(form.buyIn)}</dd></div>
+                        <div className={`cart-resumo-linha destaque${semSaldo ? ' perigo' : ''}`}>
+                            <dt>Fica depois de criar</dt>
+                            <dd className="num">₿C {fmt(Math.max(0, saldoMoeda - form.buyIn))}</dd>
                         </div>
-                        <div style={estilos.resumoLinha}>
-                            <span style={estilos.resumoLabel}>Custo (buy-in)</span>
-                            <span style={{ ...estilos.resumoValor, color: 'var(--cor-perigo-texto)' }}>
-                                − ₿C {fmt(form.buyIn)}
-                            </span>
-                        </div>
-                        <div style={estilos.separador} />
-                        <div style={estilos.resumoLinha}>
-                            <span style={{ ...estilos.resumoLabel, fontWeight: '600', color: 'var(--cor-texto)' }}>
-                                Saldo após criar
-                            </span>
-                            <span style={{
-                                ...estilos.resumoValor,
-                                color: (saldoTotal - form.buyIn) < 0 ? 'var(--cor-perigo-texto)' : 'var(--cor-positivo-texto)',
-                                fontWeight: '700',
-                            }}>
-                                ₿C {fmt(Math.max(0, saldoTotal - form.buyIn))}
-                            </span>
-                        </div>
-                    </div>
-                    )}
+                    </dl>
 
+                    {erros.geral && <p className="cart-erro" role="alert">{erros.geral}</p>}
                 </div>
 
-                {/* ---- Rodapé com botão de criar ---- */}
-                <div style={estilos.rodape}>
+                <div className="modal-rodape">
                     <button
+                        type="button"
                         onClick={handleCriar}
-                        // Botão desativa se o saldoTotal for menor que o buyIn
                         disabled={enviando || semSaldo}
-                        style={{
-                            ...estilos.btnCriar,
-                            opacity: enviando || semSaldo ? 0.5 : 1,
-                            cursor:  enviando || semSaldo
-                                ? 'not-allowed' : 'pointer',
-                        }}
+                        aria-busy={enviando || undefined}
+                        className="btn btn-principal cart-btn-cheio"
                     >
                         {enviando
                             ? 'Criando mesa…'
-                            : form.qtdBots > 0
-                                ? 'Criar mesa de treino'
-                                : `Criar mesa · ₿C ${fmt(form.buyIn)}`}
+                            : semSaldo
+                                ? `Falta ${NOME_MOEDA[form.moeda]} para o buy-in`
+                                : `Criar mesa de ${ehBonus ? 'bônus' : 'saldo real'} · ₿C ${fmt(form.buyIn)}`}
                     </button>
                 </div>
-
             </div>
         </>
     );
 }
 
-
-// ================================================================
-// BLOCO 3: COMPONENTE Campo
-//
-// Wrapper reutilizável para campos do formulário.
-// Exibe o label acima e o erro abaixo do input.
-// ================================================================
-
-function Campo({ label, erro, children }) {
+function BotaoMoeda({ ativo, titulo, sub, saldo, onClick }) {
     return (
-        <div style={estilos.campo}>
-            <label style={estilos.campoLabel}>{label}</label>
-            {children}
-            {erro && (
-                <p style={estilos.campoErro}>{erro}</p>
-            )}
-        </div>
+        <button type="button" role="radio" aria-checked={ativo} className="cm-moeda" onClick={onClick}>
+            <span className="t">{titulo}</span>
+            <span className="s">{sub}</span>
+            <span className="v num">Você tem ₿C {fmt(saldo)}</span>
+        </button>
     );
 }
-
-
-// ================================================================
-// BLOCO 4: ESTILOS
-// ================================================================
-
-const estilos = {
-
-    // Overlay escuro
-    overlay: {
-        position:   'fixed',
-        inset:      0,
-        background: 'var(--cor-veu)',
-        zIndex:     300,
-        backdropFilter: 'blur(2px)',
-    },
-
-    // Container do modal
-    modal: {
-        position:      'fixed',
-        bottom:        0,
-        left:          '50%',
-        transform:     'translateX(-50%)',
-        width:         '100%',
-        maxWidth:      '480px',
-        maxHeight:     '90vh',
-        background:    'var(--cor-superficie)',
-        borderRadius:  '20px 20px 0 0',
-        zIndex:        301,
-        display:       'flex',
-        flexDirection: 'column',
-        // Safe area do iPhone
-        paddingBottom: 'env(safe-area-inset-bottom)',
-    },
-
-    // Cabeçalho do modal
-    cabecalho: {
-        display:        'flex',
-        alignItems:     'flex-start',
-        justifyContent: 'space-between',
-        padding:        '18px 16px 14px',
-        borderBottom:   '1px solid var(--cor-superficie)',
-        flexShrink:     0,
-    },
-
-    titulo: {
-        fontSize:   '18px',
-        fontWeight: '700',
-        color:      'var(--cor-texto)',
-        margin:     0,
-    },
-
-    subtitulo: {
-        fontSize:  '12px',
-        color:     'var(--cor-texto-3)',
-        margin:    '4px 0 0',
-    },
-
-    btnFechar: {
-        background:   'var(--cor-linha)',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '8px',
-        color:        'var(--cor-texto-2)',
-        width:        '32px',
-        height:       '32px',
-        display:      'flex',
-        alignItems:   'center',
-        justifyContent: 'center',
-        cursor:       'pointer',
-        fontSize:     '14px',
-        flexShrink:   0,
-    },
-
-    // Corpo com scroll
-    corpo: {
-        flex:      1,
-        overflowY: 'auto',
-        padding:   '14px 16px',
-        display:   'flex',
-        flexDirection: 'column',
-        gap:       '16px',
-        WebkitOverflowScrolling: 'touch',
-    },
-
-    // Erro geral
-    erroGeral: {
-        background:   'var(--cor-perigo-suave)',
-        border:       '1px solid var(--cor-perigo-linha)',
-        borderRadius: '8px',
-        padding:      '10px 12px',
-        fontSize:     '13px',
-        color:        'var(--cor-perigo-texto)',
-    },
-
-    // Campo do formulário
-    campo: {
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '6px',
-    },
-
-    campoLabel: {
-        fontSize:   '12px',
-        fontWeight: '500',
-        color:      'var(--cor-texto-2)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-    },
-
-    campoErro: {
-        fontSize: '12px',
-        color:    'var(--cor-perigo-texto)',
-        margin:   0,
-    },
-
-    // Input de texto/número
-    input: {
-        width:        '100%',
-        padding:      '10px 12px',
-        background:   'var(--cor-superficie)',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '8px',
-        color:        'var(--cor-texto)',
-        fontSize:     '14px',
-        outline:      'none',
-        boxSizing:    'border-box',
-    },
-
-    // Grid de botões de opção rápida
-    botoesRapidos: {
-        display:             'grid',
-        gridTemplateColumns: 'repeat(5, 1fr)',
-        gap:                 '6px',
-    },
-
-    // Botão de opção rápida
-    btnOpcao: {
-        padding:      '7px 4px',
-        borderRadius: '6px',
-        fontSize:     '12px',
-        fontWeight:   '500',
-        cursor:       'pointer',
-        transition:   'all 0.15s',
-        textAlign:    'center',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    // Container do slider de bots
-    sliderContainer: {
-        display:    'flex',
-        alignItems: 'center',
-        gap:        '10px',
-    },
-
-    sliderLabel: {
-        fontSize:  '12px',
-        color:     'var(--cor-texto-3)',
-        minWidth:  '12px',
-        textAlign: 'center',
-    },
-
-    // Slider
-    slider: {
-        flex:        1,
-        accentColor: 'var(--cor-destaque)',
-        cursor:      'pointer',
-    },
-
-    // Dica sobre os bots
-    dicaBots: {
-        fontSize: '11px',
-        color:    'var(--cor-texto-3)',
-        margin:   '4px 0 0',
-        fontStyle: 'italic',
-    },
-
-    // Container do toggle de mesa privada
-    toggleContainer: {
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'space-between',
-        gap:            '12px',
-        padding:        '12px',
-        background:     'var(--cor-superficie)',
-        borderRadius:   '10px',
-        border:         '1px solid var(--cor-superficie)',
-    },
-
-    toggleLabel: {
-        fontSize:   '14px',
-        fontWeight: '500',
-        color:      'var(--cor-texto)',
-        margin:     0,
-    },
-
-    toggleDesc: {
-        fontSize: '11px',
-        color:    'var(--cor-texto-3)',
-        margin:   '2px 0 0',
-    },
-
-    // Botão toggle
-    toggle: {
-        width:        '44px',
-        height:       '24px',
-        borderRadius: '12px',
-        border:       'none',
-        cursor:       'pointer',
-        padding:      '2px',
-        transition:   'background 0.2s',
-        flexShrink:   0,
-        position:     'relative',
-        display:      'flex',
-        alignItems:   'center',
-    },
-
-    // Bolinha do toggle
-    toggleBolinha: {
-        width:        '20px',
-        height:       '20px',
-        borderRadius: '50%',
-        background:   '#fff',
-        transition:   'transform 0.2s',
-        position:     'absolute',
-        left:         '2px',
-    },
-
-    // Box de resumo do custo
-    resumoCusto: {
-        background:    'var(--cor-superficie)',
-        border:        '1px solid var(--cor-superficie)',
-        borderRadius:  '10px',
-        padding:       '12px',
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '8px',
-    },
-
-    resumoLinha: {
-        display:        'flex',
-        justifyContent: 'space-between',
-        alignItems:     'center',
-    },
-
-    resumoLabel: {
-        fontSize: '13px',
-        color:    'var(--cor-texto-3)',
-    },
-
-    resumoValor: {
-        fontSize:   '13px',
-        fontWeight: '500',
-        color:      'var(--cor-texto)',
-    },
-
-    separador: {
-        height:     '1px',
-        background: 'var(--cor-superficie)',
-    },
-
-    // Rodapé com botão de criar
-    rodape: {
-        padding:     '12px 16px',
-        borderTop:   '1px solid var(--cor-superficie)',
-        flexShrink:  0,
-    },
-
-    // Botão principal de criar mesa
-    btnCriar: {
-        width:        '100%',
-        padding:      '14px',
-        background:   'var(--cor-destaque)',
-        border:       'none',
-        borderRadius: '12px',
-        color:        'var(--cor-texto-inverso)',
-        fontSize:     '15px',
-        fontWeight:   '600',
-        transition:   'opacity 0.2s',
-        WebkitTapHighlightColor: 'transparent',
-    },
-};

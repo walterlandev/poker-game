@@ -83,6 +83,8 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
         conviteTorneio || avisoTorneio ? TABS.CAMPEONATO : TABS.MESAS
     );
     const [filtroMesas,   setFiltroMesas  ] = useState(FILTRO_MESAS.PUBLICAS);
+    // Filtro por moeda da mesa: 'todas' | 'real' | 'bonus' (só exibição)
+    const [filtroMoeda,   setFiltroMoeda  ] = useState('todas');
     const [mesasPublicas, setMesasPublicas] = useState([]);
     const [mesasPrivadas, setMesasPrivadas] = useState([]);
     const [ranking,       setRanking      ] = useState([]);
@@ -358,9 +360,17 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
                                 </button>
                             </div>
 
+                            <div className="segmento segmento-moeda" role="group" aria-label="Moeda da mesa">
+                                {[['todas', 'Todas'], ['real', 'Real'], ['bonus', 'Bônus']].map(([id, rot]) => (
+                                    <button key={id} type="button" aria-pressed={filtroMoeda === id} onClick={() => setFiltroMoeda(id)}>
+                                        {rot}
+                                    </button>
+                                ))}
+                            </div>
+
                             {filtroMesas === FILTRO_MESAS.PUBLICAS && (
                                 <ListaMesas
-                                    mesas={mesasPublicas}
+                                    mesas={filtrarPorMoeda(mesasPublicas, filtroMoeda)}
                                     carregando={carregando}
                                     privadas={false}
                                     ocupado={entrando}
@@ -369,7 +379,7 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
                             )}
                             {filtroMesas === FILTRO_MESAS.PRIVADAS && (
                                 <ListaMesas
-                                    mesas={mesasPrivadas}
+                                    mesas={filtrarPorMoeda(mesasPrivadas, filtroMoeda)}
                                     carregando={carregando}
                                     privadas={true}
                                     ocupado={entrando}
@@ -470,4 +480,11 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
 
         </div>
     );
+}
+
+
+// Filtra a lista pela moeda da mesa (servidor antigo sem o campo = real)
+function filtrarPorMoeda(mesas, filtro) {
+    if (filtro === 'todas') return mesas;
+    return mesas.filter(m => (m?.moeda ?? 'real') === filtro);
 }

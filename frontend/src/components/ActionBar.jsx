@@ -59,10 +59,9 @@ export default function ActionBar({
     pote          = 0,
     expiraEm      = null,   // prazo do turno atual (mesa.turnoExpiraEm) — só exibição
     nomeDaVez     = '',     // primeiro nome de quem está na vez — só exibição
-    treino        = false,  // mesa de treino: fichas sem o símbolo ₿C — só exibição
     onAcao,
 }) {
-    const moeda = (n) => (treino ? fmt(n) : `₿C ${fmt(n)}`);
+    const moeda = (n) => `₿C ${fmt(n)}`;
 
 
     // Custo para igualar a maior aposta

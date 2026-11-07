@@ -31,6 +31,8 @@
 ================================================================ */
 
 import { useState } from 'react';
+import Icone      from '../../components/Icone';
+import GoogleLogo from '../../components/GoogleLogo';
 
 // Importa auth e db do arquivo central — Firebase já inicializado lá
 import { auth, db } from '../../services/firebase-config';
@@ -204,297 +206,74 @@ export default function Login({ onAutenticado, onIrParaCadastro }) {
     }
 
 
-    // ================================================================
-    // RENDERIZAÇÃO
-    // ================================================================
     return (
-        <div style={estilos.container}>
-
-            {/* ---- Título ---- */}
-            <div style={estilos.cabecalho}>
-                <h2 style={estilos.titulo}>Entrar</h2>
-                <p style={estilos.subtitulo}>Bem-vindo de volta!</p>
+        <div className="auth-form">
+            <div className="auth-cab">
+                <h1>Entrar</h1>
+                <p>Que bom te ver de volta.</p>
             </div>
 
-            {/* ---- Botão Google ---- */}
-            <button
-                onClick={handleGoogle}
-                disabled={carregando}
-                style={{
-                    ...estilos.btnGoogle,
-                    opacity: carregando ? 0.7 : 1,
-                }}
-            >
-                <svg width="18" height="18" viewBox="0 0 18 18">
-                    <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
-                    <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
-                    <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18z"/>
-                    <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/>
-                </svg>
-                {carregando ? 'Entrando...' : 'Continuar com Google'}
+            <button type="button" onClick={handleGoogle} disabled={carregando} className="btn auth-google">
+                <GoogleLogo />
+                {carregando ? 'Entrando…' : 'Continuar com Google'}
             </button>
 
-            {/* ---- Divisor ---- */}
-            <div style={estilos.divisor}>
-                <div style={estilos.linhaDivisor} />
-                <span style={estilos.textoDivisor}>ou</span>
-                <div style={estilos.linhaDivisor} />
-            </div>
+            <div className="auth-ou" aria-hidden="true"><span>ou com email</span></div>
 
-            {/* ---- Formulário email/senha ---- */}
-            <form onSubmit={handleEmailSenha} style={estilos.form}>
-
-                {/* Email */}
-                <div style={estilos.campo}>
-                    <label style={estilos.label}>Email</label>
+            <form onSubmit={handleEmailSenha} className="auth-campos" noValidate>
+                <label className="cart-campo-rot" htmlFor="login-email">Email</label>
+                <div className="cart-campo">
                     <input
+                        id="login-email"
+                        name="email"
                         type="email"
-                        placeholder="seu@email.com"
+                        inputMode="email"
+                        placeholder="voce@exemplo.com…"
                         value={email}
                         onChange={e => setEmail(e.target.value)}
                         disabled={carregando}
-                        style={estilos.input}
                         autoComplete="email"
+                        spellCheck={false}
                     />
                 </div>
 
-                {/* Senha */}
-                <div style={estilos.campo}>
-                    <label style={estilos.label}>Senha</label>
-                    <div style={estilos.inputContainer}>
-                        <input
-                            type={verSenha ? 'text' : 'password'}
-                            placeholder="Sua senha"
-                            value={senha}
-                            onChange={e => setSenha(e.target.value)}
-                            disabled={carregando}
-                            style={{ ...estilos.input, paddingRight: '40px' }}
-                            autoComplete="current-password"
-                        />
-                        <button
-                            type="button"
-                            onClick={() => setVerSenha(v => !v)}
-                            style={estilos.btnOlho}
-                            tabIndex={-1}
-                        >
-                            {verSenha ? '🙈' : '👁️'}
-                        </button>
-                    </div>
+                <label className="cart-campo-rot" htmlFor="login-senha">Senha</label>
+                <div className="cart-campo">
+                    <input
+                        id="login-senha"
+                        name="senha"
+                        type={verSenha ? 'text' : 'password'}
+                        placeholder="Sua senha…"
+                        value={senha}
+                        onChange={e => setSenha(e.target.value)}
+                        disabled={carregando}
+                        autoComplete="current-password"
+                    />
+                    <button type="button" onClick={() => setVerSenha(v => !v)} className="cart-campo-acao" aria-label={verSenha ? 'Ocultar senha' : 'Mostrar senha'} aria-pressed={verSenha}>
+                        <Icone nome="olho" tamanho={18} />
+                    </button>
                 </div>
 
-                {/* Mensagem de erro */}
-                {erro && (
-                    <div style={estilos.erro}>{erro}</div>
-                )}
-
-                {/* Confirmação de reset enviado */}
+                {erro && <p className="cart-erro" role="alert">{erro}</p>}
                 {resetEnviado && (
-                    <div style={estilos.sucesso}>
-                        ✓ Link de redefinição enviado para {email}. Verifique sua caixa de entrada.
-                    </div>
+                    <p className="cart-nota positivo" role="status">
+                        Enviamos o link de redefinição para {email}. Confira sua caixa de entrada.
+                    </p>
                 )}
 
-                {/* Esqueceu a senha */}
-                <button
-                    type="button"
-                    onClick={handleEsqueceuSenha}
-                    style={estilos.btnLink}
-                >
-                    Esqueceu a senha?
+                <button type="button" onClick={handleEsqueceuSenha} className="cart-link auth-esqueci">
+                    Esqueci a senha
                 </button>
 
-                {/* Botão entrar */}
-                <button
-                    type="submit"
-                    disabled={carregando}
-                    style={{
-                        ...estilos.btnEntrar,
-                        opacity: carregando ? 0.7 : 1,
-                    }}
-                >
-                    {carregando ? 'Entrando...' : 'Entrar'}
+                <button type="submit" disabled={carregando} aria-busy={carregando || undefined} className="btn btn-principal cart-btn-cheio">
+                    {carregando ? 'Entrando…' : 'Entrar'}
                 </button>
-
             </form>
 
-            {/* ---- Link para cadastro ---- */}
-            <p style={estilos.linkCadastro}>
-                Não tem conta?{' '}
-                <button onClick={onIrParaCadastro} style={estilos.btnLink}>
-                    Criar conta
-                </button>
+            <p className="auth-troca">
+                Ainda não tem conta?{' '}
+                <button type="button" onClick={onIrParaCadastro} className="cart-link">Criar conta</button>
             </p>
-
         </div>
     );
 }
-
-
-// ================================================================
-// ESTILOS
-// ================================================================
-
-const estilos = {
-
-    container: {
-        padding:       '24px 20px',
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '16px',
-    },
-
-    cabecalho: {
-        marginBottom: '4px',
-    },
-
-    titulo: {
-        fontSize:   '22px',
-        fontWeight: '700',
-        color:      'var(--cor-texto)',
-        margin:     0,
-    },
-
-    subtitulo: {
-        fontSize:  '13px',
-        color:     'var(--cor-texto-3)',
-        margin:    '4px 0 0',
-    },
-
-    btnGoogle: {
-        width:          '100%',
-        padding:        '12px',
-        background:     '#FFFFFF',
-        border:         'none',
-        borderRadius:   '10px',
-        color:          'var(--cor-superficie)',
-        fontSize:       '14px',
-        fontWeight:     '500',
-        cursor:         'pointer',
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        gap:            '10px',
-        transition:     'opacity 0.2s',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    divisor: {
-        display:    'flex',
-        alignItems: 'center',
-        gap:        '10px',
-    },
-
-    linhaDivisor: {
-        flex:       1,
-        height:     '1px',
-        background: 'var(--cor-linha)',
-    },
-
-    textoDivisor: {
-        fontSize:   '12px',
-        color:      'var(--cor-texto-3)',
-        flexShrink: 0,
-    },
-
-    form: {
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '12px',
-    },
-
-    campo: {
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '6px',
-    },
-
-    label: {
-        fontSize:      '12px',
-        fontWeight:    '500',
-        color:         'var(--cor-texto-2)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-    },
-
-    inputContainer: {
-        position: 'relative',
-    },
-
-    input: {
-        width:        '100%',
-        padding:      '11px 12px',
-        background:   'var(--cor-superficie)',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '8px',
-        color:        'var(--cor-texto)',
-        fontSize:     '14px',
-        outline:      'none',
-        boxSizing:    'border-box',
-        transition:   'border-color 0.2s',
-    },
-
-    btnOlho: {
-        position:   'absolute',
-        right:      '10px',
-        top:        '50%',
-        transform:  'translateY(-50%)',
-        background: 'none',
-        border:     'none',
-        cursor:     'pointer',
-        fontSize:   '16px',
-        padding:    '4px',
-        lineHeight: 1,
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    erro: {
-        padding:      '10px 12px',
-        background:   'var(--cor-perigo-suave)',
-        border:       '1px solid var(--cor-perigo-linha)',
-        borderRadius: '8px',
-        fontSize:     '13px',
-        color:        'var(--cor-perigo-texto)',
-    },
-
-    sucesso: {
-        padding:      '10px 12px',
-        background:   'var(--cor-positivo-suave)',
-        border:       '1px solid var(--cor-positivo)',
-        borderRadius: '8px',
-        fontSize:     '13px',
-        color:        'var(--cor-positivo-texto)',
-    },
-
-    btnEntrar: {
-        width:        '100%',
-        padding:      '12px',
-        background:   'var(--cor-destaque)',
-        border:       'none',
-        borderRadius: '10px',
-        color:        'var(--cor-texto-inverso)',
-        fontSize:     '15px',
-        fontWeight:   '600',
-        cursor:       'pointer',
-        transition:   'opacity 0.2s',
-        WebkitTapHighlightColor: 'transparent',
-        marginTop:    '4px',
-    },
-
-    linkCadastro: {
-        fontSize:  '13px',
-        color:     'var(--cor-texto-3)',
-        textAlign: 'center',
-        margin:    0,
-    },
-
-    btnLink: {
-        background: 'none',
-        border:     'none',
-        color:      'var(--cor-destaque)',
-        fontSize:   '13px',
-        fontWeight: '600',
-        cursor:     'pointer',
-        padding:    0,
-        WebkitTapHighlightColor: 'transparent',
-    },
-};

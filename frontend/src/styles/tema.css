@@ -845,19 +845,39 @@ button.aviso-inline { cursor: pointer; }
 .dialogo-acoes .btn { flex: 1; min-height: 48px; }
 
 /* ================================================================
-   MESA DE TREINO (mesa com bots: fichas sem valor)
+   MOEDA DA MESA (real | bonus)
 ================================================================ */
-.etiqueta-treino {
+.etiqueta-moeda {
     display: inline-block; flex-shrink: 0; margin-left: 6px; padding: 1px 6px; border-radius: var(--r-badge);
     font-size: var(--t-11); font-weight: 600; line-height: 1.5; vertical-align: 1px;
     background: var(--cor-superficie-2); color: var(--cor-texto-2);
 }
-.aviso-treino {
-    display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding: 10px 12px;
-    border-radius: var(--r-botao); background: var(--cor-superficie-2); color: var(--cor-texto-2);
-    font-size: var(--t-12); line-height: 1.45;
+.etiqueta-moeda.bonus { background: transparent; box-shadow: inset 0 0 0 1px var(--cor-destaque-linha); color: var(--cor-destaque-texto); }
+.segmento-moeda { margin-bottom: var(--s-3); }
+
+/* Modal de criar mesa */
+.modal-largo { max-width: 520px; }
+.modal-rodape { flex-shrink: 0; padding: var(--s-3) var(--s-5) var(--s-4); border-top: 1px solid var(--cor-linha); }
+.modal-rodape .cart-btn-cheio { margin-top: 0; }
+.cm { display: flex; flex-direction: column; gap: var(--s-2); }
+.cm-grupo { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.cm-moedas { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); }
+.cm-moeda {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px; text-align: left;
+    border: 1px solid var(--cor-linha-forte); border-radius: var(--r-painel); background: var(--cor-fundo);
+    color: var(--cor-texto); font-family: inherit; cursor: pointer;
 }
-.aviso-treino b { color: var(--cor-texto); font-size: var(--t-14); font-weight: 600; }
+.cm-moeda:hover { background: var(--cor-superficie-2); }
+.cm-moeda .t { font-size: var(--t-16); font-weight: 700; }
+.cm-moeda .s { font-size: var(--t-12); color: var(--cor-texto-2); line-height: 1.35; }
+.cm-moeda .v { margin-top: 4px; font-size: var(--t-12); font-weight: 600; color: var(--cor-texto-3); }
+.cm-moeda[aria-checked="true"] { border-color: var(--cor-destaque-linha); background: var(--cor-destaque-suave); box-shadow: inset 0 0 0 1px var(--cor-destaque-linha); }
+.cm-moeda[aria-checked="true"] .v { color: var(--cor-destaque-texto); }
+.cm-dica { font-weight: 500; color: var(--cor-texto-3); margin-left: 6px; }
+.cm-slider { display: flex; align-items: center; gap: var(--s-3); font-size: var(--t-12); color: var(--cor-texto-3); }
+.cm-slider input { flex: 1; }
+.cm-aviso-bots { display: flex; align-items: center; gap: 6px; }
+.cm-privada { margin-top: var(--s-2); }
 
 /* ================================================================
    MODAL GENÉRICO (Configurações e outros)
@@ -1186,3 +1206,217 @@ button.config-item:hover { background: var(--cor-superficie-2); }
     .cart-ledger { grid-area: ledger; align-self: end; }
     .cart-divisao, .cart-acoes { max-width: none; }
 }
+
+/* ================================================================
+   ENTRADA (Auth: Login, Cadastro, CriarPin) e tela de carregamento
+================================================================ */
+.tela-carregando {
+    min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-5);
+    background: var(--textura-fundo), var(--cor-fundo); color: var(--cor-texto-2); font-size: var(--t-14); font-family: var(--fonte);
+}
+.tela-carregando p { margin: 0; }
+.tela-carregando .marca-selo { width: 40px; height: 40px; font-size: 16px; border-radius: 10px; }
+.tela-carregando .marca-nome { font-size: var(--t-28); }
+
+.auth { min-height: 100dvh; display: flex; flex-direction: column; background: var(--textura-fundo), var(--cor-fundo); color: var(--cor-texto); font-family: var(--fonte); }
+.auth-marca { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: var(--s-5) var(--s-4) 0; }
+.auth-marca .marca-selo { width: 36px; height: 36px; font-size: 14px; border-radius: 10px; }
+.auth-marca .marca-nome { font-size: var(--t-23); }
+.auth-lema { margin: 4px 0 0; font-size: var(--t-14); color: var(--cor-texto-2); }
+.auth-mesa { display: none; }
+.auth-conteudo { flex: 1; display: flex; flex-direction: column; align-items: stretch; padding: var(--s-4); gap: var(--s-3); }
+.auth-cartao {
+    width: 100%; max-width: 440px; padding: var(--s-5) var(--s-4); border-radius: var(--r-folha);
+    background: var(--cor-superficie); border: 1px solid var(--cor-linha);
+}
+.auth-form { display: flex; flex-direction: column; gap: var(--s-3); }
+.auth-cab h1 { margin: 0; font-size: var(--t-28); font-weight: 800; font-stretch: var(--larg-exp); letter-spacing: -0.01em; line-height: 1.1; text-wrap: balance; }
+.auth-cab p { margin: 6px 0 0; font-size: var(--t-14); line-height: 1.5; color: var(--cor-texto-2); max-width: 46ch; }
+.auth-google {
+    width: 100%; min-height: 48px; gap: 10px; font-size: var(--t-16); font-weight: 600;
+    background: var(--cor-fundo); color: var(--cor-texto); border: 1px solid var(--cor-linha-forte);
+}
+.auth-google:hover:not(:disabled) { background: var(--cor-superficie-2); }
+.auth-ou { display: flex; align-items: center; gap: var(--s-3); font-size: var(--t-12); color: var(--cor-texto-3); }
+.auth-ou::before, .auth-ou::after { content: ""; flex: 1; height: 1px; background: var(--cor-linha); }
+.auth-campos { display: flex; flex-direction: column; gap: var(--s-2); }
+.auth-rot { display: flex; justify-content: space-between; align-items: baseline; }
+.auth-rot .num { font-weight: 500; color: var(--cor-texto-3); }
+.auth-esqueci { align-self: flex-start; font-size: var(--t-14); }
+.auth-troca { margin: var(--s-2) 0 0; font-size: var(--t-14); color: var(--cor-texto-2); text-align: center; }
+.auth-aviso {
+    display: flex; gap: 8px; align-items: flex-start; margin: var(--s-2) 0 0; padding: 10px 12px; border-radius: var(--r-botao);
+    background: var(--cor-destaque-suave); color: var(--cor-texto-2); font-size: var(--t-12); line-height: 1.45;
+}
+.auth-aviso .icone { flex-shrink: 0; color: var(--cor-destaque-texto); margin-top: 1px; }
+.auth-rodape { margin: 0; max-width: 440px; font-size: var(--t-12); color: var(--cor-texto-3); text-align: center; }
+.auth-link-fraco { text-decoration: underline; text-underline-offset: 2px; }
+.auth-etapas { list-style: none; margin: 0; padding: 0; display: flex; gap: var(--s-2); max-width: 440px; }
+.auth-etapa { flex: 1; display: flex; align-items: center; gap: 8px; padding-bottom: 8px; border-bottom: 2px solid var(--cor-linha); font-size: var(--t-12); color: var(--cor-texto-3); }
+.auth-etapa .n { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--cor-superficie-2); font-size: var(--t-11); font-weight: 700; color: var(--cor-texto-2); }
+.auth-etapa.feita { border-color: var(--cor-positivo); color: var(--cor-positivo-texto); }
+.auth-etapa.feita .n { background: var(--cor-positivo); color: var(--cor-sobre-positivo); }
+.auth-etapa.ativa { border-color: var(--cor-destaque); color: var(--cor-destaque-texto); font-weight: 600; }
+.auth-etapa.ativa .n { background: var(--cor-destaque); color: var(--cor-texto-inverso); }
+
+@media (min-width: 600px) {
+    .auth-conteudo { align-items: center; justify-content: center; }
+    .auth-cartao { padding: var(--s-6); }
+}
+@media (min-width: 1000px) {
+    .auth { flex-direction: row; }
+    .auth-marca {
+        position: relative; width: 44%; max-width: 620px; padding: var(--s-7); justify-content: flex-start; overflow: hidden;
+        background: var(--ruido), radial-gradient(90% 80% at 40% 35%, var(--cor-feltro-brilho) 0%, var(--cor-feltro) 50%, var(--cor-feltro-fundo) 100%);
+        color: var(--cor-feltro-texto);
+    }
+    .auth-marca .marca-nome { font-size: var(--t-40); color: var(--cor-feltro-texto); }
+    .auth-marca .marca-selo { width: 52px; height: 52px; font-size: 20px; border-radius: 12px; background: var(--cor-feltro-fundo); }
+    .auth-lema { font-size: var(--t-19); color: var(--cor-feltro-texto-2); max-width: 22ch; line-height: 1.35; margin-top: var(--s-3); }
+    .auth-mesa {
+        display: block; position: absolute; right: -30%; bottom: -12%; width: 100%; aspect-ratio: 1.75 / 1; border-radius: 999px;
+        border: 14px solid var(--cor-trilho-2); box-shadow: inset 0 0 0 4px var(--cor-trilho-1), var(--sombra-mesa);
+    }
+    .auth-mesa span { position: absolute; inset: 8px; border-radius: 999px; border: 1.5px dashed var(--cor-costura); }
+    .auth-conteudo { padding: var(--s-7); }
+}
+
+/* ================================================================
+   LOJA (pacotes de ₿C e temas de baralho)
+================================================================ */
+.loja { display: flex; flex-direction: column; gap: var(--s-4); color: var(--cor-texto); }
+.loja-cab { display: flex; flex-direction: column; gap: 4px; }
+.loja-saldo { margin: 0; font-size: var(--t-14); color: var(--cor-texto-2); }
+.loja-saldo span { color: var(--cor-texto-3); }
+.loja > [aria-live] { display: contents; }
+.loja-colunas { display: flex; flex-direction: column; gap: var(--s-5); }
+.loja-col { display: none; flex-direction: column; gap: var(--s-3); }
+.loja-col.ativa { display: flex; }
+.loja-col-titulo { display: none; margin: 0; font-size: var(--t-16); font-weight: 700; }
+.loja-pacotes { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--s-2); }
+.loja-pacote {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px; border-radius: var(--r-painel);
+    border: 1px solid var(--cor-linha-forte); background: var(--cor-superficie); color: var(--cor-texto); font-family: inherit; cursor: pointer; text-align: left;
+}
+.loja-pacote:hover { background: var(--cor-superficie-2); }
+.loja-pacote b { font-size: var(--t-19); font-weight: 700; }
+.loja-pacote span { font-size: var(--t-12); color: var(--cor-texto-2); }
+.loja-pacote[aria-pressed="true"] { border-color: var(--cor-destaque-linha); background: var(--cor-destaque-suave); box-shadow: inset 0 0 0 1px var(--cor-destaque-linha); }
+.loja-pacote[aria-pressed="true"] span { color: var(--cor-destaque-texto); }
+
+.temas { display: flex; flex-direction: column; gap: var(--s-3); }
+.tema-preview { border-radius: var(--r-painel); overflow: hidden; border: 1px solid var(--cor-linha); background: var(--cor-superficie); }
+.tema-preview-feltro {
+    display: grid; place-items: center; padding: var(--s-5) var(--s-3);
+    background: var(--ruido), radial-gradient(80% 90% at 50% 40%, var(--cor-feltro-brilho) 0%, var(--cor-feltro) 55%, var(--cor-feltro-fundo) 100%);
+}
+.tema-preview-cartas { display: flex; gap: 6px; }
+.tema-preview-cartas .carta:nth-child(odd) { transform: translateY(-4px); }
+.tema-preview-info { display: flex; flex-direction: column; gap: 6px; padding: var(--s-4); }
+.tema-preview-titulo { display: flex; align-items: center; gap: 4px; }
+.tema-preview-titulo h3 { margin: 0; font-size: var(--t-19); font-weight: 700; }
+.tema-preco { margin: 0; font-size: var(--t-16); font-weight: 700; color: var(--cor-destaque-texto); }
+.tema-sem-saldo { font-size: var(--t-12); font-weight: 500; color: var(--cor-perigo-texto); }
+.tema-em-uso { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; font-size: var(--t-14); font-weight: 600; color: var(--cor-positivo-texto); }
+.temas-grade { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-2); }
+.tema-mini {
+    width: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; border-radius: var(--r-painel);
+    border: 1px solid var(--cor-linha); background: var(--cor-superficie); color: var(--cor-texto); font-family: inherit; cursor: pointer;
+}
+.tema-mini:hover { background: var(--cor-superficie-2); }
+.tema-mini[aria-pressed="true"] { border-color: var(--cor-destaque-linha); box-shadow: inset 0 0 0 1px var(--cor-destaque-linha); background: var(--cor-destaque-suave); }
+.tema-mini-cartas { display: flex; padding: 8px 10px; border-radius: 8px; background: var(--cor-feltro); }
+.tema-mini-cartas > * + * { margin-left: -10px; transform: rotate(8deg); }
+.tema-mini-nome { font-size: var(--t-12); font-weight: 600; text-align: center; }
+.tema-mini-preco { font-size: var(--t-11); color: var(--cor-texto-3); }
+
+@media (min-width: 900px) {
+    .loja-alterna { display: none; }
+    .loja-colunas { flex-direction: row; align-items: flex-start; gap: var(--s-6); }
+    .loja-col, .loja-col.ativa { display: flex; flex: 1; min-width: 0; }
+    .loja-col-titulo { display: block; }
+}
+
+/* ================================================================
+   TORNEIO (pages/Campeonato)
+================================================================ */
+.torneios { display: flex; flex-direction: column; gap: var(--s-4); color: var(--cor-texto); }
+.torneios-lista { display: flex; flex-direction: column; gap: var(--s-2); }
+.torneios-lista h2 { margin: 0; font-size: var(--t-16); font-weight: 700; }
+.torneios-itens { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--cor-linha); }
+.torneio-item { display: flex; align-items: center; gap: var(--s-3); padding: 12px 0; border-bottom: 1px solid var(--cor-linha); }
+.torneio-item-meio { flex: 1; min-width: 0; }
+.torneio-item-meio .nome { font-size: var(--t-16); font-weight: 600; }
+.torneio-item-meio .meta { display: flex; flex-wrap: wrap; column-gap: var(--s-3); row-gap: 2px; margin-top: 4px; font-size: var(--t-12); color: var(--cor-texto-2); }
+.torneio-item-acao { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.torneio-vagas { font-size: var(--t-12); color: var(--cor-texto-3); }
+
+.torneio-atual {
+    display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-4); border-radius: var(--r-painel);
+    background: var(--cor-superficie); border: 1px solid var(--cor-destaque-linha);
+}
+.torneio-atual-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-3); }
+.torneio-atual-rot { margin: 0; font-size: var(--t-12); color: var(--cor-texto-3); }
+.torneio-atual-cab h2 { margin: 2px 0 0; font-size: var(--t-19); font-weight: 700; }
+.torneio-status { flex-shrink: 0; padding: 2px 8px; border-radius: var(--r-badge); font-size: var(--t-12); font-weight: 600; background: var(--cor-superficie-2); color: var(--cor-texto-2); }
+.torneio-status.aberto { background: var(--cor-destaque-suave); color: var(--cor-destaque-texto); }
+.torneio-status.em_andamento { background: var(--cor-positivo-suave); color: var(--cor-positivo-texto); }
+.torneio-convite { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s-3); padding: 10px 12px; border-radius: var(--r-botao); background: var(--cor-fundo); }
+.torneio-convite b { display: block; margin-top: 2px; font-size: var(--t-19); letter-spacing: .04em; color: var(--cor-destaque-texto); }
+.torneio-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: var(--s-2); margin: 0; }
+.torneio-stats div { padding: 8px 10px; border-radius: var(--r-botao); background: var(--cor-fundo); }
+.torneio-stats dt { font-size: var(--t-11); color: var(--cor-texto-3); }
+.torneio-stats dd { margin: 2px 0 0; font-size: var(--t-16); font-weight: 700; }
+.dialogo .torneio-stats { margin-bottom: var(--s-4); }
+.torneio-situacao { margin: 0; padding: 10px 12px; border-radius: var(--r-botao); background: var(--cor-fundo); font-size: var(--t-14); font-weight: 600; }
+.torneio-situacao.ok { background: var(--cor-positivo-suave); color: var(--cor-positivo-texto); }
+.torneio-situacao.aviso { background: var(--cor-destaque-suave); color: var(--cor-destaque-texto); }
+.torneio-situacao.perigo { background: var(--cor-perigo-suave); color: var(--cor-perigo-texto); }
+.torneio-campeao { display: flex; gap: 8px; align-items: center; margin: 0; font-size: var(--t-14); color: var(--cor-texto-2); }
+.torneio-campeao .icone { color: var(--cor-destaque-texto); }
+.torneio-campeao b { color: var(--cor-texto); }
+.torneio-jogadores { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: 1px solid var(--cor-linha); }
+.torneio-jogadores li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--cor-linha); font-size: var(--t-14); }
+.torneio-av { display: grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0; overflow: hidden; border-radius: 50%; background: var(--cor-superficie-2); font-size: var(--t-12); font-weight: 700; color: var(--cor-texto-2); }
+.torneio-av img { width: 100%; height: 100%; object-fit: cover; }
+.torneio-jogadores .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.torneio-jogadores .nm .num { color: var(--cor-texto-3); font-size: var(--t-12); }
+.torneio-jstatus { font-size: var(--t-12); color: var(--cor-texto-3); }
+.torneio-jstatus.jogando, .torneio-jstatus.rebuy_pago { color: var(--cor-positivo-texto); }
+.torneio-jstatus.vencedor { color: var(--cor-destaque-texto); font-weight: 600; }
+.torneio-jstatus.eliminado, .torneio-jstatus.rebuy_disponivel { color: var(--cor-perigo-texto); }
+
+@media (min-width: 900px) {
+    .torneios { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: var(--s-6); align-items: start; }
+    .torneios > .secao-cab, .torneios > .aviso-inline { grid-column: 1 / -1; }
+    .torneio-atual { grid-column: 1; }
+    .torneios-lista { grid-column: 2; grid-row: 2 / span 3; }
+    .torneios:not(:has(.torneio-atual)) .torneios-lista { grid-column: 1 / -1; }
+}
+
+/* HandStrength no modo grande */
+.forca-grande {
+    width: 200px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: var(--s-3) var(--s-4);
+    border-radius: var(--r-painel); background: var(--cor-superficie); border: 1px solid var(--cor-linha); color: var(--cor-texto);
+}
+.forca-grande-rot { margin: 0; align-self: flex-start; display: flex; align-items: center; font-size: var(--t-12); color: var(--cor-texto-3); }
+.forca-grande-rot .hs-dot { background: var(--cor-positivo); }
+.forca-grande-anel { position: relative; display: grid; place-items: center; }
+.forca-grande-anel svg { transform: rotate(-90deg); }
+.forca-grande-anel .hs-ring-bg { stroke: var(--cor-superficie-2); }
+.forca-grande-anel .hs-ring-fill { stroke: var(--cor-positivo); }
+.forca-grande-anel .num { position: absolute; font-size: var(--t-23); font-weight: 700; }
+.forca-grande-mao { margin: 0; font-size: var(--t-14); font-weight: 600; }
+.forca-grande .forca-mao { width: 100%; }
+.forca-grande-stats { width: 100%; display: flex; justify-content: space-between; margin: 0; }
+.forca-grande-stats div { display: flex; flex-direction: column; align-items: center; }
+.forca-grande-stats dt { font-size: var(--t-11); color: var(--cor-texto-3); }
+.forca-grande-stats dd { margin: 0; font-size: var(--t-14); font-weight: 700; }
+.forca-grande-stats dd.positivo { color: var(--cor-positivo-texto); }
+.forca-grande-stats dd.perigo { color: var(--cor-perigo-texto); }
+.hs-improved { margin: 0; color: var(--cor-positivo-texto); }
+
+/* Mesa: a placa (nome e fichas) fica por cima do anel do temporizador,
+   para o anel não cobrir "Você" na mesa de 9 no celular */
+.assento-placa { z-index: 4; }
+.temporizador-seg { z-index: 6; }

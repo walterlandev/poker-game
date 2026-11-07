@@ -28,6 +28,7 @@
 ================================================================ */
 
 import { useState, useEffect, useMemo } from 'react';
+import Icone from '../../../components/Icone';
 import { calcularDeposito, fmt, fmtBC, TAXAS, LIMITES } from '../../Wallet/walletUtils';
 import PinConfirm from '../../Wallet/PinConfirm';
 
@@ -52,7 +53,7 @@ const VALORES_RAPIDOS = [
 export default function PacotesBC({ saldoAtual, usuario, socket, onFeedback }) {
 
     const [valorBRL,   setValorBRL  ] = useState('');
-    const [metodo,     setMetodo    ] = useState('pix');
+    const [metodo] = useState('pix');   // só PIX por enquanto (cartão não está disponível)
     const [etapa,      setEtapa     ] = useState('selecao'); // selecao | aguardando | qrcode | sucesso
     const [qrCode,     setQrCode    ] = useState(null);
     const [pixCopia,   setPixCopia  ] = useState(null);
@@ -73,8 +74,6 @@ export default function PacotesBC({ saldoAtual, usuario, socket, onFeedback }) {
         return calcularDeposito(valorNum);
     }, [valorNum]);
 
-    // Fichas de mesa = ₿C / 1000
-    const fichasMesa = calculo ? Math.floor(calculo.bcRecebido / 1000) : 0;
 
 
     // ----------------------------------------------------------------
@@ -85,7 +84,7 @@ export default function PacotesBC({ saldoAtual, usuario, socket, onFeedback }) {
 
         socket.on('wallet:deposito_confirmado', ({ bcCreditar }) => {
             setEtapa('sucesso');
-            onFeedback?.('sucesso', `✅ ₿C ${fmtBC(bcCreditar)} creditados! (${Math.floor(bcCreditar / 1000)} fichas)`);
+            onFeedback?.('sucesso', `Pagamento confirmado: ₿C ${fmtBC(bcCreditar)} no saldo real.`);
             setTimeout(() => {
                 setEtapa('selecao');
                 setValorBRL('');
@@ -195,597 +194,130 @@ export default function PacotesBC({ saldoAtual, usuario, socket, onFeedback }) {
     // ================================================================
     if (etapa === 'aguardando') {
         return (
-            <div style={estilos.container}>
-                <div style={estilos.estadoBox}>
-                    <span style={{ fontSize: '36px' }}>⏳</span>
-                    <p style={estilos.estadoTitulo}>Gerando pagamento...</p>
-                    <p style={estilos.estadoSub}>Conectando ao Mercado Pago</p>
-                </div>
+            <div className="cart-vazio" role="status">
+                <span className="roda-carregando" aria-hidden="true" />
+                <p className="titulo">Gerando o PIX…</p>
+                <p className="sub">Isso leva alguns segundos.</p>
             </div>
         );
     }
-
 
     // ================================================================
     // QR CODE PIX
     // ================================================================
     if (etapa === 'qrcode') {
         return (
-            <div style={estilos.container}>
-                <div style={estilos.qrcodeBox}>
-                    <p style={estilos.qrcodeTitulo}>📱 Pague com PIX</p>
-                    <p style={estilos.qrcodeSub}>Escaneie o QR Code ou copie o código</p>
-
-                    {qrCode ? (
-                        <img
-                            src={`data:image/png;base64,${qrCode}`}
-                            alt="QR Code PIX"
-                            style={estilos.qrcodeImg}
-                        />
-                    ) : (
-                        <div style={estilos.qrcodePlaceholder}>
-                            <span style={{ fontSize: '48px' }}>📷</span>
-                            <p style={{ fontSize: '12px', color: 'var(--cor-texto-3)', margin: '8px 0 0' }}>
-                                Carregando QR Code...
-                            </p>
-                        </div>
-                    )}
-
-                    <div style={estilos.qrcodeResumo}>
-                        <span style={{ color: 'var(--cor-texto-2)', fontSize: '13px' }}>
-                            ₿C {fmtBC(calculo?.bcRecebido || 0)} · {fichasMesa} fichas
-                        </span>
-                        <span style={{ color: 'var(--cor-destaque-texto)', fontWeight: '700', fontSize: '15px' }}>
-                            R$ {fmt(calculo?.totalBRL || 0)}
-                        </span>
-                    </div>
-
-                    {pixCopia && (
-                        <button onClick={handleCopiarPix} style={estilos.btnCopiarPix}>
-                            {copiado ? '✓ Copiado!' : '📋 Copiar código PIX'}
-                        </button>
-                    )}
-
-                    <p style={estilos.qrcodeAviso}>
-                        ₿C creditados automaticamente após o pagamento
-                    </p>
-
-                    <button onClick={handleCancelar} style={estilos.btnCancelarQr}>
-                        Cancelar
-                    </button>
+            <div className="cart-pix">
+                <div className="cart-form-cab">
+                    <h3>Pague o PIX para concluir</h3>
                 </div>
+                <p className="cart-pix-resumo num">
+                    R$ {fmt(calculo?.totalBRL || 0)} <span aria-hidden="true">→</span> ₿C {fmtBC(calculo?.bcRecebido || 0)} no saldo real
+                </p>
+                <div className="cart-qr">
+                    {qrCode
+                        ? <img src={`data:image/png;base64,${qrCode}`} alt="QR Code do PIX" width={200} height={200} />
+                        : <p className="cart-nota" role="status">Carregando QR Code…</p>}
+                </div>
+                {pixCopia && (
+                    <div className="cart-copia">
+                        <label className="cart-campo-rot" htmlFor="loja-pix">PIX copia e cola</label>
+                        <div className="cart-copia-linha">
+                            <input id="loja-pix" readOnly value={pixCopia} className="num" onFocus={e => e.target.select()} />
+                            <button type="button" onClick={handleCopiarPix} className={`btn ${copiado ? 'btn-neutro' : 'btn-principal'}`}>
+                                <Icone nome={copiado ? 'check' : 'copiar'} tamanho={16} />{copiado ? 'Copiado' : 'Copiar'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+                <p className="cart-nota" role="status">Aguardando o pagamento. O saldo é creditado sozinho depois que você pagar.</p>
+                <button type="button" onClick={handleCancelar} className="btn btn-fantasma">Cancelar</button>
             </div>
         );
     }
-
 
     // ================================================================
     // SUCESSO
     // ================================================================
     if (etapa === 'sucesso') {
         return (
-            <div style={estilos.container}>
-                <div style={estilos.estadoBox}>
-                    <span style={{ fontSize: '48px' }}>🎉</span>
-                    <p style={estilos.estadoTitulo}>Pagamento confirmado!</p>
-                    <p style={estilos.estadoSub}>
-                        {fichasMesa} fichas adicionadas à sua carteira
-                    </p>
-                </div>
+            <div className="cart-vazio" role="status">
+                <span className="cart-pin-icone" aria-hidden="true"><Icone nome="check" tamanho={22} /></span>
+                <p className="titulo">Pagamento confirmado</p>
+                <p className="sub">O valor já entrou no seu saldo real.</p>
             </div>
         );
     }
-
 
     // ================================================================
     // SELEÇÃO PRINCIPAL
     // ================================================================
     return (
-        <div style={estilos.container}>
-
-            {/* ---- Explicação da conversão ---- */}
-            <div style={estilos.avisoMoeda}>
-                <span style={{ fontSize: '14px' }}>ℹ️</span>
-                <p style={estilos.avisoTexto}>
-                    R$ 1,00 = <strong style={{ color: 'var(--cor-destaque-texto)' }}>₿C 1.000</strong> = <strong style={{ color: 'var(--cor-destaque-texto)' }}>1 ficha</strong> na mesa
-                    · Taxa: {TAXAS.DEPOSITO * 100}% · Saque a qualquer momento
-                </p>
-            </div>
-
-            {/* ---- Valores rápidos ---- */}
-            <div>
-                <p style={estilos.secaoLabel}>Valores rápidos</p>
-                <div style={estilos.valoresRapidos}>
-                    {VALORES_RAPIDOS.map(v => {
-                        const ativo = valorNum === v.brl;
-                        return (
-                            <button
-                                key={v.brl}
-                                onClick={() => handleValorRapido(v.brl)}
-                                style={{
-                                    ...estilos.btnRapido,
-                                    background: ativo ? 'var(--cor-destaque-suave)' : 'var(--cor-superficie)',
-                                    border:     ativo ? '1px solid var(--cor-destaque-linha)' : '1px solid var(--cor-linha)',
-                                    color:      ativo ? 'var(--cor-destaque-texto)' : 'var(--cor-texto-2)',
-                                }}
-                            >
-                                <span style={{ fontSize: '13px', fontWeight: '700' }}>{v.label}</span>
-                                <span style={{ fontSize: '10px', color: ativo ? 'var(--cor-destaque-texto)' : 'var(--cor-texto-3)' }}>
-                                    {v.fichas} fichas
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* ---- Campo livre ---- */}
-            <div>
-                <p style={estilos.secaoLabel}>Ou digite o valor</p>
-                <div style={estilos.inputGroup}>
-                    <span style={estilos.inputPrefix}>R$</span>
-                    <input
-                        type="number"
-                        min={LIMITES.DEPOSITO_MIN_BRL}
-                        max={LIMITES.DEPOSITO_MAX_BRL}
-                        step="1"
-                        placeholder="0,00"
-                        value={valorBRL}
-                        onChange={e => {
-                            setValorBRL(e.target.value);
-                            setErroValor('');
-                        }}
-                        style={estilos.input}
-                    />
-                    {valorNum > 0 && (
-                        <span style={estilos.inputSufixo}>
-                            = {Math.floor(valorNum)} fichas
-                        </span>
-                    )}
-                </div>
-                {erroValor && <p style={estilos.erroTexto}>{erroValor}</p>}
-            </div>
-
-            {/* ---- Preview do cálculo ---- */}
-            {calculo && (
-                <div style={estilos.preview}>
-
-                    {/* Fichas em destaque */}
-                    <div style={estilos.previewFichas}>
-                        <span style={estilos.previewFichasNum}>{fichasMesa}</span>
-                        <div>
-                            <p style={estilos.previewFichasLabel}>fichas na mesa</p>
-                            <p style={estilos.previewFichasSub}>₿C {fmtBC(calculo.bcRecebido)} na carteira</p>
-                        </div>
-                    </div>
-
-                    <div style={estilos.previewDivisor} />
-
-                    {/* Detalhes financeiros */}
-                    <LinhaPreview label="Valor depositado"          valor={`R$ ${fmt(calculo.valorBRL)}`} />
-                    <LinhaPreview
-                        label={`Taxa (${calculo.taxaPerc}%)`}
-                        valor={`+ R$ ${fmt(calculo.taxaBRL)}`}
-                        cor="var(--cor-destaque-texto)"
-                    />
-                    <div style={estilos.previewDivisor} />
-                    <LinhaPreview label="Total cobrado"             valor={`R$ ${fmt(calculo.totalBRL)}`}           destaque />
-                    <LinhaPreview
-                        label="Saldo após depósito"
-                        valor={`₿C ${fmtBC(saldoAtual + calculo.bcRecebido)}`}
-                        cor="var(--cor-positivo-texto)"
-                    />
-                </div>
-            )}
-
-            {/* ---- Método de pagamento ---- */}
-            {calculo && (
-                <>
-                    <p style={estilos.labelMetodo}>Pagar com</p>
-                    <div style={estilos.metodos}>
-                        {[
-                            { id: 'pix',    icone: '📱', label: 'PIX',    badge: 'Recomendado', disponivel: true },
-                            { id: 'cartao', icone: '💳', label: 'Cartão', badge: 'Em breve',     disponivel: false },
-                        ].map(m => (
-                            <button
-                                key={m.id}
-                                onClick={() => m.disponivel && setMetodo(m.id)}
-                                disabled={!m.disponivel}
-                                title={m.disponivel ? undefined : 'Pagamento por cartão ainda não está disponível'}
-                                style={{
-                                    ...estilos.btnMetodo,
-                                    background: metodo === m.id ? 'var(--cor-destaque-suave)' : 'var(--cor-superficie)',
-                                    border:     metodo === m.id ? '1px solid var(--cor-destaque-linha)' : '1px solid var(--cor-linha)',
-                                    color:      metodo === m.id ? 'var(--cor-destaque-texto)' : 'var(--cor-texto-2)',
-                                    opacity:    m.disponivel ? 1 : 0.45,
-                                    cursor:     m.disponivel ? 'pointer' : 'not-allowed',
-                                }}
-                            >
-                                <span style={{ fontSize: '18px' }}>{m.icone}</span>
-                                <span style={{ fontSize: '12px', fontWeight: metodo === m.id ? '600' : '400' }}>
-                                    {m.label}
-                                </span>
-                                {m.badge && <span style={estilos.badgePix}>{m.badge}</span>}
-                            </button>
-                        ))}
-                    </div>
-                </>
-            )}
-
-            {/* ---- Botão comprar ---- */}
-            <button
-                onClick={handleComprar}
-                disabled={!calculo}
-                style={{
-                    ...estilos.btnConfirmar,
-                    background: calculo ? 'var(--cor-destaque)' : 'var(--cor-linha)',
-                    color:      calculo ? '#fff' : 'var(--cor-texto-3)',
-                    cursor:     calculo ? 'pointer' : 'not-allowed',
-                }}
-            >
-                {calculo
-                    ? `${metodo === 'pix' ? '📱' : '💳'} Pagar R$ ${fmt(calculo.totalBRL)} · Receber ${fichasMesa} fichas`
-                    : 'Selecione um valor'
-                }
-            </button>
-
-            <p style={estilos.avisoSeguro}>
-                🔒 Pagamento seguro via Mercado Pago · Fichas creditadas automaticamente
+        <div className="cart-form sem-borda">
+            <p className="cart-nota num">
+                R$ 1 = ₿C {fmtBC(1000)} · taxa de {TAXAS.DEPOSITO * 100}% cobrada além do valor · entra no saldo real
             </p>
 
-            {/* ---- Modal de PIN ---- */}
+            <span className="cart-campo-rot">Escolha um valor</span>
+            <div className="loja-pacotes" role="group" aria-label="Valores">
+                {VALORES_RAPIDOS.map(v => (
+                    <button key={v.brl} type="button" className="loja-pacote" aria-pressed={valorNum === v.brl} onClick={() => handleValorRapido(v.brl)}>
+                        <b className="num">{v.label}</b>
+                        <span className="num">₿C {fmtBC(v.brl * 1000)}</span>
+                    </button>
+                ))}
+            </div>
+
+            <label className="cart-campo-rot" htmlFor="loja-valor">Ou digite o valor em reais</label>
+            <div className={`cart-campo${erroValor ? ' com-erro' : ''}`}>
+                <span className="cart-campo-pre">R$</span>
+                <input
+                    id="loja-valor"
+                    type="number"
+                    inputMode="decimal"
+                    min={LIMITES.DEPOSITO_MIN_BRL}
+                    max={LIMITES.DEPOSITO_MAX_BRL}
+                    step="1"
+                    placeholder="0,00"
+                    value={valorBRL}
+                    onChange={e => { setValorBRL(e.target.value); setErroValor(''); }}
+                    aria-invalid={!!erroValor}
+                />
+            </div>
+            {erroValor && <p className="cart-erro" role="alert">{erroValor}</p>}
+
+            {calculo && (
+                <dl className="cart-resumo">
+                    <LinhaPreview label="Você recebe" valor={`₿C ${fmtBC(calculo.bcRecebido)}`} tom="positivo" destaque />
+                    <LinhaPreview label="Valor" valor={`R$ ${fmt(calculo.valorBRL)}`} />
+                    <LinhaPreview label={`Taxa (${calculo.taxaPerc}%)`} valor={`+ R$ ${fmt(calculo.taxaBRL)}`} />
+                    <LinhaPreview label="Total a pagar" valor={`R$ ${fmt(calculo.totalBRL)}`} destaque />
+                    <LinhaPreview label="Saldo depois" valor={`₿C ${fmtBC(saldoAtual + calculo.bcRecebido)}`} />
+                </dl>
+            )}
+
+            <p className="cart-nota">Pagamento por PIX. Você confirma com o PIN.</p>
+            <button type="button" onClick={handleComprar} disabled={!calculo} className="btn btn-principal cart-btn-cheio">
+                {calculo ? `Gerar PIX de R$ ${fmt(calculo.totalBRL)}` : 'Escolha um valor'}
+            </button>
+
             {pinAberto && calculoPendente && (
                 <PinConfirm
-                    titulo="Confirmar depósito"
+                    titulo="Confirmar compra"
                     descricao={`R$ ${fmt(calculoPendente.totalBRL)} → ₿C ${fmtBC(calculoPendente.bcRecebido)}`}
                     onConfirmar={handlePinConfirmado}
                     onCancelar={() => { setPinAberto(false); setCalculoPendente(null); }}
                 />
             )}
-
         </div>
     );
 }
 
-
-// ================================================================
-// SUBCOMPONENTES
-// ================================================================
-
-function LinhaPreview({ label, valor, cor, destaque }) {
+function LinhaPreview({ label, valor, tom, destaque }) {
     return (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{
-                fontSize:   destaque ? '13px' : '12px',
-                color:      'var(--cor-texto-3)',
-                fontWeight: destaque ? '500' : '400',
-            }}>
-                {label}
-            </span>
-            <span style={{
-                fontSize:   destaque ? '14px' : '13px',
-                fontWeight: destaque ? '700' : '500',
-                color:      cor || 'var(--cor-texto)',
-            }}>
-                {valor}
-            </span>
+        <div className={`cart-resumo-linha${destaque ? ' destaque' : ''}${tom ? ' ' + tom : ''}`}>
+            <dt>{label}</dt>
+            <dd className="num">{valor}</dd>
         </div>
     );
 }
-
-
-// ================================================================
-// ESTILOS
-// ================================================================
-
-const estilos = {
-
-    container: {
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '16px',
-    },
-
-    avisoMoeda: {
-        display:      'flex',
-        gap:          '8px',
-        alignItems:   'flex-start',
-        padding:      '10px 12px',
-        background:   'color-mix(in srgb, var(--cor-info) 8%, transparent)',
-        border:       '1px solid color-mix(in srgb, var(--cor-info) 20%, transparent)',
-        borderRadius: '8px',
-    },
-
-    avisoTexto: {
-        fontSize:   '11px',
-        color:      'var(--cor-texto-2)',
-        margin:     0,
-        lineHeight: 1.5,
-    },
-
-    secaoLabel: {
-        fontSize:      '11px',
-        fontWeight:    '600',
-        color:         'var(--cor-texto-3)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-        margin:        '0 0 8px',
-    },
-
-    // Valores rápidos
-    valoresRapidos: {
-        display:             'grid',
-        gridTemplateColumns: 'repeat(5, 1fr)',
-        gap:                 '6px',
-    },
-
-    btnRapido: {
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'center',
-        gap:            '3px',
-        padding:        '10px 4px',
-        borderRadius:   '8px',
-        cursor:         'pointer',
-        outline:        'none',
-        fontFamily:     'inherit',
-        transition:     'all 0.15s',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    // Campo livre
-    inputGroup: {
-        display:      'flex',
-        alignItems:   'center',
-        background:   'var(--cor-superficie)',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '8px',
-        overflow:     'hidden',
-    },
-
-    inputPrefix: {
-        padding:     '0 12px',
-        fontSize:    '14px',
-        fontWeight:  '700',
-        color:       'var(--cor-destaque-texto)',
-        background:  'var(--cor-destaque-suave)',
-        borderRight: '1px solid var(--cor-linha)',
-        alignSelf:   'stretch',
-        display:     'flex',
-        alignItems:  'center',
-    },
-
-    input: {
-        flex:       1,
-        padding:    '12px',
-        background: 'transparent',
-        border:     'none',
-        outline:    'none',
-        color:      'var(--cor-texto)',
-        fontSize:   '16px',
-        fontWeight: '600',
-        fontFamily: 'inherit',
-    },
-
-    inputSufixo: {
-        padding:   '0 12px',
-        fontSize:  '11px',
-        color:     'var(--cor-destaque-texto)',
-        fontWeight:'600',
-        whiteSpace:'nowrap',
-    },
-
-    erroTexto: {
-        fontSize:  '11px',
-        color:     'var(--cor-perigo-texto)',
-        margin:    '4px 0 0',
-    },
-
-    // Preview
-    preview: {
-        background:    'var(--cor-superficie)',
-        border:        '1px solid var(--cor-linha)',
-        borderRadius:  '10px',
-        padding:       '14px',
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '8px',
-    },
-
-    previewFichas: {
-        display:    'flex',
-        alignItems: 'center',
-        gap:        '12px',
-    },
-
-    previewFichasNum: {
-        fontSize:   '36px',
-        fontWeight: '900',
-        color:      'var(--cor-destaque-texto)',
-        lineHeight:  1,
-    },
-
-    previewFichasLabel: {
-        fontSize:   '14px',
-        fontWeight: '600',
-        color:      'var(--cor-texto)',
-        margin:     0,
-    },
-
-    previewFichasSub: {
-        fontSize:  '11px',
-        color:     'var(--cor-texto-3)',
-        margin:    '2px 0 0',
-    },
-
-    previewDivisor: {
-        height:     '1px',
-        background: 'var(--cor-superficie)',
-    },
-
-    // Método de pagamento
-    labelMetodo: {
-        fontSize:      '11px',
-        color:         'var(--cor-texto-3)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-        margin:        0,
-    },
-
-    metodos: {
-        display:             'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap:                 '8px',
-    },
-
-    btnMetodo: {
-        display:       'flex',
-        flexDirection: 'column',
-        alignItems:    'center',
-        gap:           '4px',
-        padding:       '10px',
-        borderRadius:  '8px',
-        cursor:        'pointer',
-        outline:       'none',
-        fontFamily:    'inherit',
-        transition:    'all 0.15s',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    badgePix: {
-        fontSize:     '9px',
-        background:   'var(--cor-positivo-suave)',
-        color:        'var(--cor-positivo-texto)',
-        padding:      '1px 5px',
-        borderRadius: '4px',
-        fontWeight:   '600',
-    },
-
-    btnConfirmar: {
-        width:        '100%',
-        padding:      '14px',
-        border:       'none',
-        borderRadius: '10px',
-        fontSize:     '14px',
-        fontWeight:   '600',
-        transition:   'opacity 0.2s',
-        fontFamily:   'inherit',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    avisoSeguro: {
-        fontSize:  '11px',
-        color:     'var(--cor-texto-3)',
-        textAlign: 'center',
-        margin:    0,
-    },
-
-    // Estados
-    estadoBox: {
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'center',
-        gap:            '12px',
-        padding:        '40px 20px',
-        textAlign:      'center',
-    },
-
-    estadoTitulo: {
-        fontSize:   '16px',
-        fontWeight: '700',
-        color:      'var(--cor-texto)',
-        margin:     0,
-    },
-
-    estadoSub: {
-        fontSize:  '13px',
-        color:     'var(--cor-texto-3)',
-        margin:    0,
-    },
-
-    // QR Code
-    qrcodeBox: {
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'center',
-        gap:            '14px',
-        background:     'var(--cor-superficie)',
-        border:         '1px solid var(--cor-linha)',
-        borderRadius:   '14px',
-        padding:        '20px 16px',
-    },
-
-    qrcodeTitulo: {
-        fontSize:   '16px',
-        fontWeight: '700',
-        color:      'var(--cor-texto)',
-        margin:     0,
-    },
-
-    qrcodeSub: {
-        fontSize:  '12px',
-        color:     'var(--cor-texto-3)',
-        margin:    0,
-        textAlign: 'center',
-    },
-
-    qrcodeImg: {
-        width:        '200px',
-        height:       '200px',
-        borderRadius: '12px',
-        border:       '3px solid var(--cor-linha)',
-    },
-
-    qrcodePlaceholder: {
-        width:          '200px',
-        height:         '200px',
-        borderRadius:   '12px',
-        border:         '2px dashed var(--cor-linha-forte)',
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'center',
-        justifyContent: 'center',
-    },
-
-    qrcodeResumo: {
-        display:        'flex',
-        justifyContent: 'space-between',
-        alignItems:     'center',
-        width:          '100%',
-        padding:        '10px 12px',
-        background:     'var(--cor-superficie)',
-        borderRadius:   '8px',
-    },
-
-    btnCopiarPix: {
-        width:        '100%',
-        padding:      '11px',
-        background:   'var(--cor-positivo-suave)',
-        border:       '1px solid var(--cor-positivo)',
-        borderRadius: '8px',
-        color:        'var(--cor-positivo-texto)',
-        fontSize:     '13px',
-        fontWeight:   '600',
-        cursor:       'pointer',
-        fontFamily:   'inherit',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    qrcodeAviso: {
-        fontSize:  '11px',
-        color:     'var(--cor-texto-3)',
-        margin:    0,
-        textAlign: 'center',
-    },
-
-    btnCancelarQr: {
-        background:   'transparent',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '8px',
-        color:        'var(--cor-texto-3)',
-        fontSize:     '12px',
-        padding:      '8px 20px',
-        cursor:       'pointer',
-        fontFamily:   'inherit',
-    },
-};

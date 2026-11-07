@@ -51,14 +51,17 @@ export default function InfoMesa({ mesa }) {
     const fase      = NOME_FASE[mesa.fase] || NOME_FASE.AGUARDANDO;
     const temAposta = (mesa.maiorAposta || 0) > 0;
     const qtd       = Object.keys(mesa.jogadores || {}).length;
-    const treino    = mesa?.treino === true;
+    // Moeda da mesa: 'real' ou 'bonus' (lido com segurança; antigo = real)
+    const moeda     = mesa?.moeda ?? 'real';
 
     return (
         <div className="info-mesa">
             <div className="bloco">
                 <span className="nome">
                     {mesa.nome || 'Mesa'}
-                    {treino && <span className="etiqueta-treino">Mesa de treino</span>}
+                    <span className={`etiqueta-moeda ${moeda}`} title={moeda === 'bonus' ? 'Mesa de bônus: entra e sai em bônus' : 'Mesa de saldo real: entra e sai em saldo real'}>
+                        {moeda === 'bonus' ? 'Bônus' : 'Real'}
+                    </span>
                 </span>
                 <span className="sub">
                     Blinds <span className="num">{fmt(mesa.smallBlind)}/{fmt(mesa.bigBlind)}</span>, {fase}
@@ -66,8 +69,8 @@ export default function InfoMesa({ mesa }) {
             </div>
             <div className="extra">
                 <span>{qtd} {qtd === 1 ? 'jogador' : 'jogadores'}</span>
-                <span>Pote <b className={`num${treino ? '' : ' cor-bc'}`}>{treino ? fmt(mesa.pote) : `₿C ${fmt(mesa.pote)}`}</b></span>
-                {temAposta && <span>Maior aposta <b className="num">{treino ? fmt(mesa.maiorAposta) : `₿C ${fmt(mesa.maiorAposta)}`}</b></span>}
+                <span>Pote <b className="num cor-bc">₿C {fmt(mesa.pote)}</b></span>
+                {temAposta && <span>Maior aposta <b className="num">₿C {fmt(mesa.maiorAposta)}</b></span>}
             </div>
         </div>
     );

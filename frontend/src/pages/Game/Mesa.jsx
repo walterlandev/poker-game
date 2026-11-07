@@ -83,8 +83,7 @@ export default function Mesa({ mesa, meuUid, minhasCartas = [], meuAvatar = '', 
     const offset         = meuIndex >= 0 ? meuIndex : 0;
     const retrato        = dims.h > dims.w;
     const euSentado      = meuIndex >= 0;
-    const treino         = mesa?.treino === true;   // fichas sem valor: sem ₿C
-    const moeda          = (n) => (treino ? fmt(n) : `₿C ${fmt(n)}`);
+    const moeda          = (n) => `₿C ${fmt(n)}`;
 
     // ── Posições dos assentos em % da oval ──────────────────────────
     const posicoes = jogadoresArray.map(([uid, jogador], index) => {
@@ -176,7 +175,6 @@ export default function Mesa({ mesa, meuUid, minhasCartas = [], meuAvatar = '', 
                             avatarSz={avatarSz}
                             tema={tema}
                             ocultarCartas={souEu && retrato}
-                            treino={treino}
                         />
                     </div>
                 ))}
