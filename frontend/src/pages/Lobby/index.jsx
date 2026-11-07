@@ -77,7 +77,7 @@ const INTERVALO_RANKING = 60000;
 // BLOCO 2: COMPONENTE PRINCIPAL
 // ================================================================
 
-export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, conviteMesa, avisoTorneio = null, onFecharAvisoTorneio, avisoCredito = null, onFecharAvisoCredito }) {
+export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, conviteMesa, avisoTorneio = null, onFecharAvisoTorneio, avisoCredito = null, onFecharAvisoCredito, bonusBoasVindas = null, onFecharBonusBoasVindas }) {
 
     const [tabAtiva,      setTabAtiva     ] = useState(() =>
         conviteTorneio || avisoTorneio ? TABS.CAMPEONATO : TABS.MESAS
@@ -102,9 +102,6 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
 
     // Controla o modal de boas-vindas:
     // Abre automaticamente se o jogador ainda não resgatou o bônus
-    const [mostrarBoasVindas, setMostrarBoasVindas] = useState(
-        usuario?.bonusResgatado !== true
-    );
 
 
     // ----------------------------------------------------------------
@@ -255,9 +252,9 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
     }
 
     // Após resgatar bônus: fecha o modal e vai para a carteira
-    function handleBonusResgatado() {
-        setMostrarBoasVindas(false);
-        setTabAtiva(TABS.CARTEIRA);
+    function handleFecharBoasVindas() {
+        onFecharBonusBoasVindas?.();
+        setTabAtiva(TABS.MESAS);
     }
 
 
@@ -469,11 +466,11 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
             )}
 
             {/* Modal de boas-vindas — 1º acesso, bônus ainda não resgatado */}
-            {mostrarBoasVindas && (
+            {bonusBoasVindas && (
                 <ModalBoasVindas
                     nomeJogador={usuario?.nome || 'Jogador'}
-                    socket={socket}
-                    onResgatado={handleBonusResgatado}
+                    valor={bonusBoasVindas.valor}
+                    onFechar={handleFecharBoasVindas}
                 />
             )}
 

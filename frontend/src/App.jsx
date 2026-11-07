@@ -258,6 +258,16 @@ export default function App() {
     // Crédito de saída de mesa / prêmio de torneio: mostra no lobby quanto
     // voltou como saldo real e quanto como bônus (o servidor faz a conta).
     const [avisoCredito, setAvisoCredito] = useState(null);
+    // Bônus de boas-vindas creditado pelo servidor ao entrar: abre o aviso.
+    const [bonusBoasVindas, setBonusBoasVindas] = useState(null);
+    useEffect(() => {
+        const onBonus = ({ valor } = {}) => {
+            setBonusBoasVindas({ valor });
+            setUsuario(prev => prev ? { ...prev, bonusResgatado: true } : prev);
+        };
+        socket.on('wallet:bonus_creditado', onBonus);
+        return () => socket.off('wallet:bonus_creditado', onBonus);
+    }, []);
     useEffect(() => {
         const fmt = n => (Number(n) || 0).toLocaleString('pt-BR');
         const onCredito = ({ origem, real = 0, bonus = 0 } = {}) => {
@@ -361,6 +371,8 @@ export default function App() {
             onFecharAvisoTorneio={() => setAvisoTorneio(null)}
             avisoCredito={avisoCredito}
             onFecharAvisoCredito={() => setAvisoCredito(null)}
+            bonusBoasVindas={bonusBoasVindas}
+            onFecharBonusBoasVindas={() => setBonusBoasVindas(null)}
         />
     );
 }

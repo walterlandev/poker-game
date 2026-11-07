@@ -96,3 +96,14 @@ export function planejarConversaoBonus({ saldo = 0 } = {}, valor) {
     }
     return { sucesso: true, debitarReal: v, creditarBonus: v * TAXA_CONVERSAO_BONUS };
 }
+
+/**
+ * Promoção de lançamento: toda conta que ainda não ganhou o bônus de
+ * boas-vindas recebe ₿C 10.000 de bônus automaticamente ao entrar, até o
+ * fim de 07/12/2026 (horário de Brasília). Depois disso, não há mais.
+ */
+export const BONUS_PROMO_FIM_MS = Date.parse('2026-12-08T00:00:00-03:00');
+
+export function bonusBoasVindasAtivo(agoraMs = Date.now()) {
+    return agoraMs < BONUS_PROMO_FIM_MS;
+}

@@ -44,7 +44,11 @@ idToken), `game-manager.js` (motor do poker), `tournament-manager.js`,
    `mesa.contribuicoesEncerradas`, `mesa.turnoExpiraEm`.
 6. `backend/node_modules/` é versionado no git (a Hostinger não roda
    `npm install`): mudança de dependência só chega a produção se o
-   `node_modules` for commitado junto.
+   `node_modules` for commitado junto. **Mas o `.gitignore` esconde arquivos
+   NOVOS dos pacotes:** depois de atualizar, rode
+   `git status --short --ignored backend/node_modules` e adicione com
+   `git add -f` o que aparecer (fora os `.cmd`/`.ps1` do Windows), e use
+   `git -c core.fileMode=false add` para não tirar o +x dos binários.
 7. Testar o motor com script `socket.io-client` contra backend local em modo
    offline (sem `firebase-credentials.json`) antes de pedir teste manual.
 

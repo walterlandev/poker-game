@@ -33,7 +33,7 @@ import {
     firebaseEstaAtivo,
 } from './firebase-admin.js';
 
-import { registrarEventosWallet, resetarLimiteDiario, minerarBlocoSeNecessario } from './wallet/wallet-manager.js';
+import { registrarEventosWallet, resetarLimiteDiario, minerarBlocoSeNecessario, concederBonusBoasVindas } from './wallet/wallet-manager.js';
 import { blockchain } from './wallet/blockchain.js';
 import { processarWebhookMP }                          from './wallet/mercadopago.js';
 import { registrarEventosTemas }                       from './temas.js';
@@ -281,6 +281,12 @@ io.on('connection', (socket) => {
 
         console.log(`✅ Autenticado: ${dados.nome} (${uid})${socket.data.isAdmin ? ' [admin]' : ''}`);
         socket.emit('autenticado', { sucesso: true, isAdmin: socket.data.isAdmin });
+
+        // Promoção: conta que ainda não ganhou o bônus de boas-vindas recebe
+        // agora, sem precisar clicar (ver concederBonusBoasVindas).
+        if (perfil && perfil.bonusResgatado !== true) {
+            concederBonusBoasVindas(uid, socket).catch(() => {});
+        }
     });
 
 

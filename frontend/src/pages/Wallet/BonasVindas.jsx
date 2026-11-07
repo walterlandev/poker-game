@@ -37,7 +37,6 @@
      saldoReal   → number : saldo real em ₿C (para mostrar separado)
 ================================================================ */
 
-import { useState, useEffect, useRef } from 'react';
 import { BONUS, fmtBC, detalheSaldo, temBonus } from './walletUtils';
 import Icone from '../../components/Icone';
 
@@ -46,99 +45,32 @@ import Icone from '../../components/Icone';
 // EXPORT 1: MODAL DE BOAS-VINDAS (aparece no 1º acesso)
 // ================================================================
 
-export default function ModalBoasVindas({ nomeJogador, socket, onResgatado }) {
-
-    const [etapa, setEtapa] = useState('apresentacao');
-    const [erro,  setErro ] = useState(null);
-    const timeoutRef = useRef(null);
-
-    useEffect(() => {
-        return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
-    }, []);
-
-    function handleResgatar() {
-        if (!socket) { onResgatado(); return; }
-        setEtapa('resgatando');
-        setErro(null);
-        socket.emit('wallet:resgatar_bonus');
-        socket.once('wallet:bonus_creditado', () => {
-            clearTimeout(timeoutRef.current);
-            setEtapa('resgatado');
-            setTimeout(() => onResgatado(), 2000);
-        });
-        socket.once('wallet:bonus_erro', (err) => {
-            clearTimeout(timeoutRef.current);
-            setErro(err?.mensagem || 'Erro interno. Tente novamente.');
-            setEtapa('apresentacao');
-        });
-        timeoutRef.current = setTimeout(() => {
-            socket.off('wallet:bonus_creditado');
-            socket.off('wallet:bonus_erro');
-            onResgatado();
-        }, 5000);
-    }
-
-    function handlePular() {
-        clearTimeout(timeoutRef.current);
-        socket?.off('wallet:bonus_creditado');
-        socket?.off('wallet:bonus_erro');
-        onResgatado();
-    }
-
+export default function ModalBoasVindas({ nomeJogador, valor = BONUS.VALOR_BC, onFechar }) {
+    // O servidor credita o bônus sozinho ao entrar (promoção até 07/12/2026);
+    // este modal só avisa o jogador do que ele ganhou.
     return (
         <div className="modal-veu cart-pin-veu">
             <div className="cart-pin cart-bonus" role="dialog" aria-modal="true" aria-labelledby="bonus-titulo">
+                <span className="cart-pin-icone" aria-hidden="true"><Icone nome="presente" tamanho={22} /></span>
+                <h2 id="bonus-titulo">Bem-vindo, {nomeJogador}</h2>
+                <p className="cart-nota">Você ganhou um bônus para começar a jogar.</p>
 
-                {etapa === 'apresentacao' && (
-                    <>
-                        <span className="cart-pin-icone" aria-hidden="true"><Icone nome="presente" tamanho={22} /></span>
-                        <h2 id="bonus-titulo">Bem-vindo, {nomeJogador}</h2>
-                        <p className="cart-nota">Um bônus para você começar a jogar.</p>
+                <div className="cart-bonus-valor">
+                    <b className="num">₿C {fmtBC(valor)}</b>
+                    <span>de bônus, já na sua carteira</span>
+                </div>
 
-                        <div className="cart-bonus-valor">
-                            <b className="num">₿C {fmtBC(BONUS.VALOR_BC)}</b>
-                            <span>de bônus, só para jogar</span>
-                        </div>
+                <ul className="cart-regras">
+                    <RegraItem ok texto="Use nas mesas e torneios de bônus" />
+                    <RegraItem ok texto="Vale enquanto você tiver saldo de bônus" />
+                    <RegraItem texto="Não pode ser sacado" />
+                    <RegraItem texto="Não pode ser enviado a outro jogador" />
+                    <RegraItem aviso texto="Some se você perder tudo nas mesas" />
+                </ul>
 
-                        <ul className="cart-regras">
-                            <RegraItem ok texto="Use em qualquer mesa do jogo" />
-                            <RegraItem ok texto="Vale enquanto você tiver saldo de bônus" />
-                            <RegraItem texto="Não pode ser sacado" />
-                            <RegraItem texto="Não pode ser enviado a outro jogador" />
-                            <RegraItem aviso texto="Some se você perder tudo nas mesas" />
-                        </ul>
-
-                        {erro && <p className="cart-erro" role="alert">{erro}</p>}
-
-                        <button type="button" onClick={handleResgatar} className="btn btn-principal cart-btn-cheio">
-                            Resgatar bônus
-                        </button>
-                        <button type="button" onClick={handlePular} className="btn btn-fantasma cart-btn-cheio">
-                            Pular por agora
-                        </button>
-                        <p className="cart-nota">O bônus é concedido uma única vez por jogador.</p>
-                    </>
-                )}
-
-                {etapa === 'resgatando' && (
-                    <div className="cart-vazio" role="status">
-                        <span className="roda-carregando" aria-hidden="true" />
-                        <p className="titulo">Creditando seu bônus…</p>
-                        <p className="sub">Isso leva até 5 segundos.</p>
-                        <button type="button" onClick={handlePular} className="btn btn-fantasma">Pular por agora</button>
-                    </div>
-                )}
-
-                {etapa === 'resgatado' && (
-                    <div className="cart-vazio" role="status">
-                        <span className="cart-pin-icone" aria-hidden="true"><Icone nome="check" tamanho={22} /></span>
-                        <p className="titulo">Bônus creditado</p>
-                        <p className="sub num">₿C {fmtBC(BONUS.VALOR_BC)} entraram no seu saldo de bônus, que serve para jogar.</p>
-                        <button type="button" onClick={onResgatado} className="btn btn-principal">
-                            <Icone nome="mesas" tamanho={18} />Ir para as mesas
-                        </button>
-                    </div>
-                )}
+                <button type="button" onClick={onFechar} className="btn btn-principal cart-btn-cheio">
+                    <Icone nome="mesas" tamanho={18} />Ir para as mesas
+                </button>
             </div>
         </div>
     );

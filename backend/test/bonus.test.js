@@ -94,3 +94,13 @@ test('aposta de quem saiu da mesa leva a origem junto (bônus vai como bônus ao
     assert.equal(mesa.jogadores.h1.origemBonus, 200);
     assert.equal(bonusNaMesa(mesa) + 800 + saiuComBonus, bonusAntes);
 });
+
+// ── Promoção: ₿C 10.000 de bônus automático para conta nova até 07/12/2026 ──
+import { bonusBoasVindasAtivo, BONUS_PROMO_FIM_MS } from '../moeda.js';
+
+test('bônus de boas-vindas vale até o fim de 07/12/2026 (horário de Brasília)', () => {
+    assert.equal(bonusBoasVindasAtivo(Date.parse('2026-11-07T23:00:00-03:00')), true);
+    assert.equal(bonusBoasVindasAtivo(Date.parse('2026-12-07T23:59:00-03:00')), true);
+    assert.equal(bonusBoasVindasAtivo(Date.parse('2026-12-08T00:00:01-03:00')), false);
+    assert.equal(BONUS_PROMO_FIM_MS, Date.parse('2026-12-08T00:00:00-03:00'));
+});

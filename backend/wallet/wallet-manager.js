@@ -15,7 +15,7 @@ import { depositar, sacar, bonus, confirmarTransacao, TIPOS } from './transactio
 import { blockchain }                    from './blockchain.js';
 import { criarCarteira, validarEndereco } from './wallet.js';
 import { criarPagamentoPIX, enviarPIXSaida } from './mercadopago.js';
-import { planejarEnvio, planejarConversaoBonus, TAXA_CONVERSAO_BONUS } from '../moeda.js';
+import { planejarEnvio, planejarConversaoBonus, TAXA_CONVERSAO_BONUS, bonusBoasVindasAtivo } from '../moeda.js';
 import { checarReautenticacao, validarPinNovo, checarTravaPosRedefinicao } from './redefinir-pin.js';
 
 
@@ -308,6 +308,64 @@ export async function confirmarSaque(saqueId, io) {
 // BLOCO 4: REGISTRO DOS EVENTOS NO SOCKET
 // ================================================================
 
+// ================================================================
+// BÔNUS DE BOAS-VINDAS (promoção até 07/12/2026, ver moeda.js)
+// Chamado pelo server.js logo depois do 'autenticar': quem ainda não
+// ganhou o bônus recebe BONUS_BOAS_VINDAS_BC de bônus, uma única vez.
+// A flag bonusResgatado é lida e gravada na mesma transação.
+// ================================================================
+export async function concederBonusBoasVindas(jogadorUid, socket) {
+    try {
+        if (!bonusBoasVindasAtivo()) return { creditado: false, motivo: 'A promoção de bônus de boas-vindas terminou.' };
+
+        const perfil = await getPerfil(jogadorUid);
+        if (!perfil)                       return { creditado: false, motivo: 'Jogador não encontrado.' };
+        if (perfil.bonusResgatado === true) return { creditado: false, motivo: 'Bônus já resgatado anteriormente.' };
+
+        const ultimaTx  = await getUltimaTransacao(jogadorUid);
+        const resultado = bonus({
+            uid:          jogadorUid,
+            endereco:     perfil.endereco || '',
+            valor:        BONUS_BOAS_VINDAS_BC,
+            hashAnterior: ultimaTx?.hash || '0'.repeat(64),
+            descricao:    'Bônus de boas-vindas',
+        });
+        if (!resultado.sucesso) return { creditado: false, motivo: resultado.erro };
+
+        const txConfirmada = confirmarTransacao(resultado.transacao);
+
+        const creditado = await admin.firestore().runTransaction(async (tx) => {
+            const ref  = refJogador(jogadorUid);
+            const snap = await tx.get(ref);
+            if (!snap.exists) return false;
+            if (snap.data().bonusResgatado === true) return false;
+            tx.update(ref, {
+                saldoBonus:     admin.firestore.FieldValue.increment(BONUS_BOAS_VINDAS_BC),
+                bonusResgatado: true,
+            });
+            return true;
+        });
+        if (!creditado) return { creditado: false, motivo: 'Bônus já resgatado anteriormente.' };
+
+        await salvarEEmitirTx(jogadorUid, txConfirmada, socket);
+
+        const perfilAtualizado = await getPerfil(jogadorUid);
+        socket.emit('wallet:saldo_atualizado', {
+            saldo:      perfilAtualizado.saldo      || 0,
+            saldoBonus: perfilAtualizado.saldoBonus || 0,
+            sacadoHoje: perfilAtualizado.sacadoHoje || 0,
+        });
+        socket.emit('wallet:bonus_creditado', { valor: BONUS_BOAS_VINDAS_BC });
+        console.log(`🎁 Bônus de boas-vindas creditado para ${socket.data?.nome} (${jogadorUid})`);
+        return { creditado: true };
+
+    } catch (e) {
+        console.error('Erro no bônus de boas-vindas:', e.message);
+        return { creditado: false, motivo: 'Erro interno. Tente novamente.' };
+    }
+}
+
+
 export function registrarEventosWallet(socket, io) {
 
     const uid = () => socket.data.uid;
@@ -316,74 +374,16 @@ export function registrarEventosWallet(socket, io) {
     // ----------------------------------------------------------------
     // EVENTO: wallet:resgatar_bonus
     // ----------------------------------------------------------------
+    // Bônus de boas-vindas: o servidor já credita sozinho ao autenticar
+    // (concederBonusBoasVindas). Este evento fica para clientes antigos.
     socket.on('wallet:resgatar_bonus', async () => {
         const jogadorUid = uid();
         if (!jogadorUid) {
             socket.emit('wallet:bonus_erro', { mensagem: 'Não autenticado.' });
             return;
         }
-
-        try {
-            const perfil = await getPerfil(jogadorUid);
-
-            if (!perfil) {
-                socket.emit('wallet:bonus_erro', { mensagem: 'Jogador não encontrado.' });
-                return;
-            }
-
-            const ultimaTx  = await getUltimaTransacao(jogadorUid);
-            const resultado = bonus({
-                uid:          jogadorUid,
-                endereco:     perfil.endereco || '',
-                valor:        BONUS_BOAS_VINDAS_BC,
-                hashAnterior: ultimaTx?.hash || '0'.repeat(64),
-                descricao:    'Bônus de boas-vindas',
-            });
-
-            if (!resultado.sucesso) {
-                socket.emit('wallet:bonus_erro', { mensagem: resultado.erro });
-                return;
-            }
-
-            const txConfirmada = confirmarTransacao(resultado.transacao);
-
-            // Transação atômica: lê + marca resgatado numa única operação —
-            // sem isso, dois cliques rápidos (ou reconexão) podiam ambos ler
-            // bonusResgatado=false e creditar o bônus duas vezes.
-            const creditado = await admin.firestore().runTransaction(async (tx) => {
-                const ref  = refJogador(jogadorUid);
-                const snap = await tx.get(ref);
-                if (!snap.exists) return false;
-                if (snap.data().bonusResgatado === true) return false;
-
-                tx.update(ref, {
-                    saldoBonus:     admin.firestore.FieldValue.increment(BONUS_BOAS_VINDAS_BC),
-                    bonusResgatado: true,
-                });
-                return true;
-            });
-
-            if (!creditado) {
-                socket.emit('wallet:bonus_erro', { mensagem: 'Bônus já resgatado anteriormente.' });
-                return;
-            }
-
-            await salvarEEmitirTx(jogadorUid, txConfirmada, socket);
-
-            const perfilAtualizado = await getPerfil(jogadorUid);
-            socket.emit('wallet:saldo_atualizado', {
-                saldo:      perfilAtualizado.saldo      || 0,
-                saldoBonus: perfilAtualizado.saldoBonus || 0,
-                sacadoHoje: perfilAtualizado.sacadoHoje || 0,
-            });
-
-            socket.emit('wallet:bonus_creditado', { valor: BONUS_BOAS_VINDAS_BC });
-            console.log(`🎁 Bônus creditado para ${socket.data.nome}`);
-
-        } catch (e) {
-            console.error('Erro ao resgatar bônus:', e.message);
-            socket.emit('wallet:bonus_erro', { mensagem: 'Erro interno. Tente novamente.' });
-        }
+        const r = await concederBonusBoasVindas(jogadorUid, socket);
+        if (!r.creditado) socket.emit('wallet:bonus_erro', { mensagem: r.motivo });
     });
 
 
@@ -955,6 +955,11 @@ export function registrarEventosWallet(socket, io) {
                 const ref  = refJogador(jogadorUid);
                 const snap = await tx.get(ref);
                 if (!snap.exists) return { sucesso: false, erro: 'Jogador não encontrado.' };
+
+                // Mesma trava de 24 h do saque/envio: sem ela, quem redefiniu o
+                // PIN de outra pessoa podia queimar o saldo real dela em bônus.
+                const trava = checarTravaPosRedefinicao(snap.data());
+                if (trava) return { sucesso: false, erro: trava.replace('saques e envios ficam bloqueados', 'saques, envios e trocas por bônus ficam bloqueados') };
 
                 const plano = planejarConversaoBonus(snap.data(), valor);
                 if (!plano.sucesso) return plano;
