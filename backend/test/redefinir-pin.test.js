@@ -31,3 +31,20 @@ test('PIN novo segue as regras da tela', () => {
     assert.ok(validarPinNovo('A1!'));
     assert.ok(validarPinNovo(123456));
 });
+
+// ── Trava de 24 h depois de redefinir o PIN ─────────────────────────
+import { checarTravaPosRedefinicao, TRAVA_POS_REDEFINICAO_MS } from '../wallet/redefinir-pin.js';
+
+test('sem redefinição de PIN, saque/envio liberados', () => {
+    assert.equal(checarTravaPosRedefinicao({}, agora), null);
+});
+
+test('até 24 h depois de redefinir o PIN, saque/envio bloqueados', () => {
+    const perfil = { pinRedefinidoEm: { toMillis: () => agora - 60 * 60 * 1000 } };
+    assert.match(checarTravaPosRedefinicao(perfil, agora), /23 h/);
+});
+
+test('passadas 24 h, saque/envio liberados de novo', () => {
+    const perfil = { pinRedefinidoEm: { toMillis: () => agora - TRAVA_POS_REDEFINICAO_MS - 1 } };
+    assert.equal(checarTravaPosRedefinicao(perfil, agora), null);
+});

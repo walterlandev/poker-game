@@ -218,7 +218,7 @@ export default function History({ transacoes, socket, onCarregar, compacto = fal
 
 const ICONE_TIPO = {
     deposito: 'baixo', saque: 'cima', envio: 'enviar', recebimento: 'receber',
-    premio: 'torneio', compra: 'loja', taxa: 'info', bonus: 'presente',
+    premio: 'torneio', compra: 'loja', taxa: 'info', bonus: 'presente', conversao_bonus: 'presente',
 };
 
 const NOME_STATUS = {

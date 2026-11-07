@@ -27,6 +27,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import PinConfirm from './PinConfirm';
+import ConverterBonus from './ConverterBonus';
 import SendBC     from './SendBC';
 import Icone      from '../../components/Icone';
 import {
@@ -48,7 +49,7 @@ import {
 
 export default function WalletCard({ saldoReal = 0, sacadoHoje = 0, usuario, socket, onFeedback, acaoInicial = null }) {
 
-    // Ação em foco: 'deposito' | 'saque' | 'enviar' | null
+    // Ação em foco: 'deposito' | 'saque' | 'enviar' | 'bonus' | null
     const [acao, setAcao] = useState(acaoInicial);
 
     // Detalhes da cotação/taxas (linha curta que expande)
@@ -282,11 +283,12 @@ export default function WalletCard({ saldoReal = 0, sacadoHoje = 0, usuario, soc
                 </div>
             )}
 
-            {/* ---- Três ações grandes ---- */}
+            {/* ---- Quatro ações grandes ---- */}
             <div className="cart-acoes" role="group" aria-label="Ações da carteira">
                 <BotaoAcao icone="baixo"  label="Depositar" ativo={acao === 'deposito'} onClick={() => toggleAcao('deposito')} />
                 <BotaoAcao icone="cima"   label="Sacar"     ativo={acao === 'saque'}    onClick={() => toggleAcao('saque')} />
                 <BotaoAcao icone="enviar" label="Enviar"    ativo={acao === 'enviar'}   onClick={() => toggleAcao('enviar')} />
+                <BotaoAcao icone="presente" label="Virar bônus" ativo={acao === 'bonus'} onClick={() => toggleAcao('bonus')} />
             </div>
 
             {/* ---- Depósito ---- */}
@@ -416,6 +418,11 @@ export default function WalletCard({ saldoReal = 0, sacadoHoje = 0, usuario, soc
                     </button>
                     <p className="cart-nota">O bônus não pode ser sacado: só o saldo real sai da carteira.</p>
                 </section>
+            )}
+
+            {/* ---- Trocar saldo real por bônus (1 → 10) ---- */}
+            {acao === 'bonus' && (
+                <ConverterBonus saldoReal={saldoReal} socket={socket} onFeedback={onFeedback} />
             )}
 
             {/* ---- Enviar ₿C (inline) ---- */}

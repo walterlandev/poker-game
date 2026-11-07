@@ -339,6 +339,9 @@ export default function App() {
     if (usuario && usuario.temPin === false) {
         return (
             <Auth
+                // key diferente da tela de login: sem isso o React reaproveita
+                // o Auth já montado (preso em 'login') e o CriarPin nunca aparece.
+                key="sem-pin"
                 onAutenticado={handleAutenticado}
                 socket={socket}
                 usuarioSemPin={usuario}

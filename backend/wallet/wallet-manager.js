@@ -15,8 +15,8 @@ import { depositar, sacar, bonus, confirmarTransacao, TIPOS } from './transactio
 import { blockchain }                    from './blockchain.js';
 import { criarCarteira, validarEndereco } from './wallet.js';
 import { criarPagamentoPIX, enviarPIXSaida } from './mercadopago.js';
-import { planejarEnvio }                   from '../moeda.js';
-import { checarReautenticacao, validarPinNovo } from './redefinir-pin.js';
+import { planejarEnvio, planejarConversaoBonus, TAXA_CONVERSAO_BONUS } from '../moeda.js';
+import { checarReautenticacao, validarPinNovo, checarTravaPosRedefinicao } from './redefinir-pin.js';
 
 
 // ================================================================
@@ -511,6 +511,12 @@ export function registrarEventosWallet(socket, io) {
                 return;
             }
 
+            const travaSaque = checarTravaPosRedefinicao(await getPerfil(jogadorUid));
+            if (travaSaque) {
+                socket.emit('erro', { mensagem: travaSaque });
+                return;
+            }
+
             const valor = Math.floor(Number(valorBC));
             if (!Number.isFinite(valor) || valor < SAQUE_MIN_BC) {
                 socket.emit('erro', { mensagem: `Saque mínimo: ₿C ${SAQUE_MIN_BC.toLocaleString('pt-BR')}` });
@@ -669,6 +675,12 @@ export function registrarEventosWallet(socket, io) {
             const pinCheck = await verificarPin(jogadorUid, pin);
             if (!pinCheck.ok) {
                 socket.emit('wallet:envio_erro', { mensagem: pinCheck.erro });
+                return;
+            }
+
+            const travaEnvio = checarTravaPosRedefinicao(await getPerfil(jogadorUid));
+            if (travaEnvio) {
+                socket.emit('wallet:envio_erro', { mensagem: travaEnvio });
                 return;
             }
 
@@ -923,6 +935,82 @@ export function registrarEventosWallet(socket, io) {
 
 
     // ----------------------------------------------------------------
+    // EVENTO: wallet:converter_bonus
+    // Troca saldo REAL por bônus (1 real = TAXA_CONVERSAO_BONUS bônus),
+    // só nesse sentido. Pede PIN. Só o valor vem do cliente; o bônus
+    // creditado é calculado aqui (planejarConversaoBonus, moeda.js).
+    // ----------------------------------------------------------------
+    socket.on('wallet:converter_bonus', async ({ valor, pin } = {}) => {
+        const jogadorUid = uid();
+        if (!jogadorUid) return;
+
+        try {
+            const pinCheck = await verificarPin(jogadorUid, pin);
+            if (!pinCheck.ok) {
+                socket.emit('wallet:conversao_erro', { mensagem: pinCheck.erro });
+                return;
+            }
+
+            const resultado = await admin.firestore().runTransaction(async (tx) => {
+                const ref  = refJogador(jogadorUid);
+                const snap = await tx.get(ref);
+                if (!snap.exists) return { sucesso: false, erro: 'Jogador não encontrado.' };
+
+                const plano = planejarConversaoBonus(snap.data(), valor);
+                if (!plano.sucesso) return plano;
+
+                tx.update(ref, {
+                    saldo:      admin.firestore.FieldValue.increment(-plano.debitarReal),
+                    saldoBonus: admin.firestore.FieldValue.increment(plano.creditarBonus),
+                });
+                return plano;
+            });
+
+            if (!resultado.sucesso) {
+                socket.emit('wallet:conversao_erro', { mensagem: resultado.erro });
+                return;
+            }
+
+            const ultimaTx = await getUltimaTransacao(jogadorUid);
+            const agora    = Date.now();
+            const txConv   = confirmarTransacao({
+                id:           `conv_${jogadorUid}_${agora}`,
+                hash:         `conv_${jogadorUid}_${agora}`,
+                hashAnterior: ultimaTx?.hash || '0'.repeat(64),
+                tipo:         'CONVERSAO_BONUS',
+                remetenteUid: jogadorUid,
+                destinatarioUid: 'SISTEMA_BONUS',
+                valor:        resultado.debitarReal,
+                taxa:         0,
+                valorLiquido: resultado.debitarReal,
+                timestamp:    new Date(agora).toISOString(),
+                status:       'CONFIRMADA',
+                metadados: {
+                    bonusCreditado:  resultado.creditarBonus,
+                    taxaConversao:   TAXA_CONVERSAO_BONUS,
+                    nomeContraparte: 'Bônus',
+                    descricao:       `Conversão em bônus (+₿C ${resultado.creditarBonus.toLocaleString('pt-BR')} de bônus)`,
+                },
+            });
+            await salvarEEmitirTx(jogadorUid, txConv, socket, 'SISTEMA_BONUS');
+
+            const perfil = await getPerfil(jogadorUid);
+            socket.emit('wallet:saldo_atualizado', {
+                saldo:      perfil.saldo      || 0,
+                saldoBonus: perfil.saldoBonus || 0,
+                sacadoHoje: perfil.sacadoHoje || 0,
+            });
+            socket.emit('wallet:conversao_ok', { real: resultado.debitarReal, bonus: resultado.creditarBonus });
+            console.log(`🔁 Conversão: ${socket.data.nome} trocou ₿C ${resultado.debitarReal} real por ₿C ${resultado.creditarBonus} de bônus`);
+
+        } catch (e) {
+            console.error('Erro na conversão em bônus:', e.message);
+            socket.emit('wallet:conversao_erro', { mensagem: 'Erro ao converter. Tente novamente.' });
+        }
+    });
+
+
+    // ----------------------------------------------------------------
     // EVENTO: wallet:criar_pin
     // Salva hash bcrypt do PIN no primeiro cadastro.
     // O PIN nunca é salvo em texto claro.
@@ -991,6 +1079,7 @@ export function registrarEventosWallet(socket, io) {
                 pinHash:         novoPinHash,
                 pinTentativas:   0,
                 pinBloqueadoAte: admin.firestore.FieldValue.delete(),
+                pinRedefinidoEm: admin.firestore.FieldValue.serverTimestamp(),
             });
 
             socket.emit('wallet:pin_redefinido');

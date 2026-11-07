@@ -990,7 +990,8 @@ button.config-item:hover { background: var(--cor-superficie-2); }
 
 /* Ações */
 .cart-acoes-bloco { display: flex; flex-direction: column; gap: var(--s-3); }
-.cart-acoes { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-2); }
+.cart-acoes { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-2); }
+@media (max-width: 380px) { .cart-acoes { grid-template-columns: repeat(2, 1fr); } }
 .cart-acao {
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 76px;
     border: 1px solid var(--cor-linha); border-radius: var(--r-painel); background: var(--cor-superficie);

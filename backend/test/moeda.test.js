@@ -445,3 +445,19 @@ for (const semente of [1, 2, 3, 4, 5, 6]) {
         assert.equal(depois.real, antes.real, 'mesa bônus mexeu no saldo real');
     });
 }
+
+// ── Conversão de saldo real em bônus (1 real = 10 bônus, só nesse sentido) ──
+import { planejarConversaoBonus, TAXA_CONVERSAO_BONUS } from '../moeda.js';
+
+test('converte real em bônus a 1:10', () => {
+    assert.equal(TAXA_CONVERSAO_BONUS, 10);
+    assert.deepEqual(planejarConversaoBonus({ saldo: 5000 }, 1000), { sucesso: true, debitarReal: 1000, creditarBonus: 10000 });
+});
+
+test('conversão recusa valor inválido, fracionado ou maior que o saldo real', () => {
+    assert.equal(planejarConversaoBonus({ saldo: 5000 }, 0).sucesso, false);
+    assert.equal(planejarConversaoBonus({ saldo: 5000 }, -10).sucesso, false);
+    assert.equal(planejarConversaoBonus({ saldo: 5000 }, 10.5).sucesso, false);
+    assert.equal(planejarConversaoBonus({ saldo: 5000 }, 'abc').sucesso, false);
+    assert.equal(planejarConversaoBonus({ saldo: 500, saldoBonus: 99999 }, 1000).sucesso, false);
+});

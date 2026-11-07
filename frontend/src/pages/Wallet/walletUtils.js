@@ -59,6 +59,7 @@ export const TIPO_TX = {
     COMPRA:      'compra',       // compra de tema, item na loja
     TAXA:        'taxa',
     BONUS:       'bonus',
+    CONVERSAO:   'conversao_bonus', // saldo real trocado por bônus (1 → 10)
 };
 
 // Labels legíveis para cada tipo
@@ -71,6 +72,7 @@ export const LABEL_TX = {
     compra:      'Compra na loja',
     taxa:        'Taxa',
     bonus:       'Bônus',
+    conversao_bonus: 'Troca por bônus',
 };
 
 // Ícone para cada tipo de transação
@@ -83,6 +85,7 @@ export const ICONE_TX = {
     compra:      '🛒',
     taxa:        '📋',
     bonus:       '🎁',
+    conversao_bonus: '🎁',
 };
 
 
@@ -310,7 +313,7 @@ export function fmtData(data) {
  */
 export function corTipoTx(tipo) {
     const entradas = [TIPO_TX.DEPOSITO, TIPO_TX.RECEBIMENTO, TIPO_TX.PREMIO, TIPO_TX.BONUS];
-    const saidas   = [TIPO_TX.SAQUE, TIPO_TX.ENVIO, TIPO_TX.COMPRA];
+    const saidas   = [TIPO_TX.SAQUE, TIPO_TX.ENVIO, TIPO_TX.COMPRA, TIPO_TX.CONVERSAO];
     if (entradas.includes(tipo)) return '#22C55E';   // verde
     if (saidas.includes(tipo))   return '#EF4444';   // vermelho
     return '#F59E0B';                                // amarelo (taxa, etc)

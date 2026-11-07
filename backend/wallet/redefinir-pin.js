@@ -33,3 +33,18 @@ export function checarReautenticacao(decoded, uidSocket, agoraMs = Date.now()) {
     }
     return null;
 }
+
+// Depois de um "Esqueci o PIN", saque e envio ficam travados por 24 h:
+// quem pegou o aparelho com a sessão aberta consegue redefinir o PIN, mas
+// não tira o dinheiro antes de o dono perceber. Jogar continua liberado.
+export const TRAVA_POS_REDEFINICAO_MS = 24 * 60 * 60 * 1000;
+
+export function checarTravaPosRedefinicao(perfil, agoraMs = Date.now()) {
+    const em = perfil?.pinRedefinidoEm;
+    const redefinidoMs = typeof em?.toMillis === 'function' ? em.toMillis() : Number(em) || 0;
+    if (!redefinidoMs) return null;
+    const restante = redefinidoMs + TRAVA_POS_REDEFINICAO_MS - agoraMs;
+    if (restante <= 0) return null;
+    const horas = Math.ceil(restante / (60 * 60 * 1000));
+    return `Por segurança, saques e envios ficam bloqueados por 24 h depois de redefinir o PIN. Faltam ${horas} h.`;
+}

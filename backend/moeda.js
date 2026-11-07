@@ -77,3 +77,22 @@ export function decidirMoedaMesa(config = {}, qtdBots = 0) {
     if (moeda === 'real' && qtdBots > 0) return { sucesso: false, erro: MSG_MOEDA.BOTS_SO_BONUS };
     return { sucesso: true, moeda };
 }
+
+/**
+ * Conversão de saldo REAL em bônus, só nesse sentido (bônus nunca vira
+ * real). 1 ₿C real vira TAXA_CONVERSAO_BONUS ₿C de bônus. O valor é a
+ * única entrada do cliente; o resto é calculado aqui.
+ */
+export const TAXA_CONVERSAO_BONUS = 10;
+export const CONVERSAO_MAX_BC     = 1_000_000;
+
+export function planejarConversaoBonus({ saldo = 0 } = {}, valor) {
+    const v = Number(valor);
+    if (!Number.isInteger(v) || v < 1 || v > CONVERSAO_MAX_BC) {
+        return { sucesso: false, erro: `Informe um valor inteiro entre ₿C 1 e ₿C ${fmt(CONVERSAO_MAX_BC)}.` };
+    }
+    if ((Number(saldo) || 0) < v) {
+        return { sucesso: false, erro: `Saldo real insuficiente. Seu saldo real é ₿C ${fmt(saldo)}.` };
+    }
+    return { sucesso: true, debitarReal: v, creditarBonus: v * TAXA_CONVERSAO_BONUS };
+}
