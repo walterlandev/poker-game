@@ -580,6 +580,7 @@ export class TournamentManager {
             jogadoresPorMesa:  torneio.jogadoresPorMesa,
             maxRebuys:         torneio.maxRebuys,
             rebuyPeriod:       torneio.rebuyPeriod,
+            moeda:             torneio.moeda,
             rebuyAtivo,
             rebuyMinRestantes: rebuyAtivo ? Math.round(torneio.rebuyPeriod - minDecorridos) : 0,
             aguardandoRebuys:  torneio.aguardandoRebuys,
@@ -638,6 +639,7 @@ export class TournamentManager {
                 jogadoresPorMesa: t.jogadoresPorMesa,
                 maxRebuys:        t.maxRebuys,
                 rebuyPeriod:      t.rebuyPeriod,
+                moeda:            t.moeda,
                 totalJogadores:   Object.keys(t.jogadores).length,
             }));
     }

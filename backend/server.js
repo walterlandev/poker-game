@@ -57,15 +57,21 @@ const ORIGENS_PERMITIDAS = [
     'https://btcpokerclub.online',           // site servido pelo próprio servidor
     'https://www.btcpokerclub.online',
     'https://poker-game-tawny-rho.vercel.app',
+    'https://hotpink-monkey-434476.hostingersite.com', // endereço temporário do app na Hostinger
     process.env.CLIENT_URL,
 ].filter(Boolean);
 
+// Origem fora da lista: só nega o CORS (o navegador bloqueia), sem lançar
+// erro — lançar fazia o Express responder 500 e encher o log de pilhas.
+function checarOrigem(origin, cb) {
+    if (!origin || ORIGENS_PERMITIDAS.includes(origin)) return cb(null, true);
+    console.warn(`CORS recusado: ${origin}`);
+    cb(null, false);
+}
+
 const io = new Server(server, {
     cors: {
-        origin: (origin, cb) => {
-            if (!origin || ORIGENS_PERMITIDAS.includes(origin)) cb(null, true);
-            else cb(new Error(`CORS bloqueado: ${origin}`));
-        },
+        origin: checarOrigem,
         methods:     ['GET', 'POST'],
         credentials: true,
     },
@@ -97,10 +103,7 @@ app.use('/webhook/mercadopago', express.raw({ type: 'application/json' }), (req,
 });
 
 app.use(cors({
-    origin: (origin, cb) => {
-        if (!origin || ORIGENS_PERMITIDAS.includes(origin)) cb(null, true);
-        else cb(new Error(`CORS bloqueado: ${origin}`));
-    },
+    origin: checarOrigem,
     credentials: true,
 }));
 

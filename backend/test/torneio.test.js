@@ -168,3 +168,10 @@ test('mesa de torneio que fica com um só jogador (os outros saíram entre mãos
     assert.equal(torneio.status, 'finalizado', `torneio ficou '${torneio.status}', mesa em ${gm.getMesa(mesaId)?.fase}`);
     assert.equal(torneio.campeao, 'p0');
 });
+
+test('a moeda do torneio chega ao cliente na lista e no estado', () => {
+    const { tm, torneioId, torneio } = montarTorneio(2, { maxRebuys: 0, moeda: 'bonus' });
+    assert.equal(torneio.moeda, 'bonus');
+    assert.equal(tm.listarTorneios().find(t => t.id === torneioId).moeda, 'bonus');
+    assert.equal(tm._buildEstado(torneio).moeda, 'bonus');
+});
