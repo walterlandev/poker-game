@@ -114,7 +114,10 @@ app.use(express.json());
 // já que já pagamos a hospedagem do backend mesmo.
 const __filename    = fileURLToPath(import.meta.url);
 const __dirname      = dirname(__filename);
-const PASTA_AVATARES = join(__dirname, 'public', 'avatares');
+// Em produção, AVATARES_DIR aponta para uma pasta FORA do app (ex.:
+// /home/<usuario>/avatares-poker): a Hostinger recria a pasta do app a
+// cada deploy e apagaria as fotos. Sem a variável, usa a pasta local.
+const PASTA_AVATARES = process.env.AVATARES_DIR || join(__dirname, 'public', 'avatares');
 fs.mkdirSync(PASTA_AVATARES, { recursive: true });
 app.use('/avatares', express.static(PASTA_AVATARES));
 

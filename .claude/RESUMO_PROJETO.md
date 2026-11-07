@@ -5,7 +5,7 @@ cada tela, histórico item a item): `.claude/RELATORIO_PROJETO.txt`. Regras de
 trabalho: `CLAUDE.md`. Notas e diário também no Obsidian:
 `wasobsidia/Projetos/Poker Game/`.
 
-Atualizado em: 05/11/2026 (último commit no código: 04/08/2026, `17aca68`).
+Atualizado em: 07/11/2026 (produção em `main` = `14e1a13`, bundle `index-cMGAEzoN.js`).
 
 ## O que é
 
@@ -18,11 +18,12 @@ ledger tipo blockchain, loja de temas de baralho, perfil com foto e painel admin
 
 | Parte | Tecnologia | Onde |
 |---|---|---|
-| Frontend | React 19 + Vite 8 (rolldown) | `frontend/`, Vercel: https://poker-game-tawny-rho.vercel.app |
-| Backend | Node + Express + Socket.io | `backend/`, Hostinger: https://brown-wolverine-631802.hostingersite.com |
+| Site + API | Hostinger (mesmo domínio) | https://btcpokerclub.online |
+| Frontend | React 19 + Vite 8 (rolldown) | `frontend/`; `npm run build:site` gera `backend/public/site` (versionado) |
+| Backend | Node + Express + Socket.io | `backend/`; serve o site e a API |
 | Login/banco | Firebase Auth + Firestore | projeto `poker-texas-hold-1ec8d` |
 | Pagamento | Mercado Pago (produção) | webhook exige `MP_WEBHOOK_SECRET` |
-| Repositório | GitHub `walterlandev/poker-game` | push na `main` = deploy nos dois lados |
+| Repositório | GitHub `walterlandev/poker-game` | push na `main` = deploy na Hostinger |
 
 Arquivos-chave do backend: `server.js` (sockets, rotas, autenticação por
 idToken), `game-manager.js` (motor do poker), `tournament-manager.js`,
@@ -76,38 +77,31 @@ idToken), `game-manager.js` (motor do poker), `tournament-manager.js`,
   `npm install --no-save @rolldown/binding-win32-x64-msvc@1.2.2`.
   Notas do projeto criadas no Obsidian e este resumo.
 
+- **06–07/11/2026 — segurança, moeda e domínio.** Regras do Firestore por
+  campo (21/21 testes); perfil novo nasce zerado. Mesas e torneios são **Real
+  ou Bônus** (`backend/moeda.js`): bots só no bônus, bônus nunca vira saldo
+  real, só saldo real pode ser enviado, ranking só conta mesas reais. Redesign
+  de todas as telas (tema escuro e claro). Corrigidos all-in repetido, tela
+  preta, corrida do PIN e "₿C undefined" no ranking. Domínio
+  btcpokerclub.online: o backend passou a servir o site (Vercel aposentada).
+  115 testes em `backend/test` (`npm test`).
+
 ## Pendências abertas
 
-- **Resolvido em 06/11/2026 (01:08 UTC):** as regras do Firestore deixavam o
-  usuário escrever o próprio `jogadores/{uid}` inteiro (saldo, admin, PIN) e
-  o próprio ranking. As novas regras (`firestore.rules`) já estão publicadas:
-  o cliente só cria perfil zerado e só edita nome/avatar/telefone/email.
-  Teste contra produção: 21/21. Publicar regras não reinicia o backend
-  (Admin SDK `releaseFirestoreRulesetFromSource` ou console do Firebase).
-- `Login.jsx` corrigido localmente (perfil nasce com saldo 0, como no
-  Cadastro), **ainda não enviado**: até o próximo push, um jogador novo que
-  entrar com Google pela tela de Login, sem passar pelo Cadastro, recebe erro
-  ao criar o perfil.
-
-- **Alto:** mesas e torneios só em memória (todo deploy derruba jogos). Correção
-  real exige persistir estado (Firestore/Redis) e reestruturar `game-manager.js`.
-- **Foto de perfil some no deploy (provável):** o arquivo-marcador
-  `/avatares/ncnoBxfwKMRhWaA1OujSb3Y9HsD2.png` respondeu 404 em 05/11/2026,
-  depois dos pushes de 04/08. Indica que `backend/public/avatares/` é apagada a
-  cada deploy. Precisa de storage externo (Cloudinary, S3 ou Firebase Storage pago).
-- **Corrida no cadastro:** `CriarPin.jsx` depende de socket que só conecta no fim
-  do wizard; a etapa "Criar PIN" pode travar em "Salvando..." e, ao recarregar,
-  o jogador entra sem PIN. Reproduzível localmente.
-- **Ranking mostra "₿C undefined"** (provável nome de campo divergente).
-- **All-in repetido / timer preso** relatado em produção; investigação
-  interrompida. Próximo passo: testar "entrar numa mesa já em andamento" pelo lobby.
-- **Tela preta "insertBefore":** mitigada, causa raiz não confirmada.
+- Teste real do usuário em produção (login Google, carteira, mesa Real/Bônus,
+  admin "Já paguei", perfil/foto, depósito/saque).
+- Redirecionar o site velho da Vercel para btcpokerclub.online e depois tirar
+  o domínio da Vercel da lista de domínios autorizados do Firebase.
+- **Foto de perfil some a cada deploy** (`backend/public/avatares/` é apagada).
+  Precisa de storage externo (ex.: Cloudinary).
+- Mostrar ao jogador quanto voltou como real e quanto como bônus na saída da
+  mesa / prêmio de torneio (backend devolver `{ creditadoReal, creditadoBonus }`).
+- **Alto:** mesas e torneios só em memória (todo deploy derruba jogos).
+- Tela preta "insertBefore": mitigada, causa raiz não confirmada.
 - Saque é manual (sem API de PIX para chave qualquer).
 - Código morto: `wallet.js` (ECDSA) e partes de `transactions.js`; remover só
   com ok do usuário.
 - Torneio funciona como bracket (Sit & Go em série), não MTT com merge de mesas.
-- Ideias não construídas: mesa em layout vertical no celular; botão de
-  atualizar manual no lobby.
 
 ## Rodar local
 

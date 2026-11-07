@@ -10,11 +10,20 @@ fizer mudanças relevantes.
 
 ## Onde as coisas moram
 
-- **Frontend**: `frontend/` — React 19 + Vite, deploy automático no Vercel
-  (`https://poker-game-tawny-rho.vercel.app`) a cada `git push origin main`.
-- **Backend**: `backend/` — Node/Express/Socket.io, deploy automático na
-  Hostinger (`https://brown-wolverine-631802.hostingersite.com`) a cada
-  `git push origin main`.
+- **Produção (desde 07/11/2026): https://btcpokerclub.online** — o PRÓPRIO
+  backend na Hostinger serve o site e a API no mesmo domínio. Deploy
+  automático a cada `git push origin main` (app "btcpokerclub.online" no
+  hPanel, pasta raiz `backend`).
+- **Frontend**: `frontend/` — React 19 + Vite. Em produção é servido pelo
+  backend a partir de `backend/public/site`, que é VERSIONADO no git:
+  **antes de qualquer push com mudança de tela, rode
+  `cd frontend && npm run build:site`** e commite a pasta, senão vai ao ar
+  o site antigo. O endereço do servidor no frontend fica só em
+  `frontend/src/services/servidor.js` (em produção usa a própria origem).
+- **Backend**: `backend/` — Node/Express/Socket.io na Hostinger. Variáveis
+  `SERVER_URL` e `CLIENT_URL` = `https://btcpokerclub.online`.
+- **Vercel**: o projeto antigo (`poker-game-tawny-rho.vercel.app`) não é
+  mais a produção e aponta para um endereço desativado; não usar.
 - **Banco/login**: Firebase (Auth + Firestore), projeto `poker-texas-hold-1ec8d`.
 - **Pagamento**: Mercado Pago, credenciais de PRODUÇÃO já configuradas.
 
@@ -91,15 +100,19 @@ cd backend && node server.js
 # Rodar frontend local
 cd frontend && npm run dev
 
-# Build de produção do frontend (sempre rodar antes de subir)
-cd frontend && npm run build
+# Compilar o site para produção (sempre antes de subir mudança de tela)
+cd frontend && npm run build:site   # gera backend/public/site — commitar
 
-# Ver se o deploy do frontend já está no ar
-curl -s https://poker-game-tawny-rho.vercel.app/ | grep -o 'assets/index-[^"]*\.js'
+# Testes do motor/dinheiro (rodar antes de todo push)
+cd backend && npm test
 
-# Ver se o backend está respondendo
+# Ver se o deploy está no ar (uptime baixo = reiniciou; compare o bundle)
+curl -s https://btcpokerclub.online/health
+curl -s https://btcpokerclub.online/ | grep -o 'assets/index-[^"]*\.js'
+
+# Ver se a conexão do jogo responde
 curl -s -o /dev/null -w "%{http_code}\n" \
-  "https://brown-wolverine-631802.hostingersite.com/socket.io/?EIO=4&transport=polling"
+  "https://btcpokerclub.online/socket.io/?EIO=4&transport=polling"
 ```
 
 ## Antes de reportar algo como "corrigido"

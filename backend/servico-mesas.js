@@ -12,7 +12,7 @@ export const MSG = {
     OUTRA_MESA: 'Você já está sentado em outra mesa. Saia dela antes de entrar em outra.',
 };
 
-import { decidirMoedaMesa, normalizarMoeda } from './moeda.js';
+import { decidirMoedaMesa, normalizarMoeda, planejarCredito } from './moeda.js';
 
 export function criarServicoMesas({ io, gameManager, tournamentManager, debitar, creditar, emitirSaldo, socketMesa = new Map() }) {
 
@@ -279,6 +279,9 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         if (fichasRestantes > 0) {
             await creditar(uid, fichasRestantes, moeda, origemBonus);
             await emitirSaldo(socket, uid);
+            // Mesma conta que creditarSaidaMesa faz: o aviso mostra o que voltou.
+            const { real, bonus } = planejarCredito(fichasRestantes, moeda, origemBonus);
+            socket.emit('wallet:credito_recebido', { origem: 'mesa', real, bonus });
         }
         console.log(`🚪 ${socket.data.nome} saiu (${motivo}): ₿C ${fichasRestantes} devolvidos`);
     }
@@ -288,8 +291,11 @@ export function criarServicoMesas({ io, gameManager, tournamentManager, debitar,
         if (torneioId) { tournamentManager.abandonarMesa(torneioId, uid); return; }
         if (saldo > 0) {
             await creditar(uid, saldo, moeda || 'real', origemBonus);
+            const { real, bonus } = planejarCredito(saldo, moeda || 'real', origemBonus);
             for (const [, s] of io?.sockets?.sockets || []) {
-                if (s.data.uid === uid) await emitirSaldo(s, uid);
+                if (s.data.uid !== uid) continue;
+                await emitirSaldo(s, uid);
+                s.emit('wallet:credito_recebido', { origem: 'inatividade', real, bonus });
             }
         }
         console.log(`🚪 ${uid} removido por inatividade: ₿C ${saldo} devolvidos`);

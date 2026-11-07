@@ -259,3 +259,14 @@ test('bot não entra em mesa real nem em mesa de torneio', async (t) => {
     assert.equal(gm.adicionarBot(mesaT, 0)?.sucesso, false);
     assert.ok(Object.values(gm.getMesa(mesaT).jogadores).every(j => j.tipo === 'humano'));
 });
+
+test('ao sair da mesa o jogador é avisado de quanto voltou como real e como bônus', async (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { servico } = montar({ bonus: 200 });
+    const a = sock('a'), b = sock('b');
+    const mesaId = await servico.criarMesa(a, { buyIn: 500 });
+    await servico.entrarMesa(b, { mesaId });
+    await servico.sairMesa(b, 'voluntária');
+    const aviso = b.emitidos.find(e => e.ev === 'wallet:credito_recebido');
+    assert.deepEqual(aviso?.dados, { origem: 'mesa', real: 300, bonus: 200 });
+});

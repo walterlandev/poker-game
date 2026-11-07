@@ -255,6 +255,25 @@ export default function App() {
         return () => socket.off('torneio:cancelado_sem_jogadores', onCancelado);
     }, []);
 
+    // Crédito de saída de mesa / prêmio de torneio: mostra no lobby quanto
+    // voltou como saldo real e quanto como bônus (o servidor faz a conta).
+    const [avisoCredito, setAvisoCredito] = useState(null);
+    useEffect(() => {
+        const fmt = n => (Number(n) || 0).toLocaleString('pt-BR');
+        const onCredito = ({ origem, real = 0, bonus = 0 } = {}) => {
+            if (real <= 0 && bonus <= 0) return;
+            const partes = [];
+            if (real  > 0) partes.push(`₿C ${fmt(real)} de saldo real`);
+            if (bonus > 0) partes.push(`₿C ${fmt(bonus)} de bônus`);
+            const inicio = origem === 'torneio' ? 'Prêmio do torneio:'
+                : origem === 'inatividade' ? 'Você saiu da mesa por inatividade. Voltaram'
+                : 'Voltaram';
+            setAvisoCredito({ mensagem: `${inicio} ${partes.join(' e ')} para sua carteira.`, em: Date.now() });
+        };
+        socket.on('wallet:credito_recebido', onCredito);
+        return () => socket.off('wallet:credito_recebido', onCredito);
+    }, []);
+
     const handleSairMesa = useCallback(() => {
         // Game já emite 'sair_mesa' internamente; aqui apenas limpa o estado local
         setMesaAtual(null);
@@ -337,6 +356,8 @@ export default function App() {
             conviteMesa={conviteMesa}
             avisoTorneio={avisoTorneio}
             onFecharAvisoTorneio={() => setAvisoTorneio(null)}
+            avisoCredito={avisoCredito}
+            onFecharAvisoCredito={() => setAvisoCredito(null)}
         />
     );
 }

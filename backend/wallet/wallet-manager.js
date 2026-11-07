@@ -16,6 +16,7 @@ import { blockchain }                    from './blockchain.js';
 import { criarCarteira, validarEndereco } from './wallet.js';
 import { criarPagamentoPIX, enviarPIXSaida } from './mercadopago.js';
 import { planejarEnvio }                   from '../moeda.js';
+import { checarReautenticacao, validarPinNovo } from './redefinir-pin.js';
 
 
 // ================================================================
@@ -951,6 +952,53 @@ export function registrarEventosWallet(socket, io) {
         } catch (e) {
             console.error('Erro ao criar PIN:', e.message);
             socket.emit('wallet:pin_erro', { mensagem: 'Erro ao salvar PIN.' });
+        }
+    });
+
+
+    // ----------------------------------------------------------------
+    // EVENTO: wallet:redefinir_pin  ("Esqueci o PIN")
+    // O cliente acabou de entrar de novo (Google ou senha) e manda o
+    // idToken novo. O servidor verifica o token, exige que seja da mesma
+    // conta do socket e de um login feito há menos de 5 min (auth_time,
+    // assinado pelo Google), e só então troca o PIN e zera o bloqueio.
+    // ----------------------------------------------------------------
+    socket.on('wallet:redefinir_pin', async ({ idToken, pinNovo } = {}) => {
+        const jogadorUid = uid();
+        if (!jogadorUid) return;
+
+        try {
+            const erroPin = validarPinNovo(pinNovo);
+            if (erroPin) {
+                socket.emit('wallet:pin_erro', { mensagem: erroPin });
+                return;
+            }
+
+            let decoded = null;
+            try {
+                decoded = await admin.auth().verifyIdToken(String(idToken || ''), true);
+            } catch {
+                decoded = null;
+            }
+            const erroIdentidade = checarReautenticacao(decoded, jogadorUid);
+            if (erroIdentidade) {
+                socket.emit('wallet:pin_erro', { tipo: 'REAUTENTICAR', mensagem: erroIdentidade });
+                return;
+            }
+
+            const novoPinHash = await bcrypt.hash(pinNovo, 12);
+            await refJogador(jogadorUid).update({
+                pinHash:         novoPinHash,
+                pinTentativas:   0,
+                pinBloqueadoAte: admin.firestore.FieldValue.delete(),
+            });
+
+            socket.emit('wallet:pin_redefinido');
+            console.log(`🔐 PIN redefinido (reautenticado) para ${socket.data.nome}`);
+
+        } catch (e) {
+            console.error('Erro ao redefinir PIN:', e.message);
+            socket.emit('wallet:pin_erro', { mensagem: 'Erro ao redefinir PIN.' });
         }
     });
 

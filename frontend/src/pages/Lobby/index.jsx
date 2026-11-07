@@ -77,7 +77,7 @@ const INTERVALO_RANKING = 60000;
 // BLOCO 2: COMPONENTE PRINCIPAL
 // ================================================================
 
-export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, conviteMesa, avisoTorneio = null, onFecharAvisoTorneio }) {
+export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, conviteMesa, avisoTorneio = null, onFecharAvisoTorneio, avisoCredito = null, onFecharAvisoCredito }) {
 
     const [tabAtiva,      setTabAtiva     ] = useState(() =>
         conviteTorneio || avisoTorneio ? TABS.CAMPEONATO : TABS.MESAS
@@ -311,6 +311,13 @@ export default function Lobby({ usuario, socket, onEntrarMesa, conviteTorneio, c
                     {avisoTorneio && (
                         <button type="button" className="aviso-inline info" role="status" onClick={onFecharAvisoTorneio}>
                             <span>{avisoTorneio.mensagem}</span>
+                            <Icone nome="fechar" tamanho={16} />
+                        </button>
+                    )}
+
+                    {avisoCredito && (
+                        <button type="button" className="aviso-inline info" role="status" onClick={onFecharAvisoCredito}>
+                            <span>{avisoCredito.mensagem}</span>
                             <Icone nome="fechar" tamanho={16} />
                         </button>
                     )}

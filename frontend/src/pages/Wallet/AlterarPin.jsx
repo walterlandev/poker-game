@@ -21,7 +21,20 @@
 ================================================================ */
 
 import { useState, useCallback } from 'react';
+import {
+    EmailAuthProvider,
+    GoogleAuthProvider,
+    reauthenticateWithCredential,
+    reauthenticateWithPopup,
+} from 'firebase/auth';
 import Icone from '../../components/Icone';
+import { auth } from '../../services/firebase-config';
+
+// "Esqueci o PIN": o jogador entra de novo (Google ou senha) e o servidor
+// confere que o login é recente e da mesma conta antes de trocar o PIN.
+function entrouComGoogle() {
+    return !!auth.currentUser?.providerData?.some(p => p.providerId === 'google.com');
+}
 
 
 // ================================================================
@@ -74,6 +87,13 @@ export default function AlterarPin({ usuario, socket, onConcluido, onCancelar })
     const [erroGeral,    setErroGeral   ] = useState('');
     const [salvando,     setSalvando    ] = useState(false);
     const [concluido,    setConcluido   ] = useState(false);
+    // 'alterar' (sabe o PIN atual) | 'esqueci' (confirma identidade)
+    const [modo,         setModo        ] = useState('alterar');
+    const [senhaConta,   setSenhaConta  ] = useState('');
+    const [verSenha,     setVerSenha    ] = useState(false);
+    const [erroSenha,    setErroSenha   ] = useState('');
+    const esqueci   = modo === 'esqueci';
+    const usaGoogle = entrouComGoogle();
 
     const forca     = pinNovo.length > 0 ? forcaPin(pinNovo) : null;
     const novoValido = validarPin(pinNovo).length === 0;
@@ -141,6 +161,67 @@ export default function AlterarPin({ usuario, socket, onConcluido, onCancelar })
     }, [pinAtual, pinNovo, confirmar, socket, usuario, onConcluido]);
 
 
+    // ----------------------------------------------------------------
+    // Esqueci o PIN: confirma a identidade e grava o novo PIN
+    // ----------------------------------------------------------------
+    const handleRedefinir = useCallback(async () => {
+        const erros = validarPin(pinNovo);
+        if (erros.length > 0) { setErrosNovo(erros); return; }
+        if (pinNovo !== confirmar) { setErroConfirm('Os PINs não conferem.'); return; }
+        if (!usaGoogle && !senhaConta) { setErroSenha('Informe a senha da sua conta.'); return; }
+        if (!socket || !auth.currentUser) { setErroGeral('Conexão não disponível.'); return; }
+
+        setSalvando(true);
+        setErroGeral('');
+        try {
+            if (usaGoogle) {
+                await reauthenticateWithPopup(auth.currentUser, new GoogleAuthProvider());
+            } else {
+                const cred = EmailAuthProvider.credential(auth.currentUser.email, senhaConta);
+                await reauthenticateWithCredential(auth.currentUser, cred);
+            }
+            const idToken = await auth.currentUser.getIdToken(true);
+
+            const limpar = () => {
+                socket.off('wallet:pin_redefinido', onOk);
+                socket.off('wallet:pin_erro', onErro);
+            };
+            const onOk = () => {
+                limpar();
+                setSalvando(false);
+                setConcluido(true);
+                setTimeout(() => onConcluido(), 1500);
+            };
+            const onErro = (err) => {
+                limpar();
+                setSalvando(false);
+                setErroGeral(err?.mensagem || 'Erro ao redefinir PIN.');
+            };
+            socket.on('wallet:pin_redefinido', onOk);
+            socket.on('wallet:pin_erro', onErro);
+            socket.emit('wallet:redefinir_pin', { idToken, pinNovo });
+        } catch (e) {
+            setSalvando(false);
+            const codigo = e?.code || '';
+            if (codigo === 'auth/popup-closed-by-user' || codigo === 'auth/cancelled-popup-request') return;
+            if (codigo === 'auth/invalid-credential' || codigo === 'auth/wrong-password') {
+                setErroSenha('Senha incorreta.');
+            } else if (codigo === 'auth/user-mismatch') {
+                setErroGeral('Use a mesma conta Google com que você entrou no site.');
+            } else if (codigo === 'auth/too-many-requests') {
+                setErroGeral('Muitas tentativas. Aguarde alguns minutos.');
+            } else {
+                setErroGeral('Não foi possível confirmar sua identidade.');
+            }
+        }
+    }, [pinNovo, confirmar, usaGoogle, senhaConta, socket, onConcluido]);
+
+    const trocarModo = (novo) => {
+        setModo(novo);
+        setPinAtual(''); setErroAtual(''); setSenhaConta(''); setErroSenha(''); setErroGeral('');
+    };
+
+
     // ================================================================
     // TELA DE SUCESSO
     // ================================================================
@@ -148,7 +229,7 @@ export default function AlterarPin({ usuario, socket, onConcluido, onCancelar })
         return (
             <div className="cart-vazio" role="status">
                 <span className="cart-pin-icone" aria-hidden="true"><Icone nome="check" tamanho={22} /></span>
-                <p className="titulo">PIN alterado</p>
+                <p className="titulo">{esqueci ? 'PIN redefinido' : 'PIN alterado'}</p>
                 <p className="sub">Seu novo PIN já está ativo.</p>
             </div>
         );
@@ -161,17 +242,45 @@ export default function AlterarPin({ usuario, socket, onConcluido, onCancelar })
         { texto: '1 símbolo (!@#$%^&*)',     ok: /[^A-Za-z0-9]/.test(pinNovo) },
     ];
     const pontosForca = pontosPin(pinNovo);
-    const podeSalvar  = pinAtual && novoValido && pinsBatem && !salvando;
+    const podeSalvar  = (esqueci ? (usaGoogle || senhaConta) : pinAtual) && novoValido && pinsBatem && !salvando;
 
     return (
         <div className="cart-form sem-borda">
             <p className="cart-nota">O PIN protege depósitos, saques e envios da sua carteira ₿C.</p>
 
-            <CampoPin
-                id="pin-atual" rotulo="PIN atual" valor={pinAtual} ver={verAtual} setVer={setVerAtual}
-                onChange={v => { setPinAtual(v); setErroAtual(''); }} erro={erroAtual}
-                desabilitado={salvando} autoComplete="current-password" placeholder="Seu PIN atual…"
-            />
+            {!esqueci && (
+                <>
+                    <CampoPin
+                        id="pin-atual" rotulo="PIN atual" valor={pinAtual} ver={verAtual} setVer={setVerAtual}
+                        onChange={v => { setPinAtual(v); setErroAtual(''); }} erro={erroAtual}
+                        desabilitado={salvando} autoComplete="current-password" placeholder="Seu PIN atual…"
+                    />
+                    <button type="button" className="cart-link" onClick={() => trocarModo('esqueci')} disabled={salvando}>
+                        Esqueci o PIN
+                    </button>
+                </>
+            )}
+
+            {esqueci && (
+                <>
+                    <p className="cart-nota">
+                        {usaGoogle
+                            ? 'Para criar um PIN novo, confirme que é você entrando de novo com o Google ao salvar.'
+                            : 'Para criar um PIN novo, confirme que é você com a senha da sua conta.'}
+                    </p>
+                    {!usaGoogle && (
+                        <CampoPin
+                            id="senha-conta" rotulo="Senha da conta" valor={senhaConta} ver={verSenha} setVer={setVerSenha}
+                            onChange={v => { setSenhaConta(v); setErroSenha(''); }} erro={erroSenha}
+                            desabilitado={salvando} autoComplete="current-password" placeholder="Sua senha de login…"
+                            rotuloVer="senha"
+                        />
+                    )}
+                    <button type="button" className="cart-link" onClick={() => trocarModo('alterar')} disabled={salvando}>
+                        Lembrei o PIN
+                    </button>
+                </>
+            )}
 
             <CampoPin
                 id="pin-novo" rotulo="Novo PIN" valor={pinNovo} ver={verNovo} setVer={setVerNovo}
@@ -208,8 +317,8 @@ export default function AlterarPin({ usuario, socket, onConcluido, onCancelar })
                 <button type="button" onClick={onCancelar} className="btn btn-neutro" disabled={salvando}>
                     Cancelar
                 </button>
-                <button type="button" onClick={handleSalvar} disabled={!podeSalvar} aria-busy={salvando || undefined} className="btn btn-principal">
-                    {salvando ? 'Salvando…' : 'Salvar novo PIN'}
+                <button type="button" onClick={esqueci ? handleRedefinir : handleSalvar} disabled={!podeSalvar} aria-busy={salvando || undefined} className="btn btn-principal">
+                    {salvando ? 'Salvando…' : esqueci ? 'Confirmar e salvar PIN' : 'Salvar novo PIN'}
                 </button>
             </div>
         </div>
@@ -227,7 +336,7 @@ function pontosPin(pin) {
     return p;
 }
 
-function CampoPin({ id, rotulo, valor, ver, setVer, onChange, erro, ok, desabilitado, autoComplete, placeholder }) {
+function CampoPin({ id, rotulo, valor, ver, setVer, onChange, erro, ok, desabilitado, autoComplete, placeholder, rotuloVer = 'PIN' }) {
     return (
         <>
             <label className="cart-campo-rot" htmlFor={id}>{rotulo}</label>
@@ -243,7 +352,7 @@ function CampoPin({ id, rotulo, valor, ver, setVer, onChange, erro, ok, desabili
                     aria-invalid={!!erro}
                     aria-describedby={erro ? `${id}-erro` : undefined}
                 />
-                <button type="button" onClick={() => setVer(v => !v)} className="cart-campo-acao" aria-label={ver ? 'Ocultar PIN' : 'Mostrar PIN'} aria-pressed={ver}>
+                <button type="button" onClick={() => setVer(v => !v)} className="cart-campo-acao" aria-label={ver ? `Ocultar ${rotuloVer}` : `Mostrar ${rotuloVer}`} aria-pressed={ver}>
                     <Icone nome="olho" tamanho={18} />
                 </button>
             </div>

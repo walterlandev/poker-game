@@ -23,7 +23,7 @@
 ================================================================ */
 
 import { creditarSaidaMesa, buscarSaldo } from './firebase-admin.js';
-import { normalizarMoeda } from './moeda.js';
+import { normalizarMoeda, planejarCredito } from './moeda.js';
 
 export class TournamentManager {
 
@@ -382,7 +382,9 @@ export class TournamentManager {
             // todas as entradas + rebuys) creditado direto no saldo real.
             if (campeaoUid && torneio.premioTotal > 0) {
                 // A parte paga com bônus (premioBonus) volta como bônus: bônus nunca vira real.
-                await this.creditar(campeaoUid, torneio.premioTotal, torneio.moeda || 'real', Math.min(torneio.premioTotal, torneio.premioBonus || 0));
+                const origemBonusPremio = Math.min(torneio.premioTotal, torneio.premioBonus || 0);
+                await this.creditar(campeaoUid, torneio.premioTotal, torneio.moeda || 'real', origemBonusPremio);
+                this._avisarCredito(campeaoUid, 'torneio', planejarCredito(torneio.premioTotal, torneio.moeda || 'real', origemBonusPremio));
                 this.io.to(`torneio:${torneioId}`).emit('torneio:premio_creditado', {
                     torneioId,
                     campeaoUid,
@@ -601,6 +603,13 @@ export class TournamentManager {
     // Empurra o saldo atualizado pro(s) socket(s) já conectado(s) do jogador
     // (ex: campeão recebendo o prêmio) — sem isso a carteira só atualizaria
     // depois de um refresh.
+    /** Avisa o jogador de quanto voltou como real e como bônus. */
+    _avisarCredito(uid, origem, { real, bonus }) {
+        for (const [, s] of this.io?.sockets?.sockets || []) {
+            if (s.data.uid === uid) s.emit('wallet:credito_recebido', { origem, real, bonus });
+        }
+    }
+
     async _notificarSaldoJogador(uid) {
         try {
             const saldos = await this.buscarSaldo(uid);
