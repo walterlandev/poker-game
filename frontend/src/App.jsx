@@ -35,6 +35,10 @@ const TELAS = {
 
 export default function App() {
     const [tela,      setTela     ] = useState(TELAS.CARREGANDO);
+
+    // Marca a tela no <body>: o PWA não recarrega no meio de uma mesa e o
+    // aviso de instalação some durante o jogo (ver src/pwa/registrar.js).
+    useEffect(() => { document.body.dataset.tela = tela; }, [tela]);
     const [usuario,   setUsuario  ] = useState(null);
     const [mesaAtual, setMesaAtual] = useState(null);
     const [erroGlobal, setErroGlobal] = useState(null);

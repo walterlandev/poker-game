@@ -23,16 +23,20 @@
 
 import admin from 'firebase-admin';
 import { verificarPin } from './wallet/wallet-manager.js';
+import { planejarCompraTema } from './moeda.js';
 
 // Catálogo de preços — fonte única de verdade no backend
 // (nunca confiar no preço enviado pelo cliente)
 const PRECOS = {
     classico:    0,
     quatroCores: 0,
-    royal:       1000,
-    neon:        500,
-    dourado:     800,
-    minimalista: 300,
+    // Coleções desenhadas (aprovadas em 07/11/2026)
+    rivieraNoir: 2500,
+    satoshi: 2000,
+    lasVegas: 1500,
+    cyberNeon: 1500,
+    ouroImperial: 3000,
+    tropicalBrasil: 3000,
 };
 
 const TEMAS_GRATIS = new Set(['classico', 'quatroCores']);
@@ -87,28 +91,20 @@ export function registrarEventosTemas(socket) {
                 const temasComprados = d.temasComprados || [];
                 const saldo          = d.saldo          || 0;
                 const saldoBonus     = d.saldoBonus      || 0;
-                const saldoTotal     = saldo + saldoBonus;
 
                 // Já comprado?
                 if (temasComprados.includes(temaId)) {
                     return { sucesso: false, erro: 'Você já possui este tema.' };
                 }
 
-                // Saldo suficiente?
-                if (saldoTotal < preco) {
-                    return {
-                        sucesso: false,
-                        erro: `Saldo insuficiente. Você tem ₿C ${saldoTotal.toLocaleString('pt-BR')}.`,
-                    };
-                }
-
-                // Debita: real primeiro, complementa com bônus
-                const debitarReal  = Math.min(preco, saldo);
-                const debitarBonus = preco - debitarReal;
+                // Só saldo REAL compra tema (bônus não compra nada na loja)
+                const plano = planejarCompraTema(d, preco);
+                if (!plano.sucesso) return plano;
+                const debitarReal  = plano.debitarReal;
+                const debitarBonus = 0;
 
                 tx.update(ref, {
                     saldo:          admin.firestore.FieldValue.increment(-debitarReal),
-                    saldoBonus:     admin.firestore.FieldValue.increment(-debitarBonus),
                     temasComprados: admin.firestore.FieldValue.arrayUnion(temaId),
                 });
 

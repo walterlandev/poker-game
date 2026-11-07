@@ -341,6 +341,28 @@ button { touch-action: manipulation; color: inherit; }
     flex-shrink: 0; border-radius: var(--r-carta); border: 1px dashed var(--cor-carta-vazia);
 }
 .carta-premium-canto { position: absolute; line-height: 1; opacity: .7; }
+/* Aviso de instalação do app (components/BannerInstalar.jsx) */
+.banner-instalar {
+    position: fixed; z-index: 60; left: 50%; bottom: max(12px, env(safe-area-inset-bottom));
+    transform: translateX(-50%); width: min(560px, calc(100% - 24px));
+    display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+    background: var(--cor-superficie); color: var(--cor-texto);
+    border: 1px solid var(--cor-linha); border-radius: var(--r-painel);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .35); font-family: var(--fonte);
+}
+.banner-instalar-icone { border-radius: 10px; flex-shrink: 0; }
+.banner-instalar-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.banner-instalar-texto strong { font-size: var(--t-14); }
+.banner-instalar-texto span { font-size: 13px; color: var(--cor-texto-2, inherit); opacity: .85; }
+.banner-instalar-botoes { display: flex; gap: 6px; flex-shrink: 0; }
+body[data-tela="jogo"] .banner-instalar { display: none; }
+@media (max-width: 480px) {
+    .banner-instalar { flex-wrap: wrap; }
+    .banner-instalar-botoes { width: 100%; justify-content: flex-end; }
+}
+/* Coleções em SVG: o desenho já traz fundo e moldura */
+.carta.carta-colecao, .carta-verso.carta-colecao { padding: 0; border: 0; background: none; overflow: hidden; }
+.carta-colecao svg { display: block; }
 
 /* Assento (Jogador.jsx) */
 .assento { position: relative; display: flex; flex-direction: column; align-items: center; }

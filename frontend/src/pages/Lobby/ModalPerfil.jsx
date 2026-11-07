@@ -52,10 +52,12 @@ const AVATARES = [
 const NOMES_TEMAS = {
     classico:    'Clássico',
     quatroCores: '4 Cores',
-    royal:       'Royal',
-    neon:        'Neon',
-    dourado:     'Dourado',
-    minimalista: 'Minimalista',
+    rivieraNoir: 'Riviera Noir',
+    satoshi: 'Satoshi',
+    lasVegas: 'Las Vegas 1970',
+    cyberNeon: 'Cyber Neon',
+    ouroImperial: 'Ouro Imperial',
+    tropicalBrasil: 'Tropical Brasil',
 };
 
 export default function ModalPerfil({ usuario, socket, onFechar, onAtualizar }) {

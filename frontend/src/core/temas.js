@@ -72,60 +72,99 @@ const CATALOGO = {
         verso:  { fundo: '#111827', detalhe: '#374151' },
     },
 
-    royal: {
-        id:      'royal',
-        nome:    'Royal',
-        premium: true,
+
+
+
+
+    // ---- Coleções desenhadas em SVG (core/colecoes.js) ----
+    rivieraNoir: {
+        id:        'rivieraNoir',
+        nome:      'Riviera Noir',
+        premium:   true,
+        colecao:   true,
         naipes: {
-            '♥': { cor: '#C0392B' },
-            '♦': { cor: '#C0392B' },
-            '♠': { cor: '#2C1810' },
-            '♣': { cor: '#2C1810' },
+            '♥': { cor: '#8e1c26' },
+            '♦': { cor: '#8e1c26' },
+            '♣': { cor: '#151313' },
+            '♠': { cor: '#151313' },
         },
-        frente: { fundo: '#FFFBEB', borda: '#8B6914', raio: 8 },
-        verso:  { fundo: '#6B0F1A', detalhe: '#8B1A2A' },
+        frente: { fundo: '#f6efdf', borda: '#b8913f', raio: 8 },
+        verso:  { fundo: '#0e0d0c', detalhe: '#c9a24f' },
     },
 
-    neon: {
-        id:      'neon',
-        nome:    'Neon',
-        premium: true,
+    satoshi: {
+        id:        'satoshi',
+        nome:      'Satoshi',
+        premium:   true,
+        colecao:   true,
         naipes: {
-            '♥': { cor: '#F472B6' },
-            '♦': { cor: '#34D399' },
-            '♣': { cor: '#60A5FA' },
-            '♠': { cor: '#A78BFA' },
+            '♥': { cor: '#f7931a' },
+            '♦': { cor: '#f7931a' },
+            '♣': { cor: '#eae6df' },
+            '♠': { cor: '#eae6df' },
         },
-        frente: { fundo: '#0F172A', borda: '#7C3AED', raio: 10 },
-        verso:  { fundo: '#0F0F1A', detalhe: '#7C3AED' },
+        frente: { fundo: '#202326', borda: '#f7931a', raio: 8 },
+        verso:  { fundo: '#1a1c1f', detalhe: '#f7931a' },
     },
 
-    dourado: {
-        id:      'dourado',
-        nome:    'Dourado',
-        premium: true,
+    lasVegas: {
+        id:        'lasVegas',
+        nome:      'Las Vegas 1970',
+        premium:   true,
+        colecao:   true,
         naipes: {
-            '♥': { cor: '#EF4444' },
-            '♦': { cor: '#F59E0B' },
-            '♣': { cor: '#92400E' },
-            '♠': { cor: '#78350F' },
+            '♥': { cor: '#c8102e' },
+            '♦': { cor: '#c8102e' },
+            '♣': { cor: '#1d1a17' },
+            '♠': { cor: '#1d1a17' },
         },
-        frente: { fundo: '#FFFBEB', borda: '#D97706', raio: 8 },
-        verso:  { fundo: '#78350F', detalhe: '#B45309' },
+        frente: { fundo: '#fbf3e2', borda: '#c8102e', raio: 8 },
+        verso:  { fundo: '#c8102e', detalhe: '#a50d26' },
     },
 
-    minimalista: {
-        id:      'minimalista',
-        nome:    'Minimalista',
-        premium: true,
+    cyberNeon: {
+        id:        'cyberNeon',
+        nome:      'Cyber Neon',
+        premium:   true,
+        colecao:   true,
         naipes: {
-            '♥': { cor: '#6B7280' },
-            '♦': { cor: '#6B7280' },
-            '♣': { cor: '#374151' },
-            '♠': { cor: '#374151' },
+            '♥': { cor: '#ff3fb4' },
+            '♦': { cor: '#ff3fb4' },
+            '♣': { cor: '#21e6f2' },
+            '♠': { cor: '#21e6f2' },
         },
-        frente: { fundo: '#FFFFFF', borda: '#E5E7EB', raio: 4 },
-        verso:  { fundo: '#F9FAFB', detalhe: '#E5E7EB' },
+        frente: { fundo: '#120a26', borda: '#21e6f2', raio: 8 },
+        verso:  { fundo: '#0b0518', detalhe: '#ff3fb4' },
+    },
+
+    ouroImperial: {
+        id:        'ouroImperial',
+        nome:      'Ouro Imperial',
+        premium:   true,
+        colecao:   true,
+        naipes: {
+            '♥': { cor: '#7a1424' },
+            '♦': { cor: '#7a1424' },
+            '♣': { cor: '#1f1712' },
+            '♠': { cor: '#1f1712' },
+        },
+        frente: { fundo: '#f4e7c8', borda: '#a8822f', raio: 8 },
+        verso:  { fundo: '#5e0f1c', detalhe: '#d4a640' },
+    },
+
+    tropicalBrasil: {
+        id:        'tropicalBrasil',
+        nome:      'Tropical Brasil',
+        premium:   true,
+        colecao:   true,
+        naipes: {
+            '♥': { cor: '#00873a' },
+            '♦': { cor: '#00873a' },
+            '♣': { cor: '#0b3d91' },
+            '♠': { cor: '#0b3d91' },
+        },
+        frente: { fundo: '#ffffff', borda: '#009c3b', raio: 8 },
+        verso:  { fundo: '#009c3b', detalhe: '#ffdf00' },
     },
 };
 

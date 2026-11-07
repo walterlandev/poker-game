@@ -31,6 +31,8 @@ import './styles/tema.css';
 import { iniciarTemaVisual } from './core/temaVisual.js';
 import App from './App.jsx';
 import ErrorBoundary from './ErrorBoundary.jsx';
+import BannerInstalar from './components/BannerInstalar.jsx';
+import { registrarPWA } from './pwa/registrar.js';
 
 // ================================================================
 // ESTILOS GLOBAIS INLINE
@@ -213,11 +215,13 @@ document.head.appendChild(styleTag);
 // ================================================================
 
 iniciarTemaVisual();
+registrarPWA();
 
 createRoot(document.getElementById('root')).render(
     <StrictMode>
         <ErrorBoundary>
             <App />
+            <BannerInstalar />
         </ErrorBoundary>
     </StrictMode>
 );

@@ -71,7 +71,8 @@ export default function Loja({ usuario, socket }) {
                 <section className={`loja-col${tabAtiva === 'temas' ? ' ativa' : ''}`} aria-labelledby="loja-temas-titulo">
                     <h2 id="loja-temas-titulo" className="loja-col-titulo">Temas de baralho</h2>
                     <TemasCartas
-                        saldoAtual={saldoTotal}
+                        // Tema só se compra com saldo REAL (o servidor confere)
+                        saldoAtual={saldoReal}
                         temaAtual={usuario?.tema || 'classico'}
                         temasComprados={usuario?.temasComprados || []}
                         socket={socket}

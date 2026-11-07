@@ -461,3 +461,16 @@ test('conversão recusa valor inválido, fracionado ou maior que o saldo real', 
     assert.equal(planejarConversaoBonus({ saldo: 5000 }, 'abc').sucesso, false);
     assert.equal(planejarConversaoBonus({ saldo: 500, saldoBonus: 99999 }, 1000).sucesso, false);
 });
+
+// ── Loja: tema só se compra com saldo REAL (bônus não compra nada na loja) ──
+import { planejarCompraTema } from '../moeda.js';
+
+test('tema é pago só com saldo real', () => {
+    assert.deepEqual(planejarCompraTema({ saldo: 2000, saldoBonus: 0 }, 1000), { sucesso: true, debitarReal: 1000 });
+});
+
+test('bônus não completa a compra de tema', () => {
+    const r = planejarCompraTema({ saldo: 300, saldoBonus: 50000 }, 1000);
+    assert.equal(r.sucesso, false);
+    assert.match(r.erro, /saldo real/i);
+});

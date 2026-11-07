@@ -107,3 +107,15 @@ export const BONUS_PROMO_FIM_MS = Date.parse('2026-12-08T00:00:00-03:00');
 export function bonusBoasVindasAtivo(agoraMs = Date.now()) {
     return agoraMs < BONUS_PROMO_FIM_MS;
 }
+
+/**
+ * Compra de tema na loja: só com saldo REAL. O bônus serve só para jogar
+ * nas mesas e torneios de bônus; não compra nada na loja.
+ */
+export function planejarCompraTema({ saldo = 0 } = {}, preco) {
+    const s = Number(saldo) || 0;
+    if (s < preco) {
+        return { sucesso: false, erro: `Temas só podem ser comprados com saldo real. Seu saldo real é ₿C ${fmt(s)}.` };
+    }
+    return { sucesso: true, debitarReal: preco };
+}

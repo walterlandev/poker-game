@@ -12,6 +12,7 @@
 ================================================================ */
 
 import { getTema } from '../core/temas';
+import { ehColecao, svgFace, svgVerso } from '../core/colecoes';
 
 function coresDoTema(temaId, naipe) {
     const t = getTema(temaId);
@@ -40,6 +41,20 @@ function coresDoTema(temaId, naipe) {
  */
 export function CartaFace({ carta, largura = 46, tema = 'classico', indice = false, className = '' }) {
     if (!carta) return null;
+    if (ehColecao(tema)) {
+        // Coleção em SVG: a carta inteira (valor, naipe, emblema) vem do desenho.
+        return (
+            <div
+                className={`carta carta-colecao ${className}`}
+                role="img"
+                aria-label={`${carta.display || carta.valor} de ${NOME_NAIPE[carta.naipe] || carta.naipe}`}
+                style={{ width: largura + 'px', height: Math.round(largura * 1.4) + 'px' }}
+            >
+                <svg viewBox="0 0 250 350" width="100%" height="100%" aria-hidden="true"
+                    dangerouslySetInnerHTML={{ __html: svgFace(tema, carta.valor, carta.naipe) }} />
+            </div>
+        );
+    }
     const { t, cor, fundo, borda } = coresDoTema(tema, carta.naipe);
     const premium = !!t.premium;
     const altura  = Math.round(largura * 1.4);
@@ -78,6 +93,15 @@ const NOME_NAIPE = { '♥': 'copas', '♦': 'ouros', '♠': 'espadas', '♣': 'p
 
 /** Verso da carta (carta fechada de outro jogador). */
 export function CartaVerso({ largura = 18, tema = 'classico' }) {
+    if (ehColecao(tema)) {
+        return (
+            <div className="carta-verso carta-colecao" aria-hidden="true"
+                style={{ width: largura + 'px', height: Math.round(largura * 1.4) + 'px' }}>
+                <svg viewBox="0 0 250 350" width="100%" height="100%" preserveAspectRatio="xMidYMid slice"
+                    dangerouslySetInnerHTML={{ __html: svgVerso(tema) }} />
+            </div>
+        );
+    }
     const t = getTema(tema);
     const classico = t.id === 'classico';
     const fundo   = classico ? 'var(--cor-feltro)'       : (t.verso.fundo || 'var(--cor-feltro)');
