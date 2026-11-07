@@ -18,6 +18,8 @@
      transacoes  → array : lista de transações já carregadas pelo pai
      socket      → Socket.io
      onCarregar  → fn(txs) : atualiza o array no pai após fetch inicial
+     compacto    → bool    : só as últimas 5, sem filtros (tela principal)
+     onDepositar → fn()    : ação do estado vazio
 ================================================================ */
 
 import { useState, useEffect, useMemo } from 'react';
@@ -25,14 +27,13 @@ import {
     fmtBC,
     fmt,
     fmtData,
-    corTipoTx,
     sinalTx,
     resumoExtrato,
     bcParaBRL,
     LABEL_TX,
-    ICONE_TX,
     TIPO_TX,
 } from './walletUtils';
+import Icone from '../../components/Icone';
 
 
 // ================================================================
@@ -62,7 +63,10 @@ const FILTROS_PERIODO = [
 // BLOCO 2: COMPONENTE PRINCIPAL
 // ================================================================
 
-export default function History({ transacoes, socket, onCarregar }) {
+// Na tela principal da carteira aparecem só as últimas movimentações
+const LIMITE_COMPACTO = 5;
+
+export default function History({ transacoes, socket, onCarregar, compacto = false, onDepositar }) {
 
     const [filtroTipo,    setFiltroTipo]    = useState('todos');
     const [filtroPeriodo, setFiltroPeriodo] = useState('30d');
@@ -129,487 +133,153 @@ export default function History({ transacoes, socket, onCarregar }) {
     // ================================================================
     // RENDERIZAÇÃO
     // ================================================================
+    const lista = compacto ? txFiltradas.slice(0, LIMITE_COMPACTO) : txFiltradas;
+
     return (
-        <div style={estilos.container}>
+        <div className={`cart-extrato${compacto ? ' compacto' : ''}`}>
 
-            {/* ---- Filtro de período ---- */}
-            <div style={estilos.filtroPeriodo}>
-                {FILTROS_PERIODO.map(f => (
-                    <button
-                        key={f.id}
-                        onClick={() => handlePeriodo(f.id)}
-                        style={{
-                            ...estilos.btnFiltro,
-                            background: filtroPeriodo === f.id
-                                ? 'var(--cor-destaque-suave)'
-                                : 'var(--cor-superficie)',
-                            border: filtroPeriodo === f.id
-                                ? '1px solid var(--cor-destaque-linha)'
-                                : '1px solid var(--cor-linha)',
-                            color: filtroPeriodo === f.id
-                                ? 'var(--cor-destaque-texto)'
-                                : 'var(--cor-texto-3)',
-                            fontWeight: filtroPeriodo === f.id ? '600' : '400',
-                        }}
-                    >
-                        {f.label}
-                    </button>
-                ))}
-            </div>
+            {!compacto && (
+                <>
+                    <div className="segmento segmento-largo" role="group" aria-label="Período">
+                        {FILTROS_PERIODO.map(f => (
+                            <button key={f.id} type="button" aria-pressed={filtroPeriodo === f.id} onClick={() => handlePeriodo(f.id)}>
+                                {f.label}
+                            </button>
+                        ))}
+                    </div>
 
-            {/* ---- Resumo do período ---- */}
-            {txFiltradas.length > 0 && (
-                <div style={estilos.cardResumo}>
-                    <CardResumoItem
-                        label="Entradas"
-                        valor={`₿C ${fmtBC(resumo.totalEntradas)}`}
-                        cor="var(--cor-positivo-texto)"
-                        icone="⬇️"
-                    />
-                    <div style={estilos.resumoDivisor} />
-                    <CardResumoItem
-                        label="Saídas"
-                        valor={`₿C ${fmtBC(resumo.totalSaidas)}`}
-                        cor="var(--cor-perigo-texto)"
-                        icone="⬆️"
-                    />
-                    <div style={estilos.resumoDivisor} />
-                    <CardResumoItem
-                        label="Taxas"
-                        valor={`R$ ${fmt(bcParaBRL(resumo.totalTaxas))}`}
-                        cor="var(--cor-destaque-texto)"
-                        icone="📋"
-                    />
-                </div>
+                    <div className="cart-chips" role="group" aria-label="Tipo de movimentação">
+                        {FILTROS_TIPO.map(f => (
+                            <button key={f.id} type="button" className="cart-chip" aria-pressed={filtroTipo === f.id} onClick={() => setFiltroTipo(f.id)}>
+                                {f.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {txFiltradas.length > 0 && (
+                        <dl className="cart-totais">
+                            <div><dt>Entradas</dt><dd className="num positivo">₿C {fmtBC(resumo.totalEntradas)}</dd></div>
+                            <div><dt>Saídas</dt><dd className="num">₿C {fmtBC(resumo.totalSaidas)}</dd></div>
+                            <div><dt>Taxas</dt><dd className="num">R$ {fmt(bcParaBRL(resumo.totalTaxas))}</dd></div>
+                        </dl>
+                    )}
+                </>
             )}
 
-            {/* ---- Filtro de tipo (scroll horizontal) ---- */}
-            <div style={estilos.filtroTipoScroll}>
-                {FILTROS_TIPO.map(f => (
-                    <button
-                        key={f.id}
-                        onClick={() => setFiltroTipo(f.id)}
-                        style={{
-                            ...estilos.chipTipo,
-                            background: filtroTipo === f.id
-                                ? 'var(--cor-destaque-suave)'
-                                : 'var(--cor-superficie)',
-                            border: filtroTipo === f.id
-                                ? '1px solid var(--cor-destaque-linha)'
-                                : '1px solid var(--cor-linha)',
-                            color: filtroTipo === f.id
-                                ? 'var(--cor-destaque-texto)'
-                                : 'var(--cor-texto-3)',
-                            fontWeight: filtroTipo === f.id ? '600' : '400',
-                        }}
-                    >
-                        {f.label}
-                    </button>
-                ))}
-            </div>
-
-            {/* ---- Estado: carregando ---- */}
             {carregando && (
-                <div style={estilos.estadoVazio}>
-                    <span style={{ fontSize: '28px', opacity: 0.4 }}>⏳</span>
-                    <p style={estilos.estadoTexto}>Carregando transações...</p>
-                </div>
+                <ul className="cart-tx-lista" aria-busy="true" aria-label="Carregando movimentações…">
+                    {[0, 1, 2].map(i => <li key={i} className="cart-tx esqueleto" />)}
+                </ul>
             )}
 
-            {/* ---- Estado: sem transações ---- */}
             {!carregando && txFiltradas.length === 0 && (
-                <div style={estilos.estadoVazio}>
-                    <span style={{ fontSize: '36px', opacity: 0.25 }}>📋</span>
-                    <p style={estilos.estadoTexto}>
-                        {transacoes.length === 0
-                            ? 'Nenhuma transação ainda.\nDeposite para começar a jogar!'
-                            : 'Nenhuma transação neste filtro.'}
-                    </p>
-                    {transacoes.length > 0 && (
-                        <button
-                            onClick={() => { setFiltroTipo('todos'); setFiltroPeriodo('tudo'); }}
-                            style={estilos.btnLimparFiltro}
-                        >
-                            Limpar filtros
-                        </button>
+                <div className="cart-vazio">
+                    <Icone nome="historico" tamanho={28} />
+                    {transacoes.length === 0 ? (
+                        <>
+                            <p className="titulo">Nenhuma movimentação ainda</p>
+                            <p className="sub">Faça um depósito para começar a jogar com saldo real.</p>
+                            {onDepositar && (
+                                <button type="button" className="btn btn-principal" onClick={onDepositar}>
+                                    <Icone nome="baixo" tamanho={16} />Depositar
+                                </button>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            <p className="titulo">Nada neste filtro</p>
+                            <button type="button" className="btn btn-neutro" onClick={() => { setFiltroTipo('todos'); handlePeriodo('tudo'); }}>
+                                Limpar filtros
+                            </button>
+                        </>
                     )}
                 </div>
             )}
 
-            {/* ---- Lista de transações ---- */}
-            {!carregando && txFiltradas.length > 0 && (
-                <div style={estilos.lista}>
-                    {txFiltradas.map((tx, i) => (
-                        <CardTx key={tx.id || i} tx={tx} />
-                    ))}
-                </div>
+            {!carregando && lista.length > 0 && (
+                <ul className="cart-tx-lista">
+                    {lista.map((tx, i) => <CardTx key={tx.id || i} tx={tx} />)}
+                </ul>
             )}
 
-            {/* ---- Contador ---- */}
-            {txFiltradas.length > 0 && (
-                <p style={estilos.contador}>
-                    {txFiltradas.length} transaç{txFiltradas.length === 1 ? 'ão' : 'ões'} encontrada{txFiltradas.length !== 1 ? 's' : ''}
+            {!compacto && txFiltradas.length > 0 && (
+                <p className="cart-nota num">
+                    {txFiltradas.length} {txFiltradas.length === 1 ? 'movimentação' : 'movimentações'}
                 </p>
             )}
-
         </div>
     );
 }
 
 
 // ================================================================
-// BLOCO 3: CARD DE TRANSAÇÃO
+// LINHA DE TRANSAÇÃO
 // ================================================================
+
+const ICONE_TIPO = {
+    deposito: 'baixo', saque: 'cima', envio: 'enviar', recebimento: 'receber',
+    premio: 'torneio', compra: 'loja', taxa: 'info', bonus: 'presente',
+};
+
+const NOME_STATUS = {
+    pendente: 'Pendente', concluido: 'Concluído', concluida: 'Concluída', confirmado: 'Confirmado',
+    confirmada: 'Confirmada', falhou: 'Falhou', erro: 'Falhou', cancelado: 'Cancelado', cancelada: 'Cancelada',
+};
+
+function tomStatus(status = '') {
+    const s = String(status).toLowerCase();
+    if (s.startsWith('pend')) return 'pendente';
+    if (s.startsWith('fal') || s.startsWith('erro') || s.startsWith('cancel')) return 'falhou';
+    return 'ok';
+}
 
 function CardTx({ tx }) {
-
     const [expandido, setExpandido] = useState(false);
-
-    const cor    = corTipoTx(tx.tipo);
-    const sinal  = sinalTx(tx.tipo);
-    const label  = LABEL_TX[tx.tipo]  || tx.tipo;
-    const icone  = ICONE_TX[tx.tipo]  || '💱';
+    const entrada = sinalTx(tx.tipo) === '+';
+    const label   = LABEL_TX[tx.tipo] || tx.tipo;
+    const idDet   = `tx-det-${tx.id || tx.criadoEm}`;
 
     return (
-        <div
-            onClick={() => setExpandido(p => !p)}
-            style={{
-                ...estilos.cardTx,
-                borderColor: expandido ? 'var(--cor-linha)' : 'var(--cor-superficie)',
-                background:  expandido ? 'var(--cor-superficie)' : 'var(--cor-superficie)',
-            }}
-        >
-            {/* Linha principal */}
-            <div style={estilos.txLinha}>
-
-                {/* Ícone do tipo */}
-                <div style={{ ...estilos.txIcone, background: `color-mix(in srgb, ${cor} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${cor} 19%, transparent)` }}>
-                    <span style={{ fontSize: '16px' }}>{icone}</span>
-                </div>
-
-                {/* Tipo e data */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={estilos.txLabel}>{label}</p>
-                    <p style={estilos.txData}>{fmtData(tx.criadoEm)}</p>
-                    {tx.contraparte && (
-                        <p style={estilos.txContraparte}>
-                            {tx.tipo === TIPO_TX.ENVIO ? '→ ' : '← '}
-                            {tx.contraparte}
-                        </p>
-                    )}
-                </div>
-
-                {/* Valor */}
-                <div style={{ textAlign: 'right' }}>
-                    <p style={{ ...estilos.txValor, color: cor }}>
-                        {sinal}₿C {fmtBC(tx.valorBC)}
-                    </p>
-                    <p style={estilos.txValorBRL}>
-                        R$ {fmt(bcParaBRL(tx.valorBC))}
-                    </p>
-                </div>
-
-                {/* Seta de expansão */}
-                <span style={{
-                    ...estilos.txSeta,
-                    transform: expandido ? 'rotate(180deg)' : 'rotate(0deg)',
-                }}>
-                    ▾
+        <li className={`cart-tx${expandido ? ' aberta' : ''}`}>
+            <button type="button" className="cart-tx-linha" onClick={() => setExpandido(p => !p)} aria-expanded={expandido} aria-controls={idDet}>
+                <span className={`cart-tx-icone${entrada ? ' entrada' : ''}`} aria-hidden="true">
+                    <Icone nome={ICONE_TIPO[tx.tipo] || 'carteira'} tamanho={18} />
                 </span>
+                <span className="cart-tx-meio">
+                    <b>{label}</b>
+                    <span className="num">
+                        {fmtData(tx.criadoEm)}
+                        {tx.contraparte ? ` · ${tx.tipo === TIPO_TX.ENVIO ? 'para' : 'de'} ${tx.contraparte}` : ''}
+                    </span>
+                </span>
+                <span className="cart-tx-valor">
+                    <b className={`num${entrada ? ' positivo' : ''}`}>{sinalTx(tx.tipo)}₿C {fmtBC(tx.valorBC)}</b>
+                    {tx.status
+                        ? <span className={`cart-status ${tomStatus(tx.status)}`}>{NOME_STATUS[String(tx.status).toLowerCase()] || tx.status}</span>
+                        : <span className="num">R$ {fmt(bcParaBRL(tx.valorBC))}</span>}
+                </span>
+                <Icone nome="desce" tamanho={16} className="cart-tx-seta" />
+            </button>
 
-            </div>
-
-            {/* Detalhes expandidos */}
             {expandido && (
-                <div style={estilos.txDetalhes}>
-
-                    {tx.taxaBC > 0 && (
-                        <DetalheLinha label="Taxa cobrada" valor={`₿C ${fmtBC(tx.taxaBC)}`} cor="var(--cor-destaque-texto)" />
-                    )}
-                    {tx.taxaBRL > 0 && (
-                        <DetalheLinha label="Taxa em R$" valor={`R$ ${fmt(tx.taxaBRL)}`} cor="var(--cor-destaque-texto)" />
-                    )}
-                    {tx.brlLiquido > 0 && (
-                        <DetalheLinha label="Valor líquido recebido" valor={`R$ ${fmt(tx.brlLiquido)}`} />
-                    )}
-                    {tx.status && (
-                        <DetalheLinha label="Status" valor={tx.status} />
-                    )}
-                    {tx.id && (
-                        <DetalheLinha label="ID da transação" valor={tx.id} mono />
-                    )}
-
-                </div>
+                <dl id={idDet} className="cart-tx-det">
+                    <DetalheLinha label="Equivale a" valor={`R$ ${fmt(bcParaBRL(tx.valorBC))}`} />
+                    {tx.taxaBC > 0 && <DetalheLinha label="Taxa cobrada" valor={`₿C ${fmtBC(tx.taxaBC)}`} />}
+                    {tx.taxaBRL > 0 && <DetalheLinha label="Taxa em R$" valor={`R$ ${fmt(tx.taxaBRL)}`} />}
+                    {tx.brlLiquido > 0 && <DetalheLinha label="Valor líquido recebido" valor={`R$ ${fmt(tx.brlLiquido)}`} />}
+                    {tx.status && <DetalheLinha label="Status" valor={NOME_STATUS[String(tx.status).toLowerCase()] || tx.status} />}
+                    {tx.id && <DetalheLinha label="ID da transação" valor={tx.id} mono />}
+                </dl>
             )}
-
-        </div>
+        </li>
     );
 }
 
-// ================================================================
-// BLOCO 4: SUBCOMPONENTES AUXILIARES
-// ================================================================
-
-function CardResumoItem({ label, valor, cor, icone }) {
+function DetalheLinha({ label, valor, mono }) {
     return (
-        <div style={estilos.resumoItem}>
-            <span style={{ fontSize: '14px' }}>{icone}</span>
-            <div>
-                <p style={estilos.resumoLabel}>{label}</p>
-                <p style={{ ...estilos.resumoValor, color: cor }}>{valor}</p>
-            </div>
+        <div>
+            <dt>{label}</dt>
+            <dd className={mono ? 'mono' : 'num'}>{valor}</dd>
         </div>
     );
 }
-
-function DetalheLinha({ label, valor, cor, mono }) {
-    return (
-        <div style={estilos.detalheinha}>
-            <span style={estilos.detalheLabelI}>{label}</span>
-            <span style={{
-                ...estilos.detalheValorI,
-                color:      cor || 'var(--cor-texto-2)',
-                fontFamily: mono ? 'monospace' : 'inherit',
-                fontSize:   mono ? '10px' : '12px',
-            }}>
-                {valor}
-            </span>
-        </div>
-    );
-}
-
-
-// ================================================================
-// BLOCO 5: ESTILOS
-// ================================================================
-
-const estilos = {
-
-    container: {
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '12px',
-    },
-
-    // Filtro de período — 4 botões em linha
-    filtroPeriodo: {
-        display: 'flex',
-        gap:     '6px',
-    },
-
-    btnFiltro: {
-        flex:         1,
-        padding:      '7px 4px',
-        borderRadius: '7px',
-        cursor:       'pointer',
-        outline:      'none',
-        fontSize:     '12px',
-        fontFamily:   'inherit',
-        transition:   'all 0.15s',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    // Card de resumo do período
-    cardResumo: {
-        display:      'flex',
-        alignItems:   'center',
-        background:   'var(--cor-superficie)',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '10px',
-        padding:      '12px',
-        gap:          '0',
-    },
-
-    resumoItem: {
-        flex:          1,
-        display:       'flex',
-        gap:           '8px',
-        alignItems:    'center',
-        justifyContent:'center',
-    },
-
-    resumoDivisor: {
-        width:      '1px',
-        height:     '32px',
-        background: 'var(--cor-linha)',
-    },
-
-    resumoLabel: {
-        fontSize: '10px',
-        color:    'var(--cor-texto-3)',
-        margin:   0,
-        textTransform: 'uppercase',
-        letterSpacing: '0.04em',
-    },
-
-    resumoValor: {
-        fontSize:   '13px',
-        fontWeight: '700',
-        margin:     '2px 0 0',
-    },
-
-    // Filtro de tipo — scroll horizontal no mobile
-    filtroTipoScroll: {
-        display:    'flex',
-        gap:        '6px',
-        overflowX:  'auto',
-        paddingBottom: '4px',
-        scrollbarWidth: 'none',
-    },
-
-    chipTipo: {
-        flexShrink:   0,
-        padding:      '5px 12px',
-        borderRadius: '20px',
-        cursor:       'pointer',
-        outline:      'none',
-        fontSize:     '12px',
-        fontFamily:   'inherit',
-        whiteSpace:   'nowrap',
-        transition:   'all 0.15s',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    // Estado vazio / carregando
-    estadoVazio: {
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'center',
-        justifyContent: 'center',
-        gap:            '10px',
-        padding:        '40px 20px',
-        textAlign:      'center',
-    },
-
-    estadoTexto: {
-        fontSize:   '13px',
-        color:      'var(--cor-texto-3)',
-        margin:     0,
-        lineHeight: 1.5,
-        whiteSpace: 'pre-line',
-    },
-
-    btnLimparFiltro: {
-        background:   'transparent',
-        border:       '1px solid var(--cor-linha-forte)',
-        borderRadius: '6px',
-        color:        'var(--cor-texto-3)',
-        fontSize:     '12px',
-        padding:      '6px 14px',
-        cursor:       'pointer',
-        fontFamily:   'inherit',
-    },
-
-    // Lista de cards de transação
-    lista: {
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '8px',
-    },
-
-    // Card individual de transação
-    cardTx: {
-        background:   'var(--cor-superficie)',
-        border:       '1px solid var(--cor-superficie)',
-        borderRadius: '10px',
-        padding:      '12px',
-        cursor:       'pointer',
-        transition:   'all 0.15s',
-        display:      'flex',
-        flexDirection:'column',
-        gap:          '0',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    txLinha: {
-        display:    'flex',
-        alignItems: 'center',
-        gap:        '10px',
-    },
-
-    txIcone: {
-        width:          '36px',
-        height:         '36px',
-        borderRadius:   '8px',
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        flexShrink:     0,
-    },
-
-    txLabel: {
-        fontSize:   '13px',
-        fontWeight: '600',
-        color:      'var(--cor-texto)',
-        margin:     0,
-    },
-
-    txData: {
-        fontSize: '10px',
-        color:    'var(--cor-texto-3)',
-        margin:   '2px 0 0',
-    },
-
-    txContraparte: {
-        fontSize:  '10px',
-        color:     'var(--cor-texto-3)',
-        margin:    '1px 0 0',
-        overflow:  'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace:'nowrap',
-    },
-
-    txValor: {
-        fontSize:   '14px',
-        fontWeight: '700',
-        margin:     0,
-    },
-
-    txValorBRL: {
-        fontSize: '10px',
-        color:    'var(--cor-texto-3)',
-        margin:   '2px 0 0',
-    },
-
-    txSeta: {
-        fontSize:   '14px',
-        color:      'var(--cor-texto-3)',
-        flexShrink: 0,
-        transition: 'transform 0.2s',
-        userSelect: 'none',
-    },
-
-    // Detalhes expandidos
-    txDetalhes: {
-        marginTop:    '10px',
-        paddingTop:   '10px',
-        borderTop:    '1px solid var(--cor-superficie)',
-        display:      'flex',
-        flexDirection:'column',
-        gap:          '6px',
-    },
-
-    detalheinha: {
-        display:        'flex',
-        justifyContent: 'space-between',
-        alignItems:     'center',
-    },
-
-    detalheLabelI: {
-        fontSize: '11px',
-        color:    'var(--cor-texto-3)',
-    },
-
-    detalheValorI: {
-        fontSize:   '12px',
-        fontWeight: '500',
-    },
-
-    // Contador de resultados
-    contador: {
-        fontSize:  '11px',
-        color:     'var(--cor-linha-forte)',
-        margin:    0,
-        textAlign: 'center',
-    },
-};

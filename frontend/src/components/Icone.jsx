@@ -34,6 +34,16 @@ const CAMINHOS = {
     usuarios: <><circle cx="9" cy="9" r="3" /><path d="M3.5 19c.8-2.8 3-4.2 5.5-4.2s4.7 1.4 5.5 4.2M15.5 6.2a3 3 0 0 1 0 5.6M17 14.9c1.7.5 3 1.8 3.5 4.1" /></>,
     robo:     <><rect x="5" y="8" width="14" height="11" rx="3" /><path d="M12 4v4M9 13h.01M15 13h.01M9.5 16h5" /></>,
     menu:     <path d="M4 7h16M4 12h16M4 17h16" />,
+    baixo:    <path d="M12 4v14M6 12l6 6 6-6M5 20h14" />,
+    cima:     <path d="M12 20V6M6 12l6-6 6 6M5 4h14" />,
+    presente: <><rect x="4" y="9" width="16" height="11" rx="1.5" /><path d="M3 9h18M12 9v11M12 9c-2-4-6-4-6-1.5S10 9 12 9zm0 0c2-4 6-4 6-1.5S14 9 12 9z" /></>,
+    escudo:   <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z" />,
+    busca:    <><circle cx="11" cy="11" r="6" /><path d="m20 20-4.2-4.2" /></>,
+    alerta:   <><path d="M12 4 2.8 19.5h18.4z" /><path d="M12 10v4.5M12 17.2h.01" /></>,
+    info:     <><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></>,
+    qr:       <><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2" /></>,
+    relogio:  <><circle cx="12" cy="12" r="8" /><path d="M12 8v4l2.5 2.5" /></>,
+    cadeia:   <path d="M9 15l6-6M10 7l1.5-1.5a4 4 0 0 1 5.7 5.7L15.7 13M14 17l-1.5 1.5a4 4 0 0 1-5.7-5.7L8.3 11" />,
 };
 
 export default function Icone({ nome, tamanho = 20, className = '', titulo }) {

@@ -32,6 +32,7 @@
 ================================================================ */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import Icone from '../../components/Icone';
 
 
 // ================================================================
@@ -101,240 +102,56 @@ export default function PinConfirm({ titulo, descricao, onConfirmar, onCancelar 
     // RENDERIZAÇÃO
     // ================================================================
     return (
-        <div style={estilos.overlay} onClick={onCancelar}>
+        <div className="modal-veu cart-pin-veu" onClick={onCancelar}>
+            <div
+                className="cart-pin"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="cart-pin-titulo"
+                onClick={e => e.stopPropagation()}
+            >
+                <span className="cart-pin-icone" aria-hidden="true"><Icone nome="cadeado" tamanho={22} /></span>
+                <h2 id="cart-pin-titulo">{titulo}</h2>
+                {descricao && <p className="cart-pin-desc num">{descricao}</p>}
 
-            <div style={estilos.modal} onClick={e => e.stopPropagation()}>
-
-                {/* Ícone */}
-                <div style={estilos.iconeBox}>
-                    <span style={estilos.icone}>🔐</span>
-                </div>
-
-                {/* Título e descrição */}
-                <div style={estilos.textos}>
-                    <p style={estilos.titulo}>{titulo}</p>
-                    {descricao && (
-                        <p style={estilos.descricao}>{descricao}</p>
-                    )}
-                </div>
-
-                {/* Campo de PIN */}
-                <div style={{
-                    ...estilos.inputWrapper,
-                    animation: agitando ? 'agitar 0.4s ease' : 'none',
-                }}>
+                <label className="cart-campo-rot" htmlFor="cart-pin-input">PIN de segurança</label>
+                <div className={`cart-campo${erro ? ' com-erro' : ''}${agitando ? ' agitando' : ''}`}>
                     <input
+                        id="cart-pin-input"
                         ref={inputRef}
                         type={verPin ? 'text' : 'password'}
                         value={pin}
                         onChange={e => { setPin(e.target.value); setErro(null); }}
                         onKeyDown={handleKeyDown}
-                        placeholder="Digite seu PIN"
+                        placeholder="Digite seu PIN…"
                         autoComplete="off"
                         autoCorrect="off"
                         spellCheck={false}
-                        style={{
-                            ...estilos.input,
-                            borderColor: erro
-                                ? 'var(--cor-perigo-linha)'
-                                : pinValido
-                                    ? 'var(--cor-destaque-linha)'
-                                    : 'var(--cor-linha)',
-                        }}
+                        aria-invalid={!!erro}
+                        aria-describedby={erro ? 'cart-pin-erro' : undefined}
                     />
                     <button
                         type="button"
                         onClick={() => setVerPin(v => !v)}
-                        style={estilos.btnOlho}
-                        tabIndex={-1}
+                        className="cart-campo-acao"
+                        aria-label={verPin ? 'Ocultar PIN' : 'Mostrar PIN'}
+                        aria-pressed={verPin}
                     >
-                        {verPin ? '🙈' : '👁️'}
+                        <Icone nome="olho" tamanho={18} />
                     </button>
                 </div>
 
-                {/* Erro */}
-                {erro && (
-                    <p style={estilos.erroTexto}>⚠ {erro}</p>
-                )}
+                {erro && <p id="cart-pin-erro" className="cart-erro" role="alert">{erro}</p>}
 
-                {/* Botão confirmar */}
-                <button
-                    onClick={handleConfirmar}
-                    disabled={!pinValido}
-                    style={{
-                        ...estilos.btnConfirmar,
-                        background: pinValido
-                            ? 'var(--cor-destaque)'
-                            : 'var(--cor-superficie)',
-                        color:  pinValido ? '#fff' : 'var(--cor-texto-3)',
-                        cursor: pinValido ? 'pointer' : 'not-allowed',
-                    }}
-                >
-                    ✓ Confirmar
+                <button type="button" onClick={handleConfirmar} disabled={!pinValido} className="btn btn-principal cart-btn-cheio">
+                    Confirmar
                 </button>
-
-                {/* Botão cancelar */}
-                <button onClick={onCancelar} style={estilos.btnCancelar}>
+                <button type="button" onClick={onCancelar} className="btn btn-fantasma cart-btn-cheio">
                     Cancelar
                 </button>
 
-                {/* Aviso */}
-                <p style={estilos.avisoSeguranca}>
-                    🔒 Nunca compartilhe seu PIN com ninguém
-                </p>
-
+                <p className="cart-nota">Nunca compartilhe seu PIN com ninguém.</p>
             </div>
         </div>
     );
 }
-
-
-// ================================================================
-// ESTILOS
-// ================================================================
-
-const estilos = {
-
-    overlay: {
-        position:       'fixed',
-        inset:          0,
-        background:     'var(--cor-veu)',
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        zIndex:         1100,
-        padding:        '20px',
-        backdropFilter: 'blur(6px)',
-    },
-
-    modal: {
-        background:    'var(--cor-superficie)',
-        border:        '1px solid var(--cor-linha)',
-        borderRadius:  '20px',
-        padding:       '28px 24px',
-        maxWidth:      '340px',
-        width:         '100%',
-        display:       'flex',
-        flexDirection: 'column',
-        alignItems:    'center',
-        gap:           '16px',
-        boxShadow:     '0 0 60px var(--cor-veu)',
-    },
-
-    iconeBox: {
-        width:          '56px',
-        height:         '56px',
-        borderRadius:   '50%',
-        background:     'var(--cor-destaque-suave)',
-        border:         '1px solid var(--cor-destaque-linha)',
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-    },
-
-    icone:    { fontSize: '26px' },
-
-    textos: {
-        textAlign:     'center',
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '6px',
-        width:         '100%',
-    },
-
-    titulo: {
-        fontSize:   '17px',
-        fontWeight: '700',
-        color:      'var(--cor-texto)',
-        margin:     0,
-    },
-
-    descricao: {
-        fontSize:   '13px',
-        color:      'var(--cor-texto-3)',
-        margin:     0,
-        lineHeight: 1.4,
-    },
-
-    // Campo de PIN
-    inputWrapper: {
-        position: 'relative',
-        width:    '100%',
-    },
-
-    input: {
-        width:        '100%',
-        padding:      '13px 44px 13px 16px',
-        background:   'var(--cor-superficie)',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '12px',
-        color:        'var(--cor-texto)',
-        fontSize:     '16px',
-        fontFamily:   'inherit',
-        outline:      'none',
-        boxSizing:    'border-box',
-        transition:   'border-color 0.2s',
-        letterSpacing: '0.05em',
-    },
-
-    btnOlho: {
-        position:   'absolute',
-        right:      '12px',
-        top:        '50%',
-        transform:  'translateY(-50%)',
-        background: 'none',
-        border:     'none',
-        cursor:     'pointer',
-        fontSize:   '18px',
-        padding:    '4px',
-        lineHeight: 1,
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    erroTexto: {
-        fontSize:  '12px',
-        color:     'var(--cor-perigo-texto)',
-        margin:    0,
-        textAlign: 'center',
-    },
-
-    tentativasTexto: {
-        fontSize:  '11px',
-        color:     'var(--cor-destaque-texto)',
-        margin:    0,
-        textAlign: 'center',
-    },
-
-    btnConfirmar: {
-        width:        '100%',
-        padding:      '13px',
-        border:       'none',
-        borderRadius: '12px',
-        fontSize:     '15px',
-        fontWeight:   '600',
-        fontFamily:   'inherit',
-        transition:   'opacity 0.2s',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    btnCancelar: {
-        width:        '100%',
-        padding:      '11px',
-        background:   'transparent',
-        border:       '1px solid var(--cor-linha)',
-        borderRadius: '10px',
-        color:        'var(--cor-texto-3)',
-        fontSize:     '13px',
-        cursor:       'pointer',
-        fontFamily:   'inherit',
-        transition:   'all 0.15s',
-        WebkitTapHighlightColor: 'transparent',
-    },
-
-    avisoSeguranca: {
-        fontSize:  '10px',
-        color:     'var(--cor-linha-forte)',
-        margin:    0,
-        textAlign: 'center',
-    },
-};
