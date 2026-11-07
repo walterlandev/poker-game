@@ -30,6 +30,8 @@
 
 import crypto from 'crypto';
 import { creditarDeposito } from './wallet-manager.js';
+import { assinaturaWebhookValida } from './assinatura-mp.js';
+import admin from 'firebase-admin';
 
 
 // ================================================================
@@ -253,13 +255,16 @@ export function processarWebhookMP(io) {
                 return;
             }
             if (MP_WEBHOOK_SECRET) {
-                const assinaturaHeader = req.headers['x-signature'];
-                const assinaturaValida = validarAssinaturaWebhook(
-                    req.rawBody || JSON.stringify(req.body),
-                    assinaturaHeader
-                );
+                const assinaturaValida = assinaturaWebhookValida({
+                    secret:     MP_WEBHOOK_SECRET,
+                    xSignature: req.headers['x-signature'],
+                    xRequestId: req.headers['x-request-id'],
+                    dataId:     req.query?.['data.id'] ?? pagamentoId,
+                });
                 if (!assinaturaValida) {
-                    console.warn('⚠️  Webhook com assinatura inválida rejeitado.');
+                    // A reconciliação (reconciliarDepositosPendentes) ainda
+                    // confere esse pagamento direto na API em até 2 min.
+                    console.warn(`⚠️  Webhook com assinatura inválida rejeitado (pagamento ${pagamentoId}). Confira MP_WEBHOOK_SECRET.`);
                     return;
                 }
             }
@@ -295,40 +300,6 @@ export function processarWebhookMP(io) {
 // ================================================================
 
 /**
- * Valida a assinatura HMAC-SHA256 do webhook do Mercado Pago.
- * Formato do header x-signature: "ts=...,v1=..."
- */
-function validarAssinaturaWebhook(body, assinaturaHeader) {
-    if (!assinaturaHeader || !MP_WEBHOOK_SECRET) return true; // ignora se não configurado
-
-    try {
-        // Extrai o timestamp e a assinatura v1 do header
-        const partes = Object.fromEntries(
-            assinaturaHeader.split(',').map(p => p.split('='))
-        );
-        const ts  = partes['ts'];
-        const v1  = partes['v1'];
-
-        if (!ts || !v1) return false;
-
-        // Recalcula a assinatura esperada
-        const payload   = `id:;request-id:;ts:${ts};`;
-        const assinatura = crypto
-            .createHmac('sha256', MP_WEBHOOK_SECRET)
-            .update(payload)
-            .digest('hex');
-
-        // Comparação de tempo constante (evita timing attacks)
-        return crypto.timingSafeEqual(
-            Buffer.from(assinatura, 'hex'),
-            Buffer.from(v1,         'hex')
-        );
-    } catch {
-        return false;
-    }
-}
-
-/**
  * Busca os detalhes de um pagamento na API do Mercado Pago.
  */
 async function buscarPagamento(pagamentoId) {
@@ -362,4 +333,40 @@ function simularPagamentoPIX(intencaoId, totalBRL) {
         expiracaoEm:   new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min
         simulado:      true,
     };
+}
+
+// ================================================================
+// RECONCILIAÇÃO DE DEPÓSITOS (rede de segurança do webhook)
+// A cada 2 min o servidor pergunta à API do Mercado Pago sobre os
+// depósitos ainda PENDENTES das últimas 48 h. Aprovado → credita com
+// creditarDeposito (idempotente: nunca credita duas vezes). Vencido ou
+// cancelado → marca EXPIRADO. Assim um webhook perdido, recusado ou mal
+// configurado não deixa mais PIX pago sem crédito.
+// ================================================================
+const JANELA_RECONCILIACAO_MS = 48 * 60 * 60 * 1000;
+
+export async function reconciliarDepositosPendentes(io) {
+    if (MODO_DEV) return;
+    try {
+        const db   = admin.firestore();
+        const snap = await db.collection('depositos_pendentes').where('status', '==', 'PENDENTE').get();
+        const agora = Date.now();
+        for (const doc of snap.docs) {
+            const d = doc.data();
+            const criadoMs = d.criadoEm?.toMillis?.() || 0;
+            if (!d.pagamentoId || !criadoMs || agora - criadoMs > JANELA_RECONCILIACAO_MS) continue;
+
+            const pagamento = await buscarPagamento(d.pagamentoId);
+            if (!pagamento || pagamento.external_reference !== doc.id) continue;
+
+            if (pagamento.status === 'approved') {
+                console.log(`🔁 Reconciliação: pagamento ${d.pagamentoId} aprovado sem webhook — creditando ${doc.id}`);
+                await creditarDeposito(doc.id, io);
+            } else if (['cancelled', 'rejected', 'refunded', 'charged_back'].includes(pagamento.status)) {
+                await doc.ref.update({ status: 'EXPIRADO', statusMP: pagamento.status });
+            }
+        }
+    } catch (e) {
+        console.error('Erro na reconciliação de depósitos:', e.message);
+    }
 }

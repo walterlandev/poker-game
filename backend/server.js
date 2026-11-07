@@ -35,7 +35,7 @@ import {
 
 import { registrarEventosWallet, resetarLimiteDiario, minerarBlocoSeNecessario, concederBonusBoasVindas } from './wallet/wallet-manager.js';
 import { blockchain } from './wallet/blockchain.js';
-import { processarWebhookMP }                          from './wallet/mercadopago.js';
+import { processarWebhookMP, reconciliarDepositosPendentes } from './wallet/mercadopago.js';
 import { registrarEventosTemas }                       from './temas.js';
 import { registrarEventosAdmin }                       from './admin.js';
 
@@ -635,6 +635,11 @@ async function main() {
     // Mineração periódica da blockchain (a cada 20s, só se houver
     // transação pendente na mempool)
     setInterval(minerarBlocoSeNecessario, 20_000);
+
+    // Rede de segurança do PIX: confere na API do Mercado Pago os depósitos
+    // pendentes e credita os aprovados (ver reconciliarDepositosPendentes).
+    reconciliarDepositosPendentes(io);
+    setInterval(() => reconciliarDepositosPendentes(io), 2 * 60 * 1000);
 
     server.listen(PORT, () => {
         console.log(`
