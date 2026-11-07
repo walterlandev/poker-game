@@ -68,7 +68,7 @@ const FILTRO_MESAS = {
     PRIVADAS: 'privadas',
 };
 
-const SERVER_URL        = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+import { SERVER_URL } from '../../services/servidor';
 const INTERVALO_MESAS   = 10000;
 const INTERVALO_RANKING = 60000;
 

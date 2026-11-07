@@ -17,7 +17,7 @@ import Auth                                 from './pages/Auth/index';
 import Lobby                                from './pages/Lobby/index';
 import Game                                 from './pages/Game/index';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+import { SERVER_URL } from './services/servidor';
 
 const socket = io(SERVER_URL, {
     autoConnect:         false,

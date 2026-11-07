@@ -53,6 +53,9 @@ const ORIGENS_PERMITIDAS = [
     'http://localhost:5173',
     'http://localhost:5174',
     'http://localhost:3000',
+    'http://localhost:3001',                 // site servido pelo backend local
+    'https://btcpokerclub.online',           // site servido pelo próprio servidor
+    'https://www.btcpokerclub.online',
     'https://poker-game-tawny-rho.vercel.app',
     process.env.CLIENT_URL,
 ].filter(Boolean);
@@ -164,6 +167,20 @@ app.get('/jogador/:uid', async (req, res) => {
 });
 
 app.post('/webhook/mercadopago', processarWebhookMP(io));
+
+// Site (frontend já compilado) servido pelo próprio servidor, no mesmo
+// domínio: assim site e API ficam em btcpokerclub.online, sem Vercel e sem
+// CORS entre domínios. A pasta é gerada por `npm run build:site` no frontend.
+// Fica DEPOIS das rotas da API, para /mesas, /ranking etc. nunca caírem aqui.
+const PASTA_SITE = join(__dirname, 'public', 'site');
+const INDEX_SITE = join(PASTA_SITE, 'index.html');
+app.use(express.static(PASTA_SITE, { index: 'index.html' }));
+// Qualquer outro GET (ex.: recarregar a página com ?mesa=...) devolve o app
+// React, que decide a tela. /socket.io é tratado pelo Socket.io antes daqui.
+app.use((req, res, next) => {
+    if (req.method !== 'GET' || !fs.existsSync(INDEX_SITE)) return next();
+    res.sendFile(INDEX_SITE);
+});
 
 
 // ================================================================
