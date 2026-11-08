@@ -15,7 +15,8 @@ import { Server       } from 'socket.io';
 import cors             from 'cors';
 import fs               from 'fs';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname, join, resolve } from 'path';
+import os from 'os';
 import dotenv           from 'dotenv';
 import { GameManager        } from './game-manager.js';
 import { TournamentManager  } from './tournament-manager.js';
@@ -114,11 +115,23 @@ app.use(express.json());
 // já que já pagamos a hospedagem do backend mesmo.
 const __filename    = fileURLToPath(import.meta.url);
 const __dirname      = dirname(__filename);
-// Em produção, AVATARES_DIR aponta para uma pasta FORA do app (ex.:
-// /home/<usuario>/avatares-poker): a Hostinger recria a pasta do app a
-// cada deploy e apagaria as fotos. Sem a variável, usa a pasta local.
-const PASTA_AVATARES = process.env.AVATARES_DIR || join(__dirname, 'public', 'avatares');
-fs.mkdirSync(PASTA_AVATARES, { recursive: true });
+// Fotos ficam FORA da pasta do app: a Hostinger recria a pasta do app a
+// cada deploy e apagaria tudo o que estivesse dentro dela. Padrão:
+// <pasta inicial da conta>/avatares-poker. AVATARES_DIR, se definida, manda.
+// Se a hospedagem não deixar criar a pasta lá, volta para a pasta do app
+// (fotos somem no deploy, mas o servidor não deixa de subir).
+let PASTA_AVATARES = process.env.AVATARES_DIR || join(os.homedir(), 'avatares-poker');
+try {
+    fs.mkdirSync(PASTA_AVATARES, { recursive: true });
+    fs.accessSync(PASTA_AVATARES, fs.constants.W_OK);
+} catch (e) {
+    console.error(`⚠️  Pasta de avatares indisponível (${e.message}); usando a pasta do app.`);
+    PASTA_AVATARES = join(__dirname, 'public', 'avatares');
+    fs.mkdirSync(PASTA_AVATARES, { recursive: true });
+}
+// true quando a pasta não está dentro do app (sobrevive ao deploy)
+const AVATARES_PERSISTENTES = !resolve(PASTA_AVATARES).startsWith(resolve(__dirname));
+console.log(`🖼️  Avatares em ${PASTA_AVATARES} (${AVATARES_PERSISTENTES ? 'fora do app, sobrevive ao deploy' : 'dentro do app'})`);
 app.use('/avatares', express.static(PASTA_AVATARES));
 
 
@@ -132,6 +145,7 @@ app.get('/health', (req, res) => {
         uptime:  Math.floor(process.uptime()),
         mesas:   gameManager.getMesasAtivas().length,
         memoria: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+        avataresPersistentes: AVATARES_PERSISTENTES,
     });
 });
 
