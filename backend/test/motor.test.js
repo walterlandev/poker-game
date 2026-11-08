@@ -315,3 +315,28 @@ test('estado enviado aos clientes não contém a senha da mesa privada', (t) => 
     assert.equal('senha' in visto, false);
     assert.equal(JSON.stringify(visto).includes('segredo'), false);
 });
+
+// ── Bug relatado em 08/11/2026: raise do BB e todos pagam → a vez voltava ao BB ──
+test('BB dá raise no pré-flop e todos pagam: abre o flop (a vez não volta ao BB)', (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { gm, mesaId, mesa } = montarMesa([1000, 1000, 1000]);
+    gm.iniciarRodada(mesaId);
+    const bb = mesa.bbId;
+    // todos pagam o blind até o BB
+    while (mesa.turno !== bb) agir(gm, mesaId, mesa.turno, 'CALL');
+    agir(gm, mesaId, bb, 'RAISE', 80);
+    // os outros pagam o raise
+    while (mesa.turno !== bb && mesa.fase === 'PRE-FLOP') agir(gm, mesaId, mesa.turno, 'CALL');
+    assert.equal(mesa.fase, 'FLOP');
+    assert.notEqual(mesa.turno, null);
+});
+
+test('jogador comum dá raise no pré-flop e todos pagam: abre o flop', (t) => {
+    t.mock.timers.enable(TIMERS);
+    const { gm, mesaId, mesa } = montarMesa([1000, 1000, 1000]);
+    gm.iniciarRodada(mesaId);
+    const quemRaise = mesa.turno;
+    agir(gm, mesaId, quemRaise, 'RAISE', 80);
+    while (mesa.turno !== quemRaise && mesa.fase === 'PRE-FLOP') agir(gm, mesaId, mesa.turno, 'CALL');
+    assert.equal(mesa.fase, 'FLOP');
+});

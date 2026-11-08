@@ -1007,9 +1007,13 @@ export class GameManager {
             // Chegou de volta ao agressor (ou BB no pré-flop)
             if (uid === aggressor) {
                 // Opção do Big Blind (Walk): BB pode agir mesmo tendo "igualado" o próprio blind
+                // Só se o BB ainda NÃO agiu nesta rua (nivelAoAgir começa null;
+                // o blind não conta). Antes a condição era "ap >= bigBlind", que
+                // também vale depois de um RAISE do próprio BB: todos pagavam e
+                // a vez voltava ao BB em vez de abrir o flop (bug de 08/11/2026).
                 const bbPodeAgir = mesa.fase === 'PRE-FLOP'
                     && uid === mesa.bbId
-                    && ap >= mesa.bigBlind          // BB só colocou o blind, não fez raise
+                    && j.nivelAoAgir == null        // BB só colocou o blind, ainda não agiu
                     && uidAtual !== mesa.bbId;      // ainda não foi a vez do BB
                 if (bbPodeAgir) return uid;
 
