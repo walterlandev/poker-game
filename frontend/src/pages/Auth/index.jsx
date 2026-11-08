@@ -28,6 +28,7 @@ import { useState } from 'react';
 import Login    from './Login';
 import Cadastro from './Cadastro';
 import CriarPin from './CriarPin';
+import FichaBTC from '../../components/FichaBTC';
 
 
 export default function Auth({ onAutenticado, socket, usuarioSemPin = null }) {
@@ -63,13 +64,13 @@ export default function Auth({ onAutenticado, socket, usuarioSemPin = null }) {
         <div className="auth">
 
             {/* ---- Marca (painel de feltro no desktop, faixa no celular) ---- */}
-            <aside className="auth-marca" aria-label="Bitchager">
+            <aside className="auth-marca" aria-label="BTC Poker Club">
                 <div className="marca" translate="no">
                     <span className="marca-selo num" aria-hidden="true">₿C</span>
-                    <span className="marca-nome">Bitchager</span>
+                    <span className="marca-nome">BTC Poker Club</span>
                 </div>
-                <p className="auth-lema">Texas Hold’em com ₿C, de mesa em mesa.</p>
-                <div className="auth-mesa" aria-hidden="true"><span /></div>
+                <p className="auth-lema">Poker online com ₿C. Mesas ao vivo, torneios e PIX na carteira.</p>
+                <FichaBTC className="auth-ficha" />
             </aside>
 
             <main className="auth-conteudo">

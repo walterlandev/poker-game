@@ -13,7 +13,7 @@
      → todo o resto (API, socket.io, avatares): direto na rede
 ================================================================ */
 
-const VERSAO = '1794093985466';
+const VERSAO = '1794135301402';
 const CACHE  = `bitchager-${VERSAO}`;
 
 self.addEventListener('install', (e) => {

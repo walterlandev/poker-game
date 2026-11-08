@@ -1246,7 +1246,10 @@ button.config-item:hover { background: var(--cor-superficie-2); }
 .auth-marca .marca-selo { width: 36px; height: 36px; font-size: 14px; border-radius: 10px; }
 .auth-marca .marca-nome { font-size: var(--t-23); }
 .auth-lema { margin: 4px 0 0; font-size: var(--t-14); color: var(--cor-texto-2); }
-.auth-mesa { display: none; }
+.auth-marca { position: relative; }
+/* Ficha ₿ (components/FichaBTC.jsx): pequena no topo no celular */
+.auth-ficha { position: absolute; right: var(--s-4); top: var(--s-4); width: 76px; height: 76px; }
+.auth-lema { padding-right: 92px; }
 .auth-conteudo { flex: 1; display: flex; flex-direction: column; align-items: stretch; padding: var(--s-4); gap: var(--s-3); }
 .auth-cartao {
     width: 100%; max-width: 440px; padding: var(--s-5) var(--s-4); border-radius: var(--r-folha);
@@ -1290,17 +1293,14 @@ button.config-item:hover { background: var(--cor-superficie-2); }
     .auth { flex-direction: row; }
     .auth-marca {
         position: relative; width: 44%; max-width: 620px; padding: var(--s-7); justify-content: flex-start; overflow: hidden;
-        background: var(--ruido), radial-gradient(90% 80% at 40% 35%, var(--cor-feltro-brilho) 0%, var(--cor-feltro) 50%, var(--cor-feltro-fundo) 100%);
-        color: var(--cor-feltro-texto);
+        /* Grafite da identidade BTC Poker Club (mesma da imagem de compartilhamento) */
+        background: #141517;
+        color: #f1ece4;
     }
-    .auth-marca .marca-nome { font-size: var(--t-40); color: var(--cor-feltro-texto); }
-    .auth-marca .marca-selo { width: 52px; height: 52px; font-size: 20px; border-radius: 12px; background: var(--cor-feltro-fundo); }
-    .auth-lema { font-size: var(--t-19); color: var(--cor-feltro-texto-2); max-width: 22ch; line-height: 1.35; margin-top: var(--s-3); }
-    .auth-mesa {
-        display: block; position: absolute; right: -30%; bottom: -12%; width: 100%; aspect-ratio: 1.75 / 1; border-radius: 999px;
-        border: 14px solid var(--cor-trilho-2); box-shadow: inset 0 0 0 4px var(--cor-trilho-1), var(--sombra-mesa);
-    }
-    .auth-mesa span { position: absolute; inset: 8px; border-radius: 999px; border: 1.5px dashed var(--cor-costura); }
+    .auth-marca .marca-nome { font-size: var(--t-40); color: #f1ece4; }
+    .auth-marca .marca-selo { width: 52px; height: 52px; font-size: 20px; border-radius: 12px; background: #1b1612; }
+    .auth-lema { font-size: var(--t-19); color: #c9c2b6; max-width: 24ch; line-height: 1.35; margin-top: var(--s-3); padding-right: 0; }
+    .auth-ficha { top: auto; right: 6%; bottom: 7%; width: 72%; max-width: 520px; height: auto; aspect-ratio: 1; }
     .auth-conteudo { padding: var(--s-7); }
 }
 
